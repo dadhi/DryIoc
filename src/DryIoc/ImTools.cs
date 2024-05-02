@@ -25,4561 +25,4583 @@ THE SOFTWARE.
 
 // ReSharper disable once InconsistentNaming
 
-namespace DryIoc.ImTools
+namespace DryIoc.ImTools;
+
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Diagnostics;
+using System.Runtime.CompilerServices; // For [MethodImpl(AggressiveInlining)]
+
+/// <summary>General purpose Match operator</summary>
+public delegate bool MatchOp<S, T, R>(ref S state, ref T it, out R result);
+
+/// <summary>General purpose Is operator</summary>
+public delegate bool IsOp<S, T>(ref S state, ref T it);
+
+/// <summary>General purpose Map operator</summary>
+public delegate R MapOp<S, T, R>(ref S state, ref T it);
+
+/// <summary>Helpers for functional composition</summary>
+public static class Fun
 {
-    using System;
-    using System.Collections;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Text;
-    using System.Threading;
-    using System.Diagnostics;
-    using System.Runtime.CompilerServices; // For [MethodImpl(AggressiveInlining)]
+    /// <summary>Always a true condition.</summary> 
+    public static bool Always<T>(T _) => true;
 
-    /// <summary>General purpose Match operator</summary>
-    public delegate bool MatchOp<S, T, R>(ref S state, ref T it, out R result);
+    /// <summary>Identity function returning passed argument as result.</summary> 
+    public static T Id<T>(T x) => x;
 
-    /// <summary>General purpose Is operator</summary>
-    public delegate bool IsOp<S, T>(ref S state, ref T it);
+    /// <summary>Forward pipe operator (`|>` in F#)</summary> 
+    public static R To<T, R>(this T x, Func<T, R> map) => map(x);
 
-    /// <summary>General purpose Map operator</summary>
-    public delegate R MapOp<S, T, R>(ref S state, ref T it);
+    /// <summary>Forward pipe operator (`|>` in F#) with the additional state A for two arguments function</summary> 
+    public static R To<T, S, R>(this T x, S state, Func<T, S, R> map) => map(x, state);
 
-    /// <summary>Helpers for functional composition</summary>
-    public static class Fun
+    /// <summary>Cast to the R type with the forward pipe operator (`|>` in F#)</summary> 
+    public static R To<R>(this object x) => (R)x;
+
+    /// <summary>Forward pipe operator (`|>` in F#) but with side effect propagating the original `x` value</summary> 
+    public static T Do<T>(this T x, Action<T> effect)
     {
-        /// <summary>Always a true condition.</summary> 
-        public static bool Always<T>(T _) => true;
-
-        /// <summary>Identity function returning passed argument as result.</summary> 
-        public static T Id<T>(T x) => x;
-
-        /// <summary>Forward pipe operator (`|>` in F#)</summary> 
-        public static R To<T, R>(this T x, Func<T, R> map) => map(x);
-
-        /// <summary>Forward pipe operator (`|>` in F#) with the additional state A for two arguments function</summary> 
-        public static R To<T, S, R>(this T x, S state, Func<T, S, R> map) => map(x, state);
-
-        /// <summary>Cast to the R type with the forward pipe operator (`|>` in F#)</summary> 
-        public static R To<R>(this object x) => (R)x;
-
-        /// <summary>Forward pipe operator (`|>` in F#) but with side effect propagating the original `x` value</summary> 
-        public static T Do<T>(this T x, Action<T> effect)
-        {
-            effect(x);
-            return x;
-        }
-
-        /// <summary>Forward pipe operator (`|>` in F#) but with side effect propagating the original `x` value and the state object</summary> 
-        public static T Do<T, S>(this T x, S state, Action<T, S> effect)
-        {
-            effect(x, state);
-            return x;
-        }
-
-        /// <summary>Lifts argument to Func without allocations ignoring the first argument.
-        /// For example if you have `Func{T, R} = _ => instance`,
-        /// you may rewrite it without allocations as `instance.ToFunc{A, R}`</summary> 
-        public static R ToFunc<T, R>(this R result, T ignoredArg) => result;
-
-        /// <summary>Performant swapper</summary>
-        [MethodImpl(256)]
-        public static void Swap<T>(ref T a, ref T b)
-        {
-            var t = a;
-            a = b;
-            b = t;
-        }
+        effect(x);
+        return x;
     }
 
-    /// <summary>Helpers for lazy instantiations</summary>
-    public static class Lazy
+    /// <summary>Forward pipe operator (`|>` in F#) but with side effect propagating the original `x` value and the state object</summary> 
+    public static T Do<T, S>(this T x, S state, Action<T, S> effect)
     {
-        /// <summary>Provides result type inference for creation of lazy.</summary>
-        public static Lazy<T> Of<T>(Func<T> valueFactory) => new Lazy<T>(valueFactory);
+        effect(x, state);
+        return x;
     }
 
-    /// <summary>Just a helper state with the number of mutable fields with the nice names ;) Maybe used together with Fold or other methods required state</summary>
-    public sealed class St<A>
+    /// <summary>Lifts argument to Func without allocations ignoring the first argument.
+    /// For example if you have `Func{T, R} = _ => instance`,
+    /// you may rewrite it without allocations as `instance.ToFunc{A, R}`</summary> 
+    public static R ToFunc<T, R>(this R result, T ignoredArg) => result;
+
+    /// <summary>Performant swapper</summary>
+    [MethodImpl(256)]
+    public static void Swap<T>(ref T a, ref T b)
     {
-        /// <summary>A</summary>
-        public A a;
+        var t = a;
+        a = b;
+        b = t;
+    }
+}
 
-        /// <summary>Puts the pooled instance back replacing the old one</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public void Pool() => Pooled = this;
+/// <summary>Helpers for lazy instantiations</summary>
+public static class Lazy
+{
+    /// <summary>Provides result type inference for creation of lazy.</summary>
+    public static Lazy<T> Of<T>(Func<T> valueFactory) => new Lazy<T>(valueFactory);
+}
 
-        /// <summary>Puts the pooled instance back replacing the old one</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public void Reset()
-        {
-            a = default;
-            Pooled = this; // we don't need to do the atomic update here because we don't care what instance is ended up to be pooled
-        }
+/// <summary>Just a helper state with the number of mutable fields with the nice names ;) Maybe used together with Fold or other methods required state</summary>
+public sealed class St<A>
+{
+    /// <summary>A</summary>
+    public A a;
 
-        /// <summary>Puts the pooled instance back replacing the old one</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public A ResetButGetA()
-        {
-            var a1 = a;
-            a = default;
-            Pooled = this; // we don't need to do the atomic update here because we don't care what instance is ended up to be pooled
-            return a1;
-        }
+    /// <summary>Puts the pooled instance back replacing the old one</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public void Pool() => Pooled = this;
 
-        internal static St<A> Pooled;
+    /// <summary>Puts the pooled instance back replacing the old one</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public void Reset()
+    {
+        a = default;
+        Pooled = this; // we don't need to do the atomic update here because we don't care what instance is ended up to be pooled
     }
 
-    /// <summary>Just a helper state with the number of mutable fields with the nice names ;) Maybe used together with Fold or other methods required state</summary>
-    public sealed class St<A, B>
+    /// <summary>Puts the pooled instance back replacing the old one</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public A ResetButGetA()
     {
-        /// <summary>A</summary>
-        public A a;
-        /// <summary>B</summary>
-        public B b;
-
-        /// <summary>Puts the pooled instance back replacing the old one</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public St<A, B> Pool() => Pooled = this;
-
-        /// <summary>Puts the pooled instance back replacing the old one</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public void Reset()
-        {
-            a = default;
-            b = default;
-            Pooled = this; // we don't need to do the atomic update here because we don't care what instance is ended up to be pooled
-        }
-
-        /// <summary>Puts the pooled instance back replacing the old one</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public A ResetButGetA()
-        {
-            var a1 = a;
-            a = default;
-            b = default;
-            Pooled = this; // we don't need to do the atomic update here because we don't care what instance is ended up to be pooled
-            return a1;
-        }
-
-        /// <summary>Puts the pooled instance back replacing the old one</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public B ResetButGetB()
-        {
-            var b1 = b;
-            a = default;
-            b = default;
-            Pooled = this; // we don't need to do the atomic update here because we don't care what instance is ended up to be pooled
-            return b1;
-        }
-
-        internal static St<A, B> Pooled;
+        var a1 = a;
+        a = default;
+        Pooled = this; // we don't need to do the atomic update here because we don't care what instance is ended up to be pooled
+        return a1;
     }
 
-    /// <summary>State factory and helper methods</summary>
-    public static class St
+    internal static St<A> Pooled;
+}
+
+/// <summary>Just a helper state with the number of mutable fields with the nice names ;) Maybe used together with Fold or other methods required state</summary>
+public sealed class St<A, B>
+{
+    /// <summary>A</summary>
+    public A a;
+    /// <summary>B</summary>
+    public B b;
+
+    /// <summary>Puts the pooled instance back replacing the old one</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public St<A, B> Pool() => Pooled = this;
+
+    /// <summary>Puts the pooled instance back replacing the old one</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public void Reset()
     {
-        /// <summary>Creates the state out of the passed arguments</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static St<A> Of<A>(A a) => new St<A> { a = a };
-
-        /// <summary>Atomically pops the pooled instance (if exist) or creates the new one and sets the fields to the passed arguments</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static St<A> Rent<A>(A a)
-        {
-            var st = Interlocked.Exchange(ref St<A>.Pooled, null) ?? new St<A>();
-            st.a = a;
-            return st;
-        }
-
-        /// <summary>Creates the state out of the passed arguments</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static St<A, B> Of<A, B>(A a, B b) => new St<A, B> { a = a, b = b };
-
-        /// <summary>Atomically pops the pooled instance (if exist) or creates the new one and sets the fields to the passed arguments</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static St<A, B> Rent<A, B>(A a, B b)
-        {
-            var st = Interlocked.Exchange(ref St<A, B>.Pooled, null) ?? new St<A, B>();
-            st.a = a; st.b = b;
-            return st;
-        }
+        a = default;
+        b = default;
+        Pooled = this; // we don't need to do the atomic update here because we don't care what instance is ended up to be pooled
     }
 
-    // todo: @perf add 2, 4 heads on stack
-    /// <summary>Stack with the Head on Stack and the rest on Heap</summary>
-    public struct SmallStack<T>
+    /// <summary>Puts the pooled instance back replacing the old one</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public A ResetButGetA()
     {
-        /// <summary>The payload value</summary>
+        var a1 = a;
+        a = default;
+        b = default;
+        Pooled = this; // we don't need to do the atomic update here because we don't care what instance is ended up to be pooled
+        return a1;
+    }
+
+    /// <summary>Puts the pooled instance back replacing the old one</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public B ResetButGetB()
+    {
+        var b1 = b;
+        a = default;
+        b = default;
+        Pooled = this; // we don't need to do the atomic update here because we don't care what instance is ended up to be pooled
+        return b1;
+    }
+
+    internal static St<A, B> Pooled;
+}
+
+/// <summary>State factory and helper methods</summary>
+public static class St
+{
+    /// <summary>Creates the state out of the passed arguments</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static St<A> Of<A>(A a) => new St<A> { a = a };
+
+    /// <summary>Atomically pops the pooled instance (if exist) or creates the new one and sets the fields to the passed arguments</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static St<A> Rent<A>(A a)
+    {
+        var st = Interlocked.Exchange(ref St<A>.Pooled, null) ?? new St<A>();
+        st.a = a;
+        return st;
+    }
+
+    /// <summary>Creates the state out of the passed arguments</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static St<A, B> Of<A, B>(A a, B b) => new St<A, B> { a = a, b = b };
+
+    /// <summary>Atomically pops the pooled instance (if exist) or creates the new one and sets the fields to the passed arguments</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static St<A, B> Rent<A, B>(A a, B b)
+    {
+        var st = Interlocked.Exchange(ref St<A, B>.Pooled, null) ?? new St<A, B>();
+        st.a = a; st.b = b;
+        return st;
+    }
+}
+
+// todo: @perf add 2, 4 heads on stack
+/// <summary>Stack with the Head on Stack and the rest on Heap</summary>
+public struct SmallStack<T>
+{
+    /// <summary>The payload value</summary>
+    public T Value;
+
+    private Tail _tail;
+    internal SmallStack(Tail tail, T value)
+    {
+        _tail = tail;
+        Value = value;
+    }
+
+    /// <summary>Pushes the new value to stack</summary>
+    public SmallStack<T> Push(in T value) => new SmallStack<T>(new Tail(_tail, Value), value);
+
+    internal sealed class Tail
+    {
         public T Value;
-
         private Tail _tail;
-        internal SmallStack(Tail tail, T value)
+        public Tail(Tail tail, T value)
         {
             _tail = tail;
             Value = value;
         }
+    }
+}
 
-        /// <summary>Pushes the new value to stack</summary>
-        public SmallStack<T> Push(in T value) => new SmallStack<T>(new Tail(_tail, Value), value);
 
-        internal sealed class Tail
-        {
-            public T Value;
-            private Tail _tail;
-            public Tail(Tail tail, T value)
-            {
-                _tail = tail;
-                Value = value;
-            }
-        }
+/// <summary>Methods to work with immutable arrays and some sugar.</summary>
+public static class ArrayTools
+{
+    private static class EmptyArray<T>
+    {
+        public static readonly T[] Value = new T[0];
     }
 
+    /// <summary>Returns singleton empty array of provided type.</summary> 
+    /// <typeparam name="T">Array item type.</typeparam> <returns>Empty array.</returns>
+    public static T[] Empty<T>() => EmptyArray<T>.Value;
 
-    /// <summary>Methods to work with immutable arrays and some sugar.</summary>
-    public static class ArrayTools
+    /// <summary>Wraps item in array.</summary>
+    public static T[] One<T>(this T one) => new[] { one };
+
+    /// <summary>Returns true if array is null or have no items.</summary> <typeparam name="T">Type of array item.</typeparam>
+    /// <param name="source">Source array to check.</param> <returns>True if null or has no items, false otherwise.</returns>
+    public static bool IsNullOrEmpty<T>(this T[] source) => source == null || source.Length == 0;
+
+    /// <summary>Returns empty array instead of null, or source array otherwise.</summary> <typeparam name="T">Type of array item.</typeparam>
+    public static T[] EmptyIfNull<T>(this T[] source) => source ?? Empty<T>();
+
+    /// Returns source enumerable if it is array, otherwise converts source to array or an empty array if null.
+    public static T[] ToArrayOrSelf<T>(this IEnumerable<T> source) =>
+        source == null ? Empty<T>() : (source as T[] ?? source.ToArray());
+
+    /// Returns source enumerable if it is list, otherwise converts source to IList or an empty array if null.
+    public static IList<T> ToListOrSelf<T>(this IEnumerable<T> source) =>
+        source == null ? Empty<T>() : source as IList<T> ?? source.ToList();
+
+    /// <summary>Array copy</summary>
+    public static T[] Copy<T>(this T[] source)
     {
-        private static class EmptyArray<T>
-        {
-            public static readonly T[] Value = new T[0];
-        }
+        if (source == null || source.Length == 0)
+            return source;
+        var copy = new T[source.Length];
+        Array.Copy(source, 0, copy, 0, source.Length);
+        return copy;
+    }
 
-        /// <summary>Returns singleton empty array of provided type.</summary> 
-        /// <typeparam name="T">Array item type.</typeparam> <returns>Empty array.</returns>
-        public static T[] Empty<T>() => EmptyArray<T>.Value;
+    /// <summary>Array copy without checking the items for the null or the emptiness</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static T[] CopyNonEmpty<T>(this T[] source)
+    {
+        var copy = new T[source.Length];
+        Array.Copy(source, copy, source.Length);
+        return copy;
+    }
 
-        /// <summary>Wraps item in array.</summary>
-        public static T[] One<T>(this T one) => new[] { one };
+    /// <summary>Returns the new array consisting from all items from source array then the all items from added array.
+    /// If source is null or empty then the added array will be returned. If added is null or empty then the source will be returned.</summary>
+    public static T[] Append<T>(this T[] source, params T[] added)
+    {
+        if (added == null || added.Length == 0)
+            return source;
+        if (source == null || source.Length == 0)
+            return added;
+        var sourceCount = source.Length;
+        var addedCount = added.Length;
+        var result = new T[sourceCount + addedCount];
+        if (sourceCount < 6)
+            for (var i = 0; i < sourceCount; ++i)
+                result[i] = source[i];
+        else
+            Array.Copy(source, 0, result, 0, sourceCount);
+        if (addedCount < 6)
+            for (var i = 0; i < addedCount; ++i)
+                result[sourceCount + i] = added[i];
+        else
+            Array.Copy(added, 0, result, sourceCount, addedCount);
+        return result;
+    }
 
-        /// <summary>Returns true if array is null or have no items.</summary> <typeparam name="T">Type of array item.</typeparam>
-        /// <param name="source">Source array to check.</param> <returns>True if null or has no items, false otherwise.</returns>
-        public static bool IsNullOrEmpty<T>(this T[] source) => source == null || source.Length == 0;
+    /// <summary>Performant concat of enumerables in case of arrays. But performance will degrade if you use Concat().Where().</summary>
+    public static T[] Append<T>(this IEnumerable<T> source, IEnumerable<T> other) =>
+        source.ToArrayOrSelf().Append(other.ToArrayOrSelf());
 
-        /// <summary>Returns empty array instead of null, or source array otherwise.</summary> <typeparam name="T">Type of array item.</typeparam>
-        public static T[] EmptyIfNull<T>(this T[] source) => source ?? Empty<T>();
+    /// <summary>Returns new array with <paramref name="value"/> appended, 
+    /// or <paramref name="value"/> at <paramref name="index"/>, if specified.
+    /// If source array could be null or empty, then single value item array will be created despite any index.</summary>
+    public static T[] AppendOrUpdate<T>(this T[] source, T value, int index = -1)
+    {
+        if (source == null || source.Length == 0)
+            return new[] { value };
+        var sourceCount = source.Length;
+        index = index < 0 ? sourceCount : index;
+        var result = new T[index < sourceCount ? sourceCount : sourceCount + 1];
+        if (sourceCount < 6)
+            for (var i = 0; i < sourceCount; ++i)
+                result[i] = source[i];
+        else
+            Array.Copy(source, 0, result, 0, sourceCount);
+        result[index] = value;
+        return result;
+    }
 
-        /// Returns source enumerable if it is array, otherwise converts source to array or an empty array if null.
-        public static T[] ToArrayOrSelf<T>(this IEnumerable<T> source) =>
-            source == null ? Empty<T>() : (source as T[] ?? source.ToArray());
+    /// <summary>Updates the item in the copy of the array. The array should be non-empty.</summary>
+    public static T[] UpdateNonEmpty<T>(this T[] source, T value, int index)
+    {
+        var sourceCount = source.Length;
+        var result = new T[sourceCount];
+        if (sourceCount < 6)
+            for (var i = 0; i < sourceCount; ++i)
+                result[i] = source[i];
+        else
+            Array.Copy(source, 0, result, 0, sourceCount);
+        result[index] = value;
+        return result;
+    }
 
-        /// Returns source enumerable if it is list, otherwise converts source to IList or an empty array if null.
-        public static IList<T> ToListOrSelf<T>(this IEnumerable<T> source) =>
-            source == null ? Empty<T>() : source as IList<T> ?? source.ToList();
+    /// <summary>Returns the new array consisting from all items from source array then the all items from added array.
+    /// Assumes that both arrays are non-empty to avoid the checks.</summary>
+    public static T[] AppendNonEmpty<T>(this T[] source, params T[] added)
+    {
+        var sourceCount = source.Length;
+        var addedCount = added.Length;
+        var result = new T[sourceCount + addedCount];
+        if (sourceCount < 6)
+            for (var i = 0; i < sourceCount; ++i)
+                result[i] = source[i];
+        else
+            Array.Copy(source, 0, result, 0, sourceCount);
+        if (addedCount < 6)
+            for (var i = 0; i < addedCount; ++i)
+                result[sourceCount + i] = added[i];
+        else
+            Array.Copy(added, 0, result, sourceCount, addedCount);
+        return result;
+    }
 
-        /// <summary>Array copy</summary>
-        public static T[] Copy<T>(this T[] source)
-        {
-            if (source == null || source.Length == 0)
-                return source;
-            var copy = new T[source.Length];
-            Array.Copy(source, 0, copy, 0, source.Length);
-            return copy;
-        }
+    /// <summary>Returns the new array consisting from all items from source array plus the value.</summary>
+    public static T[] Append<T>(this T[] source, T value)
+    {
+        if (source == null || source.Length == 0)
+            return new T[] { value };
+        var sourceCount = source.Length;
+        var result = new T[sourceCount + 1];
+        if (sourceCount < 6)
+            for (var i = 0; i < sourceCount; ++i)
+                result[i] = source[i];
+        else
+            Array.Copy(source, 0, result, 0, sourceCount);
+        result[sourceCount] = value;
+        return result;
+    }
 
-        /// <summary>Array copy without checking the items for the null or the emptiness</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static T[] CopyNonEmpty<T>(this T[] source)
-        {
-            var copy = new T[source.Length];
-            Array.Copy(source, copy, source.Length);
-            return copy;
-        }
+    /// <summary>Returns new array with <paramref name="value"/> appended. Assumes that `source` is not empty to avoid the checks.</summary>
+    public static T[] AppendToNonEmpty<T>(this T[] source, T value)
+    {
+        var sourceCount = source.Length;
+        var result = new T[sourceCount + 1];
+        if (sourceCount < 6)
+            for (var i = 0; i < sourceCount; ++i)
+                result[i] = source[i];
+        else
+            Array.Copy(source, 0, result, 0, sourceCount);
+        result[sourceCount] = value;
+        return result;
+    }
 
-        /// <summary>Returns the new array consisting from all items from source array then the all items from added array.
-        /// If source is null or empty then the added array will be returned. If added is null or empty then the source will be returned.</summary>
-        public static T[] Append<T>(this T[] source, params T[] added)
-        {
-            if (added == null || added.Length == 0)
-                return source;
-            if (source == null || source.Length == 0)
-                return added;
-            var sourceCount = source.Length;
-            var addedCount = added.Length;
-            var result = new T[sourceCount + addedCount];
-            if (sourceCount < 6)
-                for (var i = 0; i < sourceCount; ++i)
-                    result[i] = source[i];
-            else
-                Array.Copy(source, 0, result, 0, sourceCount);
-            if (addedCount < 6)
-                for (var i = 0; i < addedCount; ++i)
-                    result[sourceCount + i] = added[i];
-            else
-                Array.Copy(added, 0, result, sourceCount, addedCount);
-            return result;
-        }
+    /// <summary>Returns new array with <paramref name="value"/> prepended. Assumes that `source` is not empty to avoid the checks.</summary>
+    public static T[] PrependToNonEmpty<T>(this T[] source, T value)
+    {
+        var sourceCount = source.Length;
+        var result = new T[sourceCount + 1];
+        if (sourceCount < 6)
+            for (var i = 0; i < sourceCount; ++i)
+                result[i + 1] = source[i];
+        else
+            Array.Copy(source, 0, result, 1, sourceCount);
+        result[0] = value;
+        return result;
+    }
 
-        /// <summary>Performant concat of enumerables in case of arrays. But performance will degrade if you use Concat().Where().</summary>
-        public static T[] Append<T>(this IEnumerable<T> source, IEnumerable<T> other) =>
-            source.ToArrayOrSelf().Append(other.ToArrayOrSelf());
+    /// <summary>Calls predicate on each item in <paramref name="source"/> array until predicate returns true,
+    /// then method will return this item index, or if predicate returns false for each item, method will return -1.</summary>
+    public static int IndexOf<T>(this T[] source, Func<T, bool> predicate)
+    {
+        if (source != null && source.Length != 0)
+            for (var i = 0; i < source.Length; ++i)
+                if (predicate(source[i]))
+                    return i;
+        return -1;
+    }
 
-        /// <summary>Returns new array with <paramref name="value"/> appended, 
-        /// or <paramref name="value"/> at <paramref name="index"/>, if specified.
-        /// If source array could be null or empty, then single value item array will be created despite any index.</summary>
-        public static T[] AppendOrUpdate<T>(this T[] source, T value, int index = -1)
-        {
-            if (source == null || source.Length == 0)
-                return new[] { value };
-            var sourceCount = source.Length;
-            index = index < 0 ? sourceCount : index;
-            var result = new T[index < sourceCount ? sourceCount : sourceCount + 1];
-            if (sourceCount < 6)
-                for (var i = 0; i < sourceCount; ++i)
-                    result[i] = source[i];
-            else
-                Array.Copy(source, 0, result, 0, sourceCount);
-            result[index] = value;
-            return result;
-        }
+    /// <summary>Minimizes the allocations for closure in predicate lambda with the provided <paramref name="state"/></summary>
+    public static int IndexOf<T, S>(this T[] source, S state, Func<S, T, bool> predicate)
+    {
+        if (source != null && source.Length != 0)
+            for (var i = 0; i < source.Length; ++i)
+                if (predicate(state, source[i]))
+                    return i;
+        return -1;
+    }
 
-        /// <summary>Updates the item in the copy of the array. The array should be non-empty.</summary>
-        public static T[] UpdateNonEmpty<T>(this T[] source, T value, int index)
-        {
-            var sourceCount = source.Length;
-            var result = new T[sourceCount];
-            if (sourceCount < 6)
-                for (var i = 0; i < sourceCount; ++i)
-                    result[i] = source[i];
-            else
-                Array.Copy(source, 0, result, 0, sourceCount);
-            result[index] = value;
-            return result;
-        }
-
-        /// <summary>Returns the new array consisting from all items from source array then the all items from added array.
-        /// Assumes that both arrays are non-empty to avoid the checks.</summary>
-        public static T[] AppendNonEmpty<T>(this T[] source, params T[] added)
-        {
-            var sourceCount = source.Length;
-            var addedCount = added.Length;
-            var result = new T[sourceCount + addedCount];
-            if (sourceCount < 6)
-                for (var i = 0; i < sourceCount; ++i)
-                    result[i] = source[i];
-            else
-                Array.Copy(source, 0, result, 0, sourceCount);
-            if (addedCount < 6)
-                for (var i = 0; i < addedCount; ++i)
-                    result[sourceCount + i] = added[i];
-            else
-                Array.Copy(added, 0, result, sourceCount, addedCount);
-            return result;
-        }
-
-        /// <summary>Returns the new array consisting from all items from source array plus the value.</summary>
-        public static T[] Append<T>(this T[] source, T value)
-        {
-            if (source == null || source.Length == 0)
-                return new T[] { value };
-            var sourceCount = source.Length;
-            var result = new T[sourceCount + 1];
-            if (sourceCount < 6)
-                for (var i = 0; i < sourceCount; ++i)
-                    result[i] = source[i];
-            else
-                Array.Copy(source, 0, result, 0, sourceCount);
-            result[sourceCount] = value;
-            return result;
-        }
-
-        /// <summary>Returns new array with <paramref name="value"/> appended. Assumes that `source` is not empty to avoid the checks.</summary>
-        public static T[] AppendToNonEmpty<T>(this T[] source, T value)
-        {
-            var sourceCount = source.Length;
-            var result = new T[sourceCount + 1];
-            if (sourceCount < 6)
-                for (var i = 0; i < sourceCount; ++i)
-                    result[i] = source[i];
-            else
-                Array.Copy(source, 0, result, 0, sourceCount);
-            result[sourceCount] = value;
-            return result;
-        }
-
-        /// <summary>Returns new array with <paramref name="value"/> prepended. Assumes that `source` is not empty to avoid the checks.</summary>
-        public static T[] PrependToNonEmpty<T>(this T[] source, T value)
-        {
-            var sourceCount = source.Length;
-            var result = new T[sourceCount + 1];
-            if (sourceCount < 6)
-                for (var i = 0; i < sourceCount; ++i)
-                    result[i + 1] = source[i];
-            else
-                Array.Copy(source, 0, result, 1, sourceCount);
-            result[0] = value;
-            return result;
-        }
-
-        /// <summary>Calls predicate on each item in <paramref name="source"/> array until predicate returns true,
-        /// then method will return this item index, or if predicate returns false for each item, method will return -1.</summary>
-        public static int IndexOf<T>(this T[] source, Func<T, bool> predicate)
-        {
-            if (source != null && source.Length != 0)
-                for (var i = 0; i < source.Length; ++i)
-                    if (predicate(source[i]))
-                        return i;
-            return -1;
-        }
-
-        /// <summary>Minimizes the allocations for closure in predicate lambda with the provided <paramref name="state"/></summary>
-        public static int IndexOf<T, S>(this T[] source, S state, Func<S, T, bool> predicate)
-        {
-            if (source != null && source.Length != 0)
-                for (var i = 0; i < source.Length; ++i)
-                    if (predicate(state, source[i]))
-                        return i;
-            return -1;
-        }
-
-        /// <summary>Looks up for item in source array equal to provided value, and returns its index, or -1 if not found.</summary>
-        public static int IndexOf<T>(this T[] source, T value)
-        {
-            if (source != null && source.Length != 0)
-                for (var i = 0; i < source.Length; ++i)
-                {
-                    var item = source[i];
-                    if (Equals(item, value))
-                        return i;
-                }
-
-            return -1;
-        }
-
-        /// <summary>The same as `IndexOf` but searching for the item by reference</summary>
-        public static int IndexOfReference<T>(this T[] source, T reference) where T : class
-        {
-            if (source != null && source.Length != 0)
-                for (var i = 0; i < source.Length; ++i)
-                    if (ReferenceEquals(source[i], reference))
-                        return i;
-            return -1;
-        }
-
-        /// <summary>Produces new array without item at specified <paramref name="index"/>.</summary>
-        public static T[] RemoveAtSurePresent<T>(this T[] source, int index)
-        {
-            if (index == 0 && source.Length == 1)
-                return Empty<T>();
-            var result = new T[source.Length - 1];
-            if (index != 0)
-                Array.Copy(source, 0, result, 0, index);
-            if (index != result.Length)
-                Array.Copy(source, index + 1, result, index, result.Length - index);
-            return result;
-        }
-
-        /// <summary>Produces new array without item at specified <paramref name="index"/>. 
-        /// Will return <paramref name="source"/> array if index is out of bounds, or source is null/empty.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static T[] RemoveAt<T>(this T[] source, int index) =>
-            source == null || source.Length == 0 || index < 0 || index >= source.Length ? source : RemoveAtSurePresent(source, index);
-
-        /// <summary>Looks for item in array using equality comparison, and returns new array with found item remove, or original array if not item found.</summary>
-        public static T[] Remove<T>(this T[] source, T value) =>
-            source.RemoveAt(source.IndexOf(value));
-
-        /// <summary>Returns first item matching the <paramref name="predicate"/>, or default item value.</summary>
-        public static T FindFirst<T>(this T[] source, Func<T, bool> predicate)
-        {
-            if (source != null)
-                for (var i = 0; i < source.Length; ++i)
-                {
-                    var item = source[i];
-                    if (predicate(item))
-                        return item;
-                }
-
-            return default(T);
-        }
-
-        /// <summary>Version of FindFirst with the passed state used by predicate to prevent allocations by predicate lambda closure</summary>
-        public static T FindFirst<T, S>(this T[] source, S state, Func<S, T, bool> predicate)
-        {
-            if (source != null)
-                for (var i = 0; i < source.Length; ++i)
-                {
-                    var item = source[i];
-                    if (predicate(state, item))
-                        return item;
-                }
-
-            return default(T);
-        }
-
-        /// <summary>Returns first item matching the <paramref name="predicate"/>, or default item value.</summary>
-        public static T FindFirst<T>(this IEnumerable<T> source, Func<T, bool> predicate) =>
-            source is T[] sourceArr ? sourceArr.FindFirst(predicate) : source.FirstOrDefault(predicate);
-
-        /// <summary>Returns first item matching the <paramref name="condition"/>,
-        /// given the <paramref name="state"/> without putting the state into the closure and allocating the unnecessary memory.</summary>
-        public static T FirstOrDefault<S, T>(this IEnumerable<T> source, S state, Func<S, T, bool> condition)
-        {
-            var e = source.GetEnumerator();
-            while (e.MoveNext())
+    /// <summary>Looks up for item in source array equal to provided value, and returns its index, or -1 if not found.</summary>
+    public static int IndexOf<T>(this T[] source, T value)
+    {
+        if (source != null && source.Length != 0)
+            for (var i = 0; i < source.Length; ++i)
             {
-                var current = e.Current;
-                if (condition(state, current))
-                    return current;
+                var item = source[i];
+                if (Equals(item, value))
+                    return i;
             }
+
+        return -1;
+    }
+
+    /// <summary>The same as `IndexOf` but searching for the item by reference</summary>
+    public static int IndexOfReference<T>(this T[] source, T reference) where T : class
+    {
+        if (source != null && source.Length != 0)
+            for (var i = 0; i < source.Length; ++i)
+                if (ReferenceEquals(source[i], reference))
+                    return i;
+        return -1;
+    }
+
+    /// <summary>Produces new array without item at specified <paramref name="index"/>.</summary>
+    public static T[] RemoveAtSurePresent<T>(this T[] source, int index)
+    {
+        if (index == 0 && source.Length == 1)
+            return Empty<T>();
+        var result = new T[source.Length - 1];
+        if (index != 0)
+            Array.Copy(source, 0, result, 0, index);
+        if (index != result.Length)
+            Array.Copy(source, index + 1, result, index, result.Length - index);
+        return result;
+    }
+
+    /// <summary>Produces new array without item at specified <paramref name="index"/>. 
+    /// Will return <paramref name="source"/> array if index is out of bounds, or source is null/empty.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static T[] RemoveAt<T>(this T[] source, int index) =>
+        source == null || source.Length == 0 || index < 0 || index >= source.Length ? source : RemoveAtSurePresent(source, index);
+
+    /// <summary>Looks for item in array using equality comparison, and returns new array with found item remove, or original array if not item found.</summary>
+    public static T[] Remove<T>(this T[] source, T value) =>
+        source.RemoveAt(source.IndexOf(value));
+
+    /// <summary>Returns first item matching the <paramref name="predicate"/>, or default item value.</summary>
+    public static T FindFirst<T>(this T[] source, Func<T, bool> predicate)
+    {
+        if (source != null)
+            for (var i = 0; i < source.Length; ++i)
+            {
+                var item = source[i];
+                if (predicate(item))
+                    return item;
+            }
+
+        return default(T);
+    }
+
+    /// <summary>Version of FindFirst with the passed state used by predicate to prevent allocations by predicate lambda closure</summary>
+    public static T FindFirst<T, S>(this T[] source, S state, Func<S, T, bool> predicate)
+    {
+        if (source != null)
+            for (var i = 0; i < source.Length; ++i)
+            {
+                var item = source[i];
+                if (predicate(state, item))
+                    return item;
+            }
+
+        return default(T);
+    }
+
+    /// <summary>Returns first item matching the <paramref name="predicate"/>, or default item value.</summary>
+    public static T FindFirst<T>(this IEnumerable<T> source, Func<T, bool> predicate) =>
+        source is T[] sourceArr ? sourceArr.FindFirst(predicate) : source.FirstOrDefault(predicate);
+
+    /// <summary>Returns first item matching the <paramref name="condition"/>,
+    /// given the <paramref name="state"/> without putting the state into the closure and allocating the unnecessary memory.</summary>
+    public static T FirstOrDefault<S, T>(this IEnumerable<T> source, S state, Func<S, T, bool> condition)
+    {
+        var e = source.GetEnumerator();
+        while (e.MoveNext())
+        {
+            var current = e.Current;
+            if (condition(state, current))
+                return current;
+        }
+        return default;
+    }
+
+    /// <summary>Returns first item matching the <paramref name="predicate"/>, or default item value.</summary>
+    public static T FindFirst<T, S>(this IEnumerable<T> source, S state, Func<S, T, bool> predicate) =>
+        source is T[] sourceArr
+            ? sourceArr.FindFirst(state, predicate)
+            : source.FirstOrDefault(state, predicate);
+
+    /// <summary>Returns last item matching the <paramref name="predicate"/>, or default item value.</summary>
+    public static T FindLast<T>(this T[] source, Func<T, bool> predicate)
+    {
+        if (source != null)
+            for (var i = source.Length - 1; i >= 0; --i)
+            {
+                var item = source[i];
+                if (predicate(item))
+                    return item;
+            }
+
+        return default(T);
+    }
+
+    /// <summary>Version of FindLast with the passed state used by predicate to prevent allocations by predicate lambda closure</summary>
+    public static T FindLast<T, S>(this T[] source, S state, Func<S, T, bool> predicate)
+    {
+        if (source != null)
+            for (var i = source.Length - 1; i >= 0; --i)
+            {
+                var item = source[i];
+                if (predicate(state, item))
+                    return item;
+            }
+
+        return default(T);
+    }
+
+    /// <summary>Returns element if collection consist on single element, otherwise returns default value.
+    /// It does not throw for collection with many elements</summary>
+    public static T FindSingle<T>(this IEnumerable<T> source)
+    {
+        if (source is IList<T> list)
+            return list.Count == 1 ? list[0] : default(T);
+
+        if (source == null)
+            return default(T);
+
+        var e = source.GetEnumerator();
+        if (!e.MoveNext())
+            return default(T);
+        var it = e.Current;
+        return !e.MoveNext() ? it : default(T);
+    }
+
+    /// <summary>Returns a single item matching the <paramref name="condition"/>, or default item value if no or many.</summary>
+    public static T FindFirstSingle<T>(this T[] source, out int nextFoundIndex, Func<T, bool> condition)
+    {
+        nextFoundIndex = -1;
+        if (source == null)
             return default;
-        }
 
-        /// <summary>Returns first item matching the <paramref name="predicate"/>, or default item value.</summary>
-        public static T FindFirst<T, S>(this IEnumerable<T> source, S state, Func<S, T, bool> predicate) =>
-            source is T[] sourceArr
-                ? sourceArr.FindFirst(state, predicate)
-                : source.FirstOrDefault(state, predicate);
-
-        /// <summary>Returns last item matching the <paramref name="predicate"/>, or default item value.</summary>
-        public static T FindLast<T>(this T[] source, Func<T, bool> predicate)
+        T found = default;
+        var isAlreadyFound = false;
+        for (var i = 0; i < source.Length; ++i)
         {
-            if (source != null)
-                for (var i = source.Length - 1; i >= 0; --i)
+            var item = source[i];
+            if (condition(item))
+            {
+                if (isAlreadyFound)
                 {
-                    var item = source[i];
-                    if (predicate(item))
-                        return item;
+                    nextFoundIndex = i;
+                    return default;
                 }
-
-            return default(T);
+                found = item;
+                isAlreadyFound = true;
+            }
         }
+        return found;
+    }
 
-        /// <summary>Version of FindLast with the passed state used by predicate to prevent allocations by predicate lambda closure</summary>
-        public static T FindLast<T, S>(this T[] source, S state, Func<S, T, bool> predicate)
+    /// <summary>Version of FindSingle with the passed state used by condition to prevent the allocations by condition lambda closure.</summary>
+    public static T FindFirstSingle<T, S>(this T[] source, out int nextFoundIndex, S state, Func<S, T, bool> condition)
+    {
+        nextFoundIndex = -1;
+        if (source == null)
+            return default;
+
+        T found = default;
+        var isAlreadyFound = false;
+        for (var i = 0; i < source.Length; ++i)
         {
-            if (source != null)
-                for (var i = source.Length - 1; i >= 0; --i)
+            var item = source[i];
+            if (condition(state, item))
+            {
+                if (isAlreadyFound)
                 {
-                    var item = source[i];
-                    if (predicate(state, item))
-                        return item;
+                    nextFoundIndex = i;
+                    return default;
                 }
-
-            return default(T);
-        }
-
-        /// <summary>Returns element if collection consist on single element, otherwise returns default value.
-        /// It does not throw for collection with many elements</summary>
-        public static T FindSingle<T>(this IEnumerable<T> source)
-        {
-            if (source is IList<T> list)
-                return list.Count == 1 ? list[0] : default(T);
-
-            if (source == null)
-                return default(T);
-
-            var e = source.GetEnumerator();
-            if (!e.MoveNext())
-                return default(T);
-            var it = e.Current;
-            return !e.MoveNext() ? it : default(T);
-        }
-
-        /// <summary>Returns a single item matching the <paramref name="condition"/>, or default item value if no or many.</summary>
-        public static T FindFirstSingle<T>(this T[] source, out int nextFoundIndex, Func<T, bool> condition)
-        {
-            nextFoundIndex = -1;
-            if (source == null)
-                return default;
-
-            T found = default;
-            var isAlreadyFound = false;
-            for (var i = 0; i < source.Length; ++i)
-            {
-                var item = source[i];
-                if (condition(item))
-                {
-                    if (isAlreadyFound)
-                    {
-                        nextFoundIndex = i;
-                        return default;
-                    }
-                    found = item;
-                    isAlreadyFound = true;
-                }
+                found = item;
+                isAlreadyFound = true;
             }
-            return found;
         }
-
-        /// <summary>Version of FindSingle with the passed state used by condition to prevent the allocations by condition lambda closure.</summary>
-        public static T FindFirstSingle<T, S>(this T[] source, out int nextFoundIndex, S state, Func<S, T, bool> condition)
-        {
-            nextFoundIndex = -1;
-            if (source == null)
-                return default;
-
-            T found = default;
-            var isAlreadyFound = false;
-            for (var i = 0; i < source.Length; ++i)
-            {
-                var item = source[i];
-                if (condition(state, item))
-                {
-                    if (isAlreadyFound)
-                    {
-                        nextFoundIndex = i;
-                        return default;
-                    }
-                    found = item;
-                    isAlreadyFound = true;
-                }
-            }
-            return found;
-        }
-
-        /// <summary>Does <paramref name="action"/> for each item</summary>
-        public static void ForEach<T>(this T[] source, Action<T> action)
-        {
-            if (!source.IsNullOrEmpty())
-                for (var i = 0; i < source.Length; i++)
-                    action(source[i]);
-        }
-
-        /// <summary>Copies the slice to the new array, just a sugar extension method</summary>
-        public static T[] Copy<T>(this T[] source, int sourcePos, int count)
-        {
-            var results = new T[count];
-            if (count == 1)
-                results[0] = source[sourcePos];
-            else
-                Array.Copy(source, sourcePos, results, 0, count);
-            return results;
-        }
-
-        private static R[] Copy<T, R>(this T[] source, int sourcePos, int count, Func<T, R> map)
-        {
-            var results = new R[count];
-            if (count == 1)
-                results[0] = map(source[sourcePos]);
-            else
-                for (int i = 0, j = sourcePos; i < count; ++i, ++j)
-                    results[i] = map(source[j]);
-            return results;
-        }
-
-        private static R[] Copy<S, T, R>(this T[] source, S state, int sourcePos, int count, Func<S, T, R> map)
-        {
-            var results = new R[count];
-            if (count == 1)
-                results[0] = map(state, source[sourcePos]);
-            else
-                for (int i = 0, j = sourcePos; i < count; ++i, ++j)
-                    results[i] = map(state, source[j]);
-            return results;
-        }
-
-        private static R[] Copy<S, T, R>(this T[] source, ref S state, int sourcePos, int count, MapOp<S, T, R> map)
-        {
-            var results = new R[count];
-            if (count == 1)
-                results[0] = map(ref state, ref source[sourcePos]);
-            else
-                for (int i = 0, j = sourcePos; i < count; ++i, ++j)
-                    results[i] = map(ref state, ref source[j]);
-            return results;
-        }
-
-        private static R[] Copy<A, B, T, R>(this T[] source, A a, B b, int sourcePos, int count, Func<A, B, T, R> map)
-        {
-            var results = new R[count];
-            if (count == 1)
-                results[0] = map(a, b, source[sourcePos]);
-            else
-                for (int i = 0, j = sourcePos; i < count; ++i, ++j)
-                    results[i] = map(a, b, source[j]);
-            return results;
-        }
-
-        /// <summary>Appends the slice from the source to the end of the results array possibly the resizing the results to accomodate the slice</summary>
-        public static T[] AppendTo<T>(this T[] source, T[] results, int sourcePos, int count)
-        {
-            var oldResultsCount = results.Length;
-            Array.Resize(ref results, oldResultsCount + count);
-            if (count == 1)
-                results[oldResultsCount] = source[sourcePos];
-            else
-                Array.Copy(source, sourcePos, results, oldResultsCount, count);
-            return results;
-        }
-
-        private static R[] AppendTo<T, R>(this T[] source, R[] results, int sourcePos, int count, Func<T, R> map)
-        {
-            var oldResultsCount = results.Length;
-            Array.Resize(ref results, oldResultsCount + count);
-            if (count == 1)
-                results[oldResultsCount] = map(source[sourcePos]);
-            else
-                for (int i = oldResultsCount, j = sourcePos; i < results.Length; ++i, ++j)
-                    results[i] = map(source[j]);
-            return results;
-        }
-
-        private static R[] AppendTo<S, T, R>(this T[] source, S state, R[] results, int sourcePos, int count, Func<S, T, R> map)
-        {
-            var oldResultsCount = results.Length;
-            Array.Resize(ref results, oldResultsCount + count);
-            if (count == 1)
-                results[oldResultsCount] = map(state, source[sourcePos]);
-            else
-                for (int i = oldResultsCount, j = sourcePos; i < results.Length; ++i, ++j)
-                    results[i] = map(state, source[j]);
-            return results;
-        }
-
-        private static R[] AppendTo<S, T, R>(this T[] source, ref S state, R[] results, int sourcePos, int count, MapOp<S, T, R> map)
-        {
-            var oldResultsCount = results.Length;
-            Array.Resize(ref results, oldResultsCount + count);
-            if (count == 1)
-                results[oldResultsCount] = map(ref state, ref source[sourcePos]);
-            else
-                for (int i = oldResultsCount, j = sourcePos; i < results.Length; ++i, ++j)
-                    results[i] = map(ref state, ref source[j]);
-            return results;
-        }
-
-        private static R[] AppendTo<A, B, T, R>(this T[] source, A a, B b, R[] results, int sourcePos, int count, Func<A, B, T, R> map)
-        {
-            var oldResultsCount = results.Length;
-            Array.Resize(ref results, oldResultsCount + count);
-            if (count == 1)
-                results[oldResultsCount] = map(a, b, source[sourcePos]);
-            else
-                for (int i = oldResultsCount, j = sourcePos; i < results.Length; ++i, ++j)
-                    results[i] = map(a, b, source[j]);
-            return results;
-        }
-
-        // todo: @perf look into MatchExperiments.cs and the benchmarks there
-        /// <summary>Where method similar to Enumerable.Where but more performant and non necessary allocating.
-        /// It returns source array and does Not create new one if all items match the condition.</summary>
-        public static T[] Match<T>(this T[] source, Func<T, bool> condition)
-        {
-            if (source == null || source.Length == 0)
-                return source;
-
-            if (source.Length == 1)
-                return condition(source[0]) ? source : Empty<T>();
-
-            if (source.Length == 2)
-            {
-                var c0 = condition(source[0]);
-                var c1 = condition(source[1]);
-                return c0 & c1 ? source : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
-            }
-
-            if (source.Length == 3)
-            {
-                var c0 = condition(source[0]);
-                var c1 = condition(source[1]);
-                var c2 = condition(source[2]);
-                return c0 & c1 & c2 ? source
-                    : c0 ? (c1 ? new[] { source[0], source[1] } : c2 ? new[] { source[0], source[2] } : new[] { source[0] })
-                    : c1 ? (c2 ? new[] { source[1], source[2] } : new[] { source[1] })
-                    : c2 ? new[] { source[2] }
-                    : Empty<T>();
-            }
-
-            var matchStart = 0;
-            T[] matches = null;
-            var matchFound = false;
-            var i = 0;
-            for (; i < source.Length; ++i)
-                if (!(matchFound = condition(source[i]))) // todo: @unclear check what will happen if the `matchFound` is set back to false
-                {
-                    // for accumulated matched items
-                    if (i != 0 && i > matchStart)
-                        matches = matches == null 
-                            ? source.Copy(matchStart, i - matchStart)
-                            : source.AppendTo(matches, matchStart, i - matchStart);
-                    matchStart = i + 1; // guess the next match start will be after the non-matched item
-                }
-
-            // when last match was found but not all items are matched (hence matchStart != 0)
-            if (matchFound && matchStart != 0)
-                return matches == null 
-                    ? source.Copy(matchStart, i - matchStart) 
-                    : source.AppendTo(matches, matchStart, i - matchStart);
-
-            return matches ?? (matchStart != 0 ? Empty<T>() : source);
-        }
-
-        /// <summary>Match with the additional state to use in <paramref name="condition"/> to minimize the allocations 
-        /// in <paramref name="condition"/> lambda closure</summary> 
-        public static T[] Match<S, T>(this T[] source, S state, Func<S, T, bool> condition)
-        {
-            if (source == null || source.Length == 0)
-                return source;
-
-            if (source.Length == 1)
-                return condition(state, source[0]) ? source : Empty<T>();
-
-            if (source.Length == 2)
-            {
-                var c0 = condition(state, source[0]);
-                var c1 = condition(state, source[1]);
-                return c0 & c1 ? source : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
-            }
-
-            if (source.Length == 3)
-            {
-                var c0 = condition(state, source[0]);
-                var c1 = condition(state, source[1]);
-                var c2 = condition(state, source[2]);
-                return c0 & c1 & c2 ? source
-                    : c0 ? (c1 ? new[] { source[0], source[1] } : c2 ? new[] { source[0], source[2] } : new[] { source[0] })
-                    : c1 ? (c2 ? new[] { source[1], source[2] } : new[] { source[1] })
-                    : c2 ? new[] { source[2] }
-                    : Empty<T>();
-            }
-
-            var matchStart = 0;
-            T[] matches = null;
-            var matchFound = false;
-            var i = 0;
-            for (; i < source.Length; ++i)
-                if (!(matchFound = condition(state, source[i])))
-                {
-                    // for accumulated matched items
-                    if (i != 0 && i > matchStart)
-                        matches = matches == null 
-                            ? source.Copy(matchStart, i - matchStart)
-                            : source.AppendTo(matches, matchStart, i - matchStart);
-                    matchStart = i + 1; // guess the next match start will be after the non-matched item
-                }
-
-            // when last match was found but not all items are matched (hence matchStart != 0)
-            if (matchFound && matchStart != 0)
-                return matches == null 
-                    ? source.Copy(matchStart, i - matchStart) 
-                    : source.AppendTo(matches, matchStart, i - matchStart);
-
-            return matches ?? (matchStart != 0 ? Empty<T>() : source);
-        }
-
-        /// <summary>Match with the additional state to use in <paramref name="condition"/> to minimize the allocations 
-        /// in <paramref name="condition"/> lambda closure</summary> 
-        public static T[] Match<A, B, T>(this T[] source, A a, B b, Func<A, B, T, bool> condition)
-        {
-            if (source == null || source.Length == 0)
-                return source;
-
-            if (source.Length == 1)
-                return condition(a, b, source[0]) ? source : Empty<T>();
-
-            if (source.Length == 2)
-            {
-                var c0 = condition(a, b, source[0]);
-                var c1 = condition(a, b, source[1]);
-                return c0 & c1 ? source : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
-            }
-
-            var matchStart = 0;
-            T[] matches = null;
-            var matchFound = false;
-            var i = 0;
-            for (; i < source.Length; ++i)
-                if (!(matchFound = condition(a, b, source[i])))
-                {
-                    // for accumulated matched items
-                    if (i != 0 && i > matchStart)
-                        matches = matches == null 
-                            ? source.Copy(matchStart, i - matchStart)
-                            : source.AppendTo(matches, matchStart, i - matchStart);
-                    matchStart = i + 1; // guess the next match start will be after the non-matched item
-                }
-
-            // when last match was found but not all items are matched (hence matchStart != 0)
-            if (matchFound && matchStart != 0)
-                return matches == null 
-                    ? source.Copy(matchStart, i - matchStart) 
-                    : source.AppendTo(matches, matchStart, i - matchStart);
-
-            return matches ?? (matchStart != 0 ? Empty<T>() : source);
-        }
-
-        /// <summary>Where method similar to Enumerable.Where but more performant and non necessary allocating.
-        /// It returns source array and does Not create new one if all items match the condition.</summary>
-        public static R[] Match<T, R>(this T[] source, Func<T, bool> condition, Func<T, R> map)
-        {
-            if (source == null)
-                return null;
-
-            if (source.Length == 0)
-                return Empty<R>();
-
-            if (source.Length == 1)
-            {
-                var item = source[0];
-                return condition(item) ? new[] { map(item) } : Empty<R>();
-            }
-
-            if (source.Length == 2)
-            {
-                var c0 = condition(source[0]);
-                var c1 = condition(source[1]);
-                return c0 & c1 ? new[] { map(source[0]), map(source[1]) } : c0 ? new[] { map(source[0]) } : c1 ? new[] { map(source[1]) } : Empty<R>();
-            }
-
-            if (source.Length == 3)
-            {
-                var c0 = condition(source[0]);
-                var c1 = condition(source[1]);
-                var c2 = condition(source[2]);
-                return c0 & c1 & c2 ? new[] { map(source[0]), map(source[1]), map(source[2]) }
-                    : c0 ? (c1 ? new[] { map(source[0]), map(source[1]) } : c2 ? new[] { map(source[0]), map(source[2]) } : new[] { map(source[0]) })
-                    : c1 ? (c2 ? new[] { map(source[1]), map(source[2]) } : new[] { map(source[1]) })
-                    : c2 ? new[] { map(source[2]) }
-                    : Empty<R>();
-            }
-
-            var matchStart = 0;
-            R[] matches = null;
-            var matchFound = false;
-
-            // todo: @perf optimize it for the two dissipate slices case to allocate the result matches once, keep the track of startA, endA, startB, endB of the matches.
-            // todo: @perf can we allocate +1, +2 items in the array and avoid the allocation?
-            var i = 0;
-            for (; i < source.Length; ++i)
-                if (!(matchFound = condition(source[i])))
-                {
-                    // for accumulated matched items
-                    if (i != 0 && i > matchStart)
-                        matches = matches == null 
-                            ? source.Copy(matchStart, i - matchStart, map)
-                            : source.AppendTo(matches, matchStart, i - matchStart, map);
-                    matchStart = i + 1; // guess the next match start will be after the non-matched item
-                }
-
-            // when last match was found but not all items are matched (hence matchStart != 0)
-            if (matchFound && matchStart != 0)
-                return matches == null 
-                    ? source.Copy(matchStart, i - matchStart, map) 
-                    : source.AppendTo(matches, matchStart, i - matchStart, map);
-
-            return matches ?? (matchStart == 0 ? source.Copy(0, source.Length, map) : Empty<R>());
-        }
-
-        /// <summary>Match with the additional state to use in <paramref name="condition"/> and <paramref name="map"/> 
-        /// to minimize the allocations in <paramref name="condition"/> lambda closure </summary>
-        public static R[] Match<S, T, R>(this T[] source, S state, Func<S, T, bool> condition, Func<S, T, R> map)
-        {
-            if (source == null)
-                return null;
-            if (source.Length == 0)
-                return Empty<R>();
-
-            if (source.Length == 1)
-            {
-                var item = source[0];
-                return condition(state, item) ? new[] { map(state, item) } : Empty<R>();
-            }
-
-            if (source.Length == 2)
-            {
-                var c0 = condition(state, source[0]);
-                var c1 = condition(state, source[1]);
-                return c0 & c1 ? new[] { map(state, source[0]), map(state, source[1]) }
-                    : c0 ? new[] { map(state, source[0]) }
-                    : c1 ? new[] { map(state, source[1]) }
-                    : Empty<R>();
-            }
-
-            if (source.Length == 3)
-            {
-                var c0 = condition(state, source[0]);
-                var c1 = condition(state, source[1]);
-                var c2 = condition(state, source[2]);
-                return c0 & c1 & c2 ? new[] { map(state, source[0]), map(state, source[1]), map(state, source[2]) }
-                    : c0 ? (c1 ? new[] { map(state, source[0]), map(state, source[1]) } : c2 ? new[] { map(state, source[0]), map(state, source[2]) } : new[] { map(state, source[0]) })
-                    : c1 ? (c2 ? new[] { map(state, source[1]), map(state, source[2]) } : new[] { map(state, source[1]) })
-                    : c2 ? new[] { map(state, source[2]) }
-                    : Empty<R>();
-            }
-
-            var matchStart = 0;
-            R[] matches = null;
-            var matchFound = false;
-
-            var i = 0;
-            for (; i < source.Length; ++i)
-                if (!(matchFound = condition(state, source[i])))
-                {
-                    // for accumulated matched items
-                    if (i != 0 && i > matchStart)
-                        matches = matches == null 
-                            ? source.Copy(state, matchStart, i - matchStart, map)
-                            : source.AppendTo(state, matches, matchStart, i - matchStart, map);
-                    matchStart = i + 1; // guess the next match start will be after the non-matched item
-                }
-
-            // when last match was found but not all items are matched (hence matchStart != 0)
-            if (matchFound && matchStart != 0)
-                return matches == null
-                    ? source.Copy(state, matchStart, i - matchStart, map) 
-                    : source.AppendTo(state, matches, matchStart, i - matchStart, map);
-
-            return matches ?? (matchStart == 0 ? source.Copy(state, 0, source.Length, map) : Empty<R>());
-        }
-
-        /// <summary>Match with the additional state to use in <paramref name="condition"/> and <paramref name="map"/> 
-        /// to minimize the allocations in <paramref name="condition"/> lambda closure </summary>
-        public static R[] Match<S, T, R>(this T[] source, ref S state, IsOp<S, T> condition, MapOp<S, T, R> map)
-        {
-            if (source == null)
-                return null;
-            if (source.Length == 0)
-                return Empty<R>();
-
-            if (source.Length == 1)
-            {
-                var item = source[0];
-                return condition(ref state, ref item) ? new[] { map(ref state, ref item) } : Empty<R>();
-            }
-
-            if (source.Length == 2)
-            {
-                var c0 = condition(ref state, ref source[0]);
-                var c1 = condition(ref state, ref source[1]);
-                return c0 & c1 ? new[] { map(ref state, ref source[0]), map(ref state, ref source[1]) }
-                    : c0 ? new[] { map(ref state, ref source[0]) }
-                    : c1 ? new[] { map(ref state, ref source[1]) }
-                    : Empty<R>();
-            }
-
-            if (source.Length == 3)
-            {
-                var c0 = condition(ref state, ref source[0]);
-                var c1 = condition(ref state, ref source[1]);
-                var c2 = condition(ref state, ref source[2]);
-                return c0 & c1 & c2 ? new[] { map(ref state, ref source[0]), map(ref state, ref source[1]), map(ref state, ref source[2]) }
-                    : c0 ? (c1 ? new[] { map(ref state, ref source[0]), map(ref state, ref source[1]) } 
-                        : c2 ? new[] { map(ref state, ref source[0]), map(ref state, ref source[2]) } 
-                        : new[] { map(ref state, ref source[0]) })
-                    : c1 ? (c2 ? new[] { map(ref state, ref source[1]), map(ref state, ref source[2]) } 
-                        : new[] { map(ref state, ref source[1]) })
-                    : c2 ? new[] { map(ref state, ref source[2]) }
-                    : Empty<R>();
-            }
-
-            var matchStart = 0;
-            R[] matches = null;
-            var matchFound = false;
-
-            var i = 0;
-            for (; i < source.Length; ++i)
-                if (!(matchFound = condition(ref state, ref source[i])))
-                {
-                    // for accumulated matched items
-                    if (i != 0 && i > matchStart)
-                        matches = matches == null 
-                            ? source.Copy(ref state, matchStart, i - matchStart, map)
-                            : source.AppendTo(ref state, matches, matchStart, i - matchStart, map);
-                    matchStart = i + 1; // guess the next match start will be after the non-matched item
-                }
-
-            // when last match was found but not all items are matched (hence matchStart != 0)
-            if (matchFound && matchStart != 0)
-                return matches == null
-                    ? source.Copy(ref state, matchStart, i - matchStart, map) 
-                    : source.AppendTo(ref state, matches, matchStart, i - matchStart, map);
-
-            return matches ?? (matchStart == 0 ? source.Copy(ref state, 0, source.Length, map) : Empty<R>());
-        }
-
-        /// <summary>Match with the additional state to use in <paramref name="condition"/> and <paramref name="map"/> 
-        /// to minimize the allocations in <paramref name="condition"/> lambda closure </summary>
-        public static R[] Match<A, B, T, R>(this T[] source, A a, B b, Func<A, B, T, bool> condition, Func<A, B, T, R> map)
-        {
-            if (source == null)
-                return null;
-            if (source.Length == 0)
-                return Empty<R>();
-
-            if (source.Length == 1)
-            {
-                var item = source[0];
-                return condition(a, b, item) ? new[] { map(a, b, item) } : Empty<R>();
-            }
-
-            if (source.Length == 2)
-            {
-                var c0 = condition(a, b, source[0]);
-                var c1 = condition(a, b, source[1]);
-                return c0 & c1 ? new[] { map(a, b, source[0]), map(a, b, source[1]) }
-                    : c0 ? new[] { map(a, b, source[0]) }
-                    : c1 ? new[] { map(a, b, source[1]) }
-                    : Empty<R>();
-            }
-
-            var matchStart = 0;
-            R[] matches = null;
-            var matchFound = false;
-
-            var i = 0;
-            for (; i < source.Length; ++i)
-                if (!(matchFound = condition(a, b, source[i])))
-                {
-                    // for accumulated matched items
-                    if (i != 0 && i > matchStart)
-                        matches = matches == null 
-                            ? source.Copy(a, b, matchStart, i - matchStart, map)
-                            : source.AppendTo(a, b, matches, matchStart, i - matchStart, map);
-
-                    matchStart = i + 1; // guess the next match start will be after the non-matched item
-                }
-
-            // when last match was found but not all items are matched (hence matchStart != 0)
-            if (matchFound && matchStart != 0)
-                return matches == null
-                    ? source.Copy(a, b, matchStart, i - matchStart, map) 
-                    : source.AppendTo(a, b, matches, matchStart, i - matchStart, map);
-
-            return matches ?? (matchStart == 0 ? source.Copy(a, b, 0, source.Length, map) : Empty<R>());
-        }
-
-        /// <summary>Maps all items from source to result array.</summary>
-        /// <typeparam name="T">Source item type</typeparam> <typeparam name="R">Result item type</typeparam>
-        /// <param name="source">Source items</param> <param name="map">Function to convert item from source to result.</param>
-        /// <returns>Converted items</returns>
-        public static R[] Map<T, R>(this T[] source, Func<T, R> map)
-        {
-            if (source == null)
-                return null;
-
-            var sourceCount = source.Length;
-            if (sourceCount == 0)
-                return Empty<R>();
-
-            if (sourceCount == 1)
-                return new[] { map(source[0]) };
-
-            if (sourceCount == 2)
-                return new[] { map(source[0]), map(source[1]) };
-
-            var results = new R[sourceCount];
+        return found;
+    }
+
+    /// <summary>Does <paramref name="action"/> for each item</summary>
+    public static void ForEach<T>(this T[] source, Action<T> action)
+    {
+        if (!source.IsNullOrEmpty())
             for (var i = 0; i < source.Length; i++)
-                results[i] = map(source[i]);
-            return results;
+                action(source[i]);
+    }
+
+    /// <summary>Copies the slice to the new array, just a sugar extension method</summary>
+    public static T[] Copy<T>(this T[] source, int sourcePos, int count)
+    {
+        var results = new T[count];
+        if (count == 1)
+            results[0] = source[sourcePos];
+        else
+            Array.Copy(source, sourcePos, results, 0, count);
+        return results;
+    }
+
+    private static R[] Copy<T, R>(this T[] source, int sourcePos, int count, Func<T, R> map)
+    {
+        var results = new R[count];
+        if (count == 1)
+            results[0] = map(source[sourcePos]);
+        else
+            for (int i = 0, j = sourcePos; i < count; ++i, ++j)
+                results[i] = map(source[j]);
+        return results;
+    }
+
+    private static R[] Copy<S, T, R>(this T[] source, S state, int sourcePos, int count, Func<S, T, R> map)
+    {
+        var results = new R[count];
+        if (count == 1)
+            results[0] = map(state, source[sourcePos]);
+        else
+            for (int i = 0, j = sourcePos; i < count; ++i, ++j)
+                results[i] = map(state, source[j]);
+        return results;
+    }
+
+    private static R[] Copy<S, T, R>(this T[] source, ref S state, int sourcePos, int count, MapOp<S, T, R> map)
+    {
+        var results = new R[count];
+        if (count == 1)
+            results[0] = map(ref state, ref source[sourcePos]);
+        else
+            for (int i = 0, j = sourcePos; i < count; ++i, ++j)
+                results[i] = map(ref state, ref source[j]);
+        return results;
+    }
+
+    private static R[] Copy<A, B, T, R>(this T[] source, A a, B b, int sourcePos, int count, Func<A, B, T, R> map)
+    {
+        var results = new R[count];
+        if (count == 1)
+            results[0] = map(a, b, source[sourcePos]);
+        else
+            for (int i = 0, j = sourcePos; i < count; ++i, ++j)
+                results[i] = map(a, b, source[j]);
+        return results;
+    }
+
+    /// <summary>Appends the slice from the source to the end of the results array possibly the resizing the results to accomodate the slice</summary>
+    public static T[] AppendTo<T>(this T[] source, T[] results, int sourcePos, int count)
+    {
+        var oldResultsCount = results.Length;
+        Array.Resize(ref results, oldResultsCount + count);
+        if (count == 1)
+            results[oldResultsCount] = source[sourcePos];
+        else
+            Array.Copy(source, sourcePos, results, oldResultsCount, count);
+        return results;
+    }
+
+    private static R[] AppendTo<T, R>(this T[] source, R[] results, int sourcePos, int count, Func<T, R> map)
+    {
+        var oldResultsCount = results.Length;
+        Array.Resize(ref results, oldResultsCount + count);
+        if (count == 1)
+            results[oldResultsCount] = map(source[sourcePos]);
+        else
+            for (int i = oldResultsCount, j = sourcePos; i < results.Length; ++i, ++j)
+                results[i] = map(source[j]);
+        return results;
+    }
+
+    private static R[] AppendTo<S, T, R>(this T[] source, S state, R[] results, int sourcePos, int count, Func<S, T, R> map)
+    {
+        var oldResultsCount = results.Length;
+        Array.Resize(ref results, oldResultsCount + count);
+        if (count == 1)
+            results[oldResultsCount] = map(state, source[sourcePos]);
+        else
+            for (int i = oldResultsCount, j = sourcePos; i < results.Length; ++i, ++j)
+                results[i] = map(state, source[j]);
+        return results;
+    }
+
+    private static R[] AppendTo<S, T, R>(this T[] source, ref S state, R[] results, int sourcePos, int count, MapOp<S, T, R> map)
+    {
+        var oldResultsCount = results.Length;
+        Array.Resize(ref results, oldResultsCount + count);
+        if (count == 1)
+            results[oldResultsCount] = map(ref state, ref source[sourcePos]);
+        else
+            for (int i = oldResultsCount, j = sourcePos; i < results.Length; ++i, ++j)
+                results[i] = map(ref state, ref source[j]);
+        return results;
+    }
+
+    private static R[] AppendTo<A, B, T, R>(this T[] source, A a, B b, R[] results, int sourcePos, int count, Func<A, B, T, R> map)
+    {
+        var oldResultsCount = results.Length;
+        Array.Resize(ref results, oldResultsCount + count);
+        if (count == 1)
+            results[oldResultsCount] = map(a, b, source[sourcePos]);
+        else
+            for (int i = oldResultsCount, j = sourcePos; i < results.Length; ++i, ++j)
+                results[i] = map(a, b, source[j]);
+        return results;
+    }
+
+    // todo: @perf look into MatchExperiments.cs and the benchmarks there
+    /// <summary>Where method similar to Enumerable.Where but more performant and non necessary allocating.
+    /// It returns source array and does Not create new one if all items match the condition.</summary>
+    public static T[] Match<T>(this T[] source, Func<T, bool> condition)
+    {
+        if (source == null || source.Length == 0)
+            return source;
+
+        if (source.Length == 1)
+            return condition(source[0]) ? source : Empty<T>();
+
+        if (source.Length == 2)
+        {
+            var c0 = condition(source[0]);
+            var c1 = condition(source[1]);
+            return c0 & c1 ? source : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
         }
 
-        /// Map with additional state to use in <paramref name="map"/> to minimize allocations in <paramref name="map"/> lambda closure 
-        public static R[] Map<T, S, R>(this T[] source, S state, Func<S, T, R> map)
+        if (source.Length == 3)
         {
-            if (source == null)
-                return null;
-
-            var sourceCount = source.Length;
-            if (sourceCount == 0)
-                return Empty<R>();
-
-            if (sourceCount == 1)
-                return new[] { map(state, source[0]) };
-
-            if (sourceCount == 2)
-                return new[] { map(state, source[0]), map(state, source[1]) };
-
-            var results = new R[sourceCount];
-            for (var i = 0; i < source.Length; i++)
-                results[i] = map(state, source[i]);
-            return results;
+            var c0 = condition(source[0]);
+            var c1 = condition(source[1]);
+            var c2 = condition(source[2]);
+            return c0 & c1 & c2 ? source
+                : c0 ? (c1 ? new[] { source[0], source[1] } : c2 ? new[] { source[0], source[2] } : new[] { source[0] })
+                : c1 ? (c2 ? new[] { source[1], source[2] } : new[] { source[1] })
+                : c2 ? new[] { source[2] }
+                : Empty<T>();
         }
 
-        /// Map with additional state to use in <paramref name="map"/> to minimize allocations in <paramref name="map"/> lambda closure 
-        public static R[] Map<T, S, R>(this T[] source, ref S state, MapOp<S, T, R> map)
-        {
-            if (source == null)
-                return null;
-
-            var sourceCount = source.Length;
-            if (sourceCount == 0)
-                return Empty<R>();
-
-            if (sourceCount == 1)
-                return new[] { map(ref state, ref source[0]) };
-
-            if (sourceCount == 2)
-                return new[] { map(ref state, ref source[0]), map(ref state, ref source[1]) };
-
-            var results = new R[sourceCount];
-            for (var i = 0; i < source.Length; i++)
-                results[i] = map(ref state, ref source[i]);
-            return results;
-        }
-
-        /// Map with additional two states to use in <paramref name="map"/> to minimize allocations in <paramref name="map"/> lambda closure 
-        public static R[] Map<T, A, B, R>(this T[] source, A a, B b, Func<A, B, T, R> map)
-        {
-            if (source == null)
-                return null;
-
-            var sourceCount = source.Length;
-            if (sourceCount == 0)
-                return Empty<R>();
-
-            if (sourceCount == 1)
-                return new[] { map(a, b, source[0]) };
-
-            if (sourceCount == 2)
-                return new[] { map(a, b, source[0]), map(a, b, source[1]) };
-
-            var results = new R[sourceCount];
-            for (var i = 0; i < source.Length; i++)
-                results[i] = map(a, b, source[i]);
-            return results;
-        }
-
-        /// <summary>Maps all items from source to result collection. If possible uses fast array Map otherwise Enumerable.Select.</summary>
-        /// <typeparam name="T">Source item type</typeparam> <typeparam name="R">Result item type</typeparam>
-        /// <param name="source">Source items</param> <param name="map">Function to convert item from source to result.</param>
-        /// <returns>Converted items</returns>
-        public static IEnumerable<R> Map<T, R>(this IEnumerable<T> source, Func<T, R> map) =>
-            source is T[] arr ? arr.Map(map) : source?.Select(map);
-
-        /// <summary>If <paramref name="source"/> is array uses more effective Match for array, otherwise just calls Where</summary>
-        /// <typeparam name="T">Type of source items.</typeparam>
-        /// <param name="source">If null, the null will be returned.</param>
-        /// <param name="condition">Condition to keep items.</param>
-        /// <returns>Result items, may be an array.</returns>
-        public static IEnumerable<T> Match<T>(this IEnumerable<T> source, Func<T, bool> condition) =>
-            source is T[] arr ? arr.Match(condition) : source?.Where(condition);
-
-        /// <summary>If <paramref name="source"/> is array than it uses more effective Match for array avoiding the closure over the state `S`,
-        /// otherwise calls Where on the Enumerator avoiding the closure over `S`.
-        /// Should be called mostly when you have an arrays.</summary>
-        public static IEnumerable<T> Match<S, T>(this IEnumerable<T> source, S s, Func<S, T, bool> condition) =>
-            source is T[] arr ? arr.Match(s, condition) : source == null ? null : Where(source, s, condition);
-
-        /// <summary>Calls Where on the Enumerator avoiding the closure over `S`.</summary>
-        public static IEnumerable<T> Where<S, T>(this IEnumerable<T> source, S state, Func<S, T, bool> condition)
-        {
-            var e = source.GetEnumerator();
-            while (e.MoveNext())
+        var matchStart = 0;
+        T[] matches = null;
+        var matchFound = false;
+        var i = 0;
+        for (; i < source.Length; ++i)
+            if (!(matchFound = condition(source[i]))) // todo: @unclear check what will happen if the `matchFound` is set back to false
             {
-                var current = e.Current;
-                if (condition(state, current))
-                    yield return current;
+                // for accumulated matched items
+                if (i != 0 && i > matchStart)
+                    matches = matches == null 
+                        ? source.Copy(matchStart, i - matchStart)
+                        : source.AppendTo(matches, matchStart, i - matchStart);
+                matchStart = i + 1; // guess the next match start will be after the non-matched item
             }
+
+        // when last match was found but not all items are matched (hence matchStart != 0)
+        if (matchFound && matchStart != 0)
+            return matches == null 
+                ? source.Copy(matchStart, i - matchStart) 
+                : source.AppendTo(matches, matchStart, i - matchStart);
+
+        return matches ?? (matchStart != 0 ? Empty<T>() : source);
+    }
+
+    /// <summary>Match with the additional state to use in <paramref name="condition"/> to minimize the allocations 
+    /// in <paramref name="condition"/> lambda closure</summary> 
+    public static T[] Match<S, T>(this T[] source, S state, Func<S, T, bool> condition)
+    {
+        if (source == null || source.Length == 0)
+            return source;
+
+        if (source.Length == 1)
+            return condition(state, source[0]) ? source : Empty<T>();
+
+        if (source.Length == 2)
+        {
+            var c0 = condition(state, source[0]);
+            var c1 = condition(state, source[1]);
+            return c0 & c1 ? source : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
         }
 
-        /// <summary>If <paramref name="source"/> is array than uses more effective Match for array avoiding the closure over the state `S`,
-        /// otherwise calls combined Where and Select on the Enumerator avoiding the closure over `S`.
-        /// Should be called mostly when you have an arrays.</summary>
-        public static IEnumerable<R> Match<T, R>(this IEnumerable<T> source, Func<T, bool> condition, Func<T, R> map) =>
-            source is T[] arr ? arr.Match(condition, map) : source?.Where(condition).Select(map);
-
-        /// <summary>If <paramref name="source"/> is array than it uses more effective Match for array,
-        /// otherwise calls combined Where and Select on the Enumerator avoiding the closure over `S`. 
-        /// Should be called mostly when you have an arrays</summary>
-        public static IEnumerable<R> Match<S, T, R>(this IEnumerable<T> source, S s, Func<S, T, bool> condition, Func<S, T, R> map) =>
-            source is T[] arr ? arr.Match(s, condition, map) : source == null ? null : WhereSelect(source, s, condition, map);
-
-        /// <summary>Calls combined Where and Select on the Enumerator avoiding the closure over `S`</summary>
-        public static IEnumerable<R> WhereSelect<S, T, R>(this IEnumerable<T> source, S s, Func<S, T, bool> condition, Func<S, T, R> map)
+        if (source.Length == 3)
         {
-            var e = source.GetEnumerator();
-            while (e.MoveNext())
-            {
-                var current = e.Current;
-                if (condition(s, current))
-                    yield return map(s, current);
-            }
+            var c0 = condition(state, source[0]);
+            var c1 = condition(state, source[1]);
+            var c2 = condition(state, source[2]);
+            return c0 & c1 & c2 ? source
+                : c0 ? (c1 ? new[] { source[0], source[1] } : c2 ? new[] { source[0], source[2] } : new[] { source[0] })
+                : c1 ? (c2 ? new[] { source[1], source[2] } : new[] { source[1] })
+                : c2 ? new[] { source[2] }
+                : Empty<T>();
         }
 
-        /// <summary>If <paramref name="source"/> is array than it uses more effective Match for array,
-        /// otherwise calls combined Where and Select on the Enumerator avoiding the closure over `A` and `B`. 
-        /// Should be called mostly when you have an arrays</summary>
-        public static IEnumerable<R> Match<A, B, T, R>(this IEnumerable<T> source, A a, B b, Func<A, B, T, bool> condition, Func<A, B, T, R> map) =>
-            source is T[] arr
-                ? arr.Match(a, b, condition, map)
-                : source == null
-                    ? null
-                    : WhereSelect(source, a, b, condition, map);
-
-        /// <summary>Calls combined Where and Select on the Enumerator avoiding the closure over `S`</summary>
-        public static IEnumerable<R> WhereSelect<A, B, T, R>(this IEnumerable<T> source, A a, B b, Func<A, B, T, bool> condition, Func<A, B, T, R> map)
-        {
-            var e = source.GetEnumerator();
-            while (e.MoveNext())
+        var matchStart = 0;
+        T[] matches = null;
+        var matchFound = false;
+        var i = 0;
+        for (; i < source.Length; ++i)
+            if (!(matchFound = condition(state, source[i])))
             {
-                var current = e.Current;
-                if (condition(a, b, current))
-                    yield return map(a, b, current);
+                // for accumulated matched items
+                if (i != 0 && i > matchStart)
+                    matches = matches == null 
+                        ? source.Copy(matchStart, i - matchStart)
+                        : source.AppendTo(matches, matchStart, i - matchStart);
+                matchStart = i + 1; // guess the next match start will be after the non-matched item
             }
+
+        // when last match was found but not all items are matched (hence matchStart != 0)
+        if (matchFound && matchStart != 0)
+            return matches == null 
+                ? source.Copy(matchStart, i - matchStart) 
+                : source.AppendTo(matches, matchStart, i - matchStart);
+
+        return matches ?? (matchStart != 0 ? Empty<T>() : source);
+    }
+
+    /// <summary>Match with the additional state to use in <paramref name="condition"/> to minimize the allocations 
+    /// in <paramref name="condition"/> lambda closure</summary> 
+    public static T[] Match<A, B, T>(this T[] source, A a, B b, Func<A, B, T, bool> condition)
+    {
+        if (source == null || source.Length == 0)
+            return source;
+
+        if (source.Length == 1)
+            return condition(a, b, source[0]) ? source : Empty<T>();
+
+        if (source.Length == 2)
+        {
+            var c0 = condition(a, b, source[0]);
+            var c1 = condition(a, b, source[1]);
+            return c0 & c1 ? source : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
+        }
+
+        var matchStart = 0;
+        T[] matches = null;
+        var matchFound = false;
+        var i = 0;
+        for (; i < source.Length; ++i)
+            if (!(matchFound = condition(a, b, source[i])))
+            {
+                // for accumulated matched items
+                if (i != 0 && i > matchStart)
+                    matches = matches == null 
+                        ? source.Copy(matchStart, i - matchStart)
+                        : source.AppendTo(matches, matchStart, i - matchStart);
+                matchStart = i + 1; // guess the next match start will be after the non-matched item
+            }
+
+        // when last match was found but not all items are matched (hence matchStart != 0)
+        if (matchFound && matchStart != 0)
+            return matches == null 
+                ? source.Copy(matchStart, i - matchStart) 
+                : source.AppendTo(matches, matchStart, i - matchStart);
+
+        return matches ?? (matchStart != 0 ? Empty<T>() : source);
+    }
+
+    /// <summary>Where method similar to Enumerable.Where but more performant and non necessary allocating.
+    /// It returns source array and does Not create new one if all items match the condition.</summary>
+    public static R[] Match<T, R>(this T[] source, Func<T, bool> condition, Func<T, R> map)
+    {
+        if (source == null)
+            return null;
+
+        if (source.Length == 0)
+            return Empty<R>();
+
+        if (source.Length == 1)
+        {
+            var item = source[0];
+            return condition(item) ? new[] { map(item) } : Empty<R>();
+        }
+
+        if (source.Length == 2)
+        {
+            var c0 = condition(source[0]);
+            var c1 = condition(source[1]);
+            return c0 & c1 ? new[] { map(source[0]), map(source[1]) } : c0 ? new[] { map(source[0]) } : c1 ? new[] { map(source[1]) } : Empty<R>();
+        }
+
+        if (source.Length == 3)
+        {
+            var c0 = condition(source[0]);
+            var c1 = condition(source[1]);
+            var c2 = condition(source[2]);
+            return c0 & c1 & c2 ? new[] { map(source[0]), map(source[1]), map(source[2]) }
+                : c0 ? (c1 ? new[] { map(source[0]), map(source[1]) } : c2 ? new[] { map(source[0]), map(source[2]) } : new[] { map(source[0]) })
+                : c1 ? (c2 ? new[] { map(source[1]), map(source[2]) } : new[] { map(source[1]) })
+                : c2 ? new[] { map(source[2]) }
+                : Empty<R>();
+        }
+
+        var matchStart = 0;
+        R[] matches = null;
+        var matchFound = false;
+
+        // todo: @perf optimize it for the two dissipate slices case to allocate the result matches once, keep the track of startA, endA, startB, endB of the matches.
+        // todo: @perf can we allocate +1, +2 items in the array and avoid the allocation?
+        var i = 0;
+        for (; i < source.Length; ++i)
+            if (!(matchFound = condition(source[i])))
+            {
+                // for accumulated matched items
+                if (i != 0 && i > matchStart)
+                    matches = matches == null 
+                        ? source.Copy(matchStart, i - matchStart, map)
+                        : source.AppendTo(matches, matchStart, i - matchStart, map);
+                matchStart = i + 1; // guess the next match start will be after the non-matched item
+            }
+
+        // when last match was found but not all items are matched (hence matchStart != 0)
+        if (matchFound && matchStart != 0)
+            return matches == null 
+                ? source.Copy(matchStart, i - matchStart, map) 
+                : source.AppendTo(matches, matchStart, i - matchStart, map);
+
+        return matches ?? (matchStart == 0 ? source.Copy(0, source.Length, map) : Empty<R>());
+    }
+
+    /// <summary>Match with the additional state to use in <paramref name="condition"/> and <paramref name="map"/> 
+    /// to minimize the allocations in <paramref name="condition"/> lambda closure </summary>
+    public static R[] Match<S, T, R>(this T[] source, S state, Func<S, T, bool> condition, Func<S, T, R> map)
+    {
+        if (source == null)
+            return null;
+        if (source.Length == 0)
+            return Empty<R>();
+
+        if (source.Length == 1)
+        {
+            var item = source[0];
+            return condition(state, item) ? new[] { map(state, item) } : Empty<R>();
+        }
+
+        if (source.Length == 2)
+        {
+            var c0 = condition(state, source[0]);
+            var c1 = condition(state, source[1]);
+            return c0 & c1 ? new[] { map(state, source[0]), map(state, source[1]) }
+                : c0 ? new[] { map(state, source[0]) }
+                : c1 ? new[] { map(state, source[1]) }
+                : Empty<R>();
+        }
+
+        if (source.Length == 3)
+        {
+            var c0 = condition(state, source[0]);
+            var c1 = condition(state, source[1]);
+            var c2 = condition(state, source[2]);
+            return c0 & c1 & c2 ? new[] { map(state, source[0]), map(state, source[1]), map(state, source[2]) }
+                : c0 ? (c1 ? new[] { map(state, source[0]), map(state, source[1]) } : c2 ? new[] { map(state, source[0]), map(state, source[2]) } : new[] { map(state, source[0]) })
+                : c1 ? (c2 ? new[] { map(state, source[1]), map(state, source[2]) } : new[] { map(state, source[1]) })
+                : c2 ? new[] { map(state, source[2]) }
+                : Empty<R>();
+        }
+
+        var matchStart = 0;
+        R[] matches = null;
+        var matchFound = false;
+
+        var i = 0;
+        for (; i < source.Length; ++i)
+            if (!(matchFound = condition(state, source[i])))
+            {
+                // for accumulated matched items
+                if (i != 0 && i > matchStart)
+                    matches = matches == null 
+                        ? source.Copy(state, matchStart, i - matchStart, map)
+                        : source.AppendTo(state, matches, matchStart, i - matchStart, map);
+                matchStart = i + 1; // guess the next match start will be after the non-matched item
+            }
+
+        // when last match was found but not all items are matched (hence matchStart != 0)
+        if (matchFound && matchStart != 0)
+            return matches == null
+                ? source.Copy(state, matchStart, i - matchStart, map) 
+                : source.AppendTo(state, matches, matchStart, i - matchStart, map);
+
+        return matches ?? (matchStart == 0 ? source.Copy(state, 0, source.Length, map) : Empty<R>());
+    }
+
+    /// <summary>Match with the additional state to use in <paramref name="condition"/> and <paramref name="map"/> 
+    /// to minimize the allocations in <paramref name="condition"/> lambda closure </summary>
+    public static R[] Match<S, T, R>(this T[] source, ref S state, IsOp<S, T> condition, MapOp<S, T, R> map)
+    {
+        if (source == null)
+            return null;
+        if (source.Length == 0)
+            return Empty<R>();
+
+        if (source.Length == 1)
+        {
+            var item = source[0];
+            return condition(ref state, ref item) ? new[] { map(ref state, ref item) } : Empty<R>();
+        }
+
+        if (source.Length == 2)
+        {
+            var c0 = condition(ref state, ref source[0]);
+            var c1 = condition(ref state, ref source[1]);
+            return c0 & c1 ? new[] { map(ref state, ref source[0]), map(ref state, ref source[1]) }
+                : c0 ? new[] { map(ref state, ref source[0]) }
+                : c1 ? new[] { map(ref state, ref source[1]) }
+                : Empty<R>();
+        }
+
+        if (source.Length == 3)
+        {
+            var c0 = condition(ref state, ref source[0]);
+            var c1 = condition(ref state, ref source[1]);
+            var c2 = condition(ref state, ref source[2]);
+            return c0 & c1 & c2 ? new[] { map(ref state, ref source[0]), map(ref state, ref source[1]), map(ref state, ref source[2]) }
+                : c0 ? (c1 ? new[] { map(ref state, ref source[0]), map(ref state, ref source[1]) } 
+                    : c2 ? new[] { map(ref state, ref source[0]), map(ref state, ref source[2]) } 
+                    : new[] { map(ref state, ref source[0]) })
+                : c1 ? (c2 ? new[] { map(ref state, ref source[1]), map(ref state, ref source[2]) } 
+                    : new[] { map(ref state, ref source[1]) })
+                : c2 ? new[] { map(ref state, ref source[2]) }
+                : Empty<R>();
+        }
+
+        var matchStart = 0;
+        R[] matches = null;
+        var matchFound = false;
+
+        var i = 0;
+        for (; i < source.Length; ++i)
+            if (!(matchFound = condition(ref state, ref source[i])))
+            {
+                // for accumulated matched items
+                if (i != 0 && i > matchStart)
+                    matches = matches == null 
+                        ? source.Copy(ref state, matchStart, i - matchStart, map)
+                        : source.AppendTo(ref state, matches, matchStart, i - matchStart, map);
+                matchStart = i + 1; // guess the next match start will be after the non-matched item
+            }
+
+        // when last match was found but not all items are matched (hence matchStart != 0)
+        if (matchFound && matchStart != 0)
+            return matches == null
+                ? source.Copy(ref state, matchStart, i - matchStart, map) 
+                : source.AppendTo(ref state, matches, matchStart, i - matchStart, map);
+
+        return matches ?? (matchStart == 0 ? source.Copy(ref state, 0, source.Length, map) : Empty<R>());
+    }
+
+    /// <summary>Match with the additional state to use in <paramref name="condition"/> and <paramref name="map"/> 
+    /// to minimize the allocations in <paramref name="condition"/> lambda closure </summary>
+    public static R[] Match<A, B, T, R>(this T[] source, A a, B b, Func<A, B, T, bool> condition, Func<A, B, T, R> map)
+    {
+        if (source == null)
+            return null;
+        if (source.Length == 0)
+            return Empty<R>();
+
+        if (source.Length == 1)
+        {
+            var item = source[0];
+            return condition(a, b, item) ? new[] { map(a, b, item) } : Empty<R>();
+        }
+
+        if (source.Length == 2)
+        {
+            var c0 = condition(a, b, source[0]);
+            var c1 = condition(a, b, source[1]);
+            return c0 & c1 ? new[] { map(a, b, source[0]), map(a, b, source[1]) }
+                : c0 ? new[] { map(a, b, source[0]) }
+                : c1 ? new[] { map(a, b, source[1]) }
+                : Empty<R>();
+        }
+
+        var matchStart = 0;
+        R[] matches = null;
+        var matchFound = false;
+
+        var i = 0;
+        for (; i < source.Length; ++i)
+            if (!(matchFound = condition(a, b, source[i])))
+            {
+                // for accumulated matched items
+                if (i != 0 && i > matchStart)
+                    matches = matches == null 
+                        ? source.Copy(a, b, matchStart, i - matchStart, map)
+                        : source.AppendTo(a, b, matches, matchStart, i - matchStart, map);
+
+                matchStart = i + 1; // guess the next match start will be after the non-matched item
+            }
+
+        // when last match was found but not all items are matched (hence matchStart != 0)
+        if (matchFound && matchStart != 0)
+            return matches == null
+                ? source.Copy(a, b, matchStart, i - matchStart, map) 
+                : source.AppendTo(a, b, matches, matchStart, i - matchStart, map);
+
+        return matches ?? (matchStart == 0 ? source.Copy(a, b, 0, source.Length, map) : Empty<R>());
+    }
+
+    /// <summary>Maps all items from source to result array.</summary>
+    /// <typeparam name="T">Source item type</typeparam> <typeparam name="R">Result item type</typeparam>
+    /// <param name="source">Source items</param> <param name="map">Function to convert item from source to result.</param>
+    /// <returns>Converted items</returns>
+    public static R[] Map<T, R>(this T[] source, Func<T, R> map)
+    {
+        if (source == null)
+            return null;
+
+        var sourceCount = source.Length;
+        if (sourceCount == 0)
+            return Empty<R>();
+
+        if (sourceCount == 1)
+            return new[] { map(source[0]) };
+
+        if (sourceCount == 2)
+            return new[] { map(source[0]), map(source[1]) };
+
+        var results = new R[sourceCount];
+        for (var i = 0; i < source.Length; i++)
+            results[i] = map(source[i]);
+        return results;
+    }
+
+    /// Map with additional state to use in <paramref name="map"/> to minimize allocations in <paramref name="map"/> lambda closure 
+    public static R[] Map<T, S, R>(this T[] source, S state, Func<S, T, R> map)
+    {
+        if (source == null)
+            return null;
+
+        var sourceCount = source.Length;
+        if (sourceCount == 0)
+            return Empty<R>();
+
+        if (sourceCount == 1)
+            return new[] { map(state, source[0]) };
+
+        if (sourceCount == 2)
+            return new[] { map(state, source[0]), map(state, source[1]) };
+
+        var results = new R[sourceCount];
+        for (var i = 0; i < source.Length; i++)
+            results[i] = map(state, source[i]);
+        return results;
+    }
+
+    /// Map with additional state to use in <paramref name="map"/> to minimize allocations in <paramref name="map"/> lambda closure 
+    public static R[] Map<T, S, R>(this T[] source, ref S state, MapOp<S, T, R> map)
+    {
+        if (source == null)
+            return null;
+
+        var sourceCount = source.Length;
+        if (sourceCount == 0)
+            return Empty<R>();
+
+        if (sourceCount == 1)
+            return new[] { map(ref state, ref source[0]) };
+
+        if (sourceCount == 2)
+            return new[] { map(ref state, ref source[0]), map(ref state, ref source[1]) };
+
+        var results = new R[sourceCount];
+        for (var i = 0; i < source.Length; i++)
+            results[i] = map(ref state, ref source[i]);
+        return results;
+    }
+
+    /// Map with additional two states to use in <paramref name="map"/> to minimize allocations in <paramref name="map"/> lambda closure 
+    public static R[] Map<T, A, B, R>(this T[] source, A a, B b, Func<A, B, T, R> map)
+    {
+        if (source == null)
+            return null;
+
+        var sourceCount = source.Length;
+        if (sourceCount == 0)
+            return Empty<R>();
+
+        if (sourceCount == 1)
+            return new[] { map(a, b, source[0]) };
+
+        if (sourceCount == 2)
+            return new[] { map(a, b, source[0]), map(a, b, source[1]) };
+
+        var results = new R[sourceCount];
+        for (var i = 0; i < source.Length; i++)
+            results[i] = map(a, b, source[i]);
+        return results;
+    }
+
+    /// <summary>Maps all items from source to result collection. If possible uses fast array Map otherwise Enumerable.Select.</summary>
+    /// <typeparam name="T">Source item type</typeparam> <typeparam name="R">Result item type</typeparam>
+    /// <param name="source">Source items</param> <param name="map">Function to convert item from source to result.</param>
+    /// <returns>Converted items</returns>
+    public static IEnumerable<R> Map<T, R>(this IEnumerable<T> source, Func<T, R> map) =>
+        source is T[] arr ? arr.Map(map) : source?.Select(map);
+
+    /// <summary>If <paramref name="source"/> is array uses more effective Match for array, otherwise just calls Where</summary>
+    /// <typeparam name="T">Type of source items.</typeparam>
+    /// <param name="source">If null, the null will be returned.</param>
+    /// <param name="condition">Condition to keep items.</param>
+    /// <returns>Result items, may be an array.</returns>
+    public static IEnumerable<T> Match<T>(this IEnumerable<T> source, Func<T, bool> condition) =>
+        source is T[] arr ? arr.Match(condition) : source?.Where(condition);
+
+    /// <summary>If <paramref name="source"/> is array than it uses more effective Match for array avoiding the closure over the state `S`,
+    /// otherwise calls Where on the Enumerator avoiding the closure over `S`.
+    /// Should be called mostly when you have an arrays.</summary>
+    public static IEnumerable<T> Match<S, T>(this IEnumerable<T> source, S s, Func<S, T, bool> condition) =>
+        source is T[] arr ? arr.Match(s, condition) : source == null ? null : Where(source, s, condition);
+
+    /// <summary>Calls Where on the Enumerator avoiding the closure over `S`.</summary>
+    public static IEnumerable<T> Where<S, T>(this IEnumerable<T> source, S state, Func<S, T, bool> condition)
+    {
+        var e = source.GetEnumerator();
+        while (e.MoveNext())
+        {
+            var current = e.Current;
+            if (condition(state, current))
+                yield return current;
         }
     }
 
-    /// <summary>Wrapper that provides optimistic-concurrency Swap operation implemented using <see cref="Ref.Swap{T}"/>.</summary>
-    /// <typeparam name="T">Type of object to wrap.</typeparam>
-    public sealed class Ref<T> where T : class
+    /// <summary>If <paramref name="source"/> is array than uses more effective Match for array avoiding the closure over the state `S`,
+    /// otherwise calls combined Where and Select on the Enumerator avoiding the closure over `S`.
+    /// Should be called mostly when you have an arrays.</summary>
+    public static IEnumerable<R> Match<T, R>(this IEnumerable<T> source, Func<T, bool> condition, Func<T, R> map) =>
+        source is T[] arr ? arr.Match(condition, map) : source?.Where(condition).Select(map);
+
+    /// <summary>If <paramref name="source"/> is array than it uses more effective Match for array,
+    /// otherwise calls combined Where and Select on the Enumerator avoiding the closure over `S`. 
+    /// Should be called mostly when you have an arrays</summary>
+    public static IEnumerable<R> Match<S, T, R>(this IEnumerable<T> source, S s, Func<S, T, bool> condition, Func<S, T, R> map) =>
+        source is T[] arr ? arr.Match(s, condition, map) : source == null ? null : WhereSelect(source, s, condition, map);
+
+    /// <summary>Calls combined Where and Select on the Enumerator avoiding the closure over `S`</summary>
+    public static IEnumerable<R> WhereSelect<S, T, R>(this IEnumerable<T> source, S s, Func<S, T, bool> condition, Func<S, T, R> map)
     {
-        /// <summary>Gets the wrapped value.</summary>
-        public T Value => _value;
-        private T _value;
-
-        /// <summary>Creates ref to object, optionally with initial value provided.</summary>
-        /// <param name="initialValue">(optional) Initial value.</param>
-        public Ref(T initialValue = default) => _value = initialValue;
-
-        /// <summary>Exchanges currently hold object with <paramref name="getNewValue"/> - see <see cref="Ref.Swap{T}"/> for details.</summary>
-        /// <param name="getNewValue">Delegate to produce new object value from current one passed as parameter.</param>
-        /// <returns>Returns old object value the same way as <see cref="Interlocked.Exchange(ref int,int)"/></returns>
-        /// <remarks>Important: <paramref name="getNewValue"/> May be called multiple times to retry update with value concurrently changed by other code.</remarks>
-        public T Swap(Func<T, T> getNewValue) =>
-            Ref.Swap(ref _value, getNewValue);
-
-        /// <summary>Swap with the additional state <paramref name="a"/> required for the delegate <paramref name="getNewValue"/>.
-        /// May prevent closure creation for the delegate</summary>
-        public T Swap<A>(A a, Func<T, A, T> getNewValue, int retryCountUntilThrow = Ref.RETRY_COUNT_UNTIL_THROW) =>
-             Ref.Swap(ref _value, a, getNewValue, retryCountUntilThrow);
-
-        /// <summary>Swap with the additional state <paramref name="a"/>, <paramref name="b"/> required for the delegate <paramref name="getNewValue"/>.
-        /// May prevent closure creation for the delegate</summary>
-        public T Swap<A, B>(A a, B b, Func<T, A, B, T> getNewValue, int retryCountUntilThrow = Ref.RETRY_COUNT_UNTIL_THROW) =>
-             Ref.Swap(ref _value, a, b, getNewValue, retryCountUntilThrow);
-
-        /// <summary>Swap returning the last created value</summary>
-        public T SwapAndGetNewValue(Func<T, T> getNewValue, int retryCountUntilThrow = Ref.RETRY_COUNT_UNTIL_THROW) =>
-             Ref.SwapAndGetNewValue(ref _value, getNewValue, retryCountUntilThrow);
-
-        /// <summary>Swap returning the last created value with additional state `A` parameter</summary>
-        public T SwapAndGetNewValue<A>(A a, Func<T, A, T> getNewValue, int retryCountUntilThrow = Ref.RETRY_COUNT_UNTIL_THROW) =>
-             Ref.SwapAndGetNewValue(ref _value, a, getNewValue, retryCountUntilThrow);
-
-        /// <summary>Just sets new value ignoring any intermingled changes and returns the original value</summary>
-        /// <param name="newValue"></param> <returns>old value</returns>
-        public T Swap(T newValue) => Interlocked.Exchange(ref _value, newValue);
-
-        /// <summary>Directly sets the value and returns the new value</summary>
-        public T SetNonAtomic(T newValue) => _value = newValue;
-
-        /// <summary>Compares current Referred value with <paramref name="currentValue"/> and if equal replaces current with <paramref name="newValue"/></summary>
-        /// <param name="currentValue"></param> <param name="newValue"></param>
-        /// <returns>True if current value was replaced with new value, and false if current value is outdated (already changed by other party).</returns>
-        /// <example><c>[!CDATA[
-        /// var value = SomeRef.Value;
-        /// if (!SomeRef.TrySwapIfStillCurrent(value, Update(value))
-        ///     SomeRef.Swap(v => Update(v)); // fallback to normal Swap with delegate allocation
-        /// ]]</c></example>
-        public bool TrySwapIfStillCurrent(T currentValue, T newValue) =>
-            Interlocked.CompareExchange(ref _value, newValue, currentValue) == currentValue;
-
-        /// <summary>Just sets the new value</summary>
-        public void UnsafeSet(T newValue) => _value = newValue;
+        var e = source.GetEnumerator();
+        while (e.MoveNext())
+        {
+            var current = e.Current;
+            if (condition(s, current))
+                yield return map(s, current);
+        }
     }
 
-    /// <summary>Provides optimistic-concurrency consistent <see cref="Swap{T}"/> operation.</summary>
-    public static class Ref
+    /// <summary>If <paramref name="source"/> is array than it uses more effective Match for array,
+    /// otherwise calls combined Where and Select on the Enumerator avoiding the closure over `A` and `B`. 
+    /// Should be called mostly when you have an arrays</summary>
+    public static IEnumerable<R> Match<A, B, T, R>(this IEnumerable<T> source, A a, B b, Func<A, B, T, bool> condition, Func<A, B, T, R> map) =>
+        source is T[] arr
+            ? arr.Match(a, b, condition, map)
+            : source == null
+                ? null
+                : WhereSelect(source, a, b, condition, map);
+
+    /// <summary>Calls combined Where and Select on the Enumerator avoiding the closure over `S`</summary>
+    public static IEnumerable<R> WhereSelect<A, B, T, R>(this IEnumerable<T> source, A a, B b, Func<A, B, T, bool> condition, Func<A, B, T, R> map)
     {
-        /// The default max retry count - can be overridden by `Swap` optional parameter 
-        public const int RETRY_COUNT_UNTIL_THROW = 50;
+        var e = source.GetEnumerator();
+        while (e.MoveNext())
+        {
+            var current = e.Current;
+            if (condition(a, b, current))
+                yield return map(a, b, current);
+        }
+    }
+}
 
-        /// <summary>Factory for <see cref="Ref{T}"/> with type of value inference.</summary>
-        /// <typeparam name="T">Type of value to wrap.</typeparam>
-        /// <param name="value">Initial value to wrap.</param>
-        /// <returns>New ref.</returns>
-        public static Ref<T> Of<T>(T value) where T : class => new Ref<T>(value);
+/// <summary>Wrapper that provides optimistic-concurrency Swap operation implemented using <see cref="Ref.Swap{T}"/>.</summary>
+/// <typeparam name="T">Type of object to wrap.</typeparam>
+public sealed class Ref<T> where T : class
+{
+    /// <summary>Gets the wrapped value.</summary>
+    public T Value => _value;
+    private T _value;
 
-        /// <summary>Creates new ref to the value of original ref.</summary> <typeparam name="T">Ref value type.</typeparam>
-        /// <param name="original">Original ref.</param> <returns>New ref to original value.</returns>
-        public static Ref<T> NewRef<T>(this Ref<T> original) where T : class => Of(original.Value);
+    /// <summary>Creates ref to object, optionally with initial value provided.</summary>
+    /// <param name="initialValue">(optional) Initial value.</param>
+    public Ref(T initialValue = default) => _value = initialValue;
 
-        /// <summary>First, it evaluates new value using <paramref name="getNewValue"/> function. 
-        /// Second, it checks that original value is not changed. 
-        /// If it is changed it will retry first step, otherwise it assigns new value and returns original (the one used for <paramref name="getNewValue"/>).</summary>
-        /// <typeparam name="T">Type of value to swap.</typeparam>
-        /// <param name="value">Reference to change to new value</param>
-        /// <param name="getNewValue">Delegate to get value from old one.</param>
-        /// <param name="retryCountUntilThrow">(optional)</param>
-        /// <returns>Old/original value. By analogy with <see cref="Interlocked.Exchange(ref int,int)"/>.</returns>
-        /// <remarks>Important: <paramref name="getNewValue"/> May be called multiple times to retry update with value concurrently changed by other code.</remarks>
-        [MethodImpl((MethodImplOptions)256)]
-        public static T Swap<T>(ref T value, Func<T, T> getNewValue,
-            int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
+    /// <summary>Exchanges currently hold object with <paramref name="getNewValue"/> - see <see cref="Ref.Swap{T}"/> for details.</summary>
+    /// <param name="getNewValue">Delegate to produce new object value from current one passed as parameter.</param>
+    /// <returns>Returns old object value the same way as <see cref="Interlocked.Exchange(ref int,int)"/></returns>
+    /// <remarks>Important: <paramref name="getNewValue"/> May be called multiple times to retry update with value concurrently changed by other code.</remarks>
+    public T Swap(Func<T, T> getNewValue) =>
+        Ref.Swap(ref _value, getNewValue);
+
+    /// <summary>Swap with the additional state <paramref name="a"/> required for the delegate <paramref name="getNewValue"/>.
+    /// May prevent closure creation for the delegate</summary>
+    public T Swap<A>(A a, Func<T, A, T> getNewValue, int retryCountUntilThrow = Ref.RETRY_COUNT_UNTIL_THROW) =>
+            Ref.Swap(ref _value, a, getNewValue, retryCountUntilThrow);
+
+    /// <summary>Swap with the additional state <paramref name="a"/>, <paramref name="b"/> required for the delegate <paramref name="getNewValue"/>.
+    /// May prevent closure creation for the delegate</summary>
+    public T Swap<A, B>(A a, B b, Func<T, A, B, T> getNewValue, int retryCountUntilThrow = Ref.RETRY_COUNT_UNTIL_THROW) =>
+            Ref.Swap(ref _value, a, b, getNewValue, retryCountUntilThrow);
+
+    /// <summary>Swap returning the last created value</summary>
+    public T SwapAndGetNewValue(Func<T, T> getNewValue, int retryCountUntilThrow = Ref.RETRY_COUNT_UNTIL_THROW) =>
+            Ref.SwapAndGetNewValue(ref _value, getNewValue, retryCountUntilThrow);
+
+    /// <summary>Swap returning the last created value with additional state `A` parameter</summary>
+    public T SwapAndGetNewValue<A>(A a, Func<T, A, T> getNewValue, int retryCountUntilThrow = Ref.RETRY_COUNT_UNTIL_THROW) =>
+            Ref.SwapAndGetNewValue(ref _value, a, getNewValue, retryCountUntilThrow);
+
+    /// <summary>Just sets new value ignoring any intermingled changes and returns the original value</summary>
+    /// <param name="newValue"></param> <returns>old value</returns>
+    public T Swap(T newValue) => Interlocked.Exchange(ref _value, newValue);
+
+    /// <summary>Directly sets the value and returns the new value</summary>
+    public T SetNonAtomic(T newValue) => _value = newValue;
+
+    /// <summary>Compares current Referred value with <paramref name="currentValue"/> and if equal replaces current with <paramref name="newValue"/></summary>
+    /// <param name="currentValue"></param> <param name="newValue"></param>
+    /// <returns>True if current value was replaced with new value, and false if current value is outdated (already changed by other party).</returns>
+    /// <example><c>[!CDATA[
+    /// var value = SomeRef.Value;
+    /// if (!SomeRef.TrySwapIfStillCurrent(value, Update(value))
+    ///     SomeRef.Swap(v => Update(v)); // fallback to normal Swap with delegate allocation
+    /// ]]</c></example>
+    public bool TrySwapIfStillCurrent(T currentValue, T newValue) =>
+        Interlocked.CompareExchange(ref _value, newValue, currentValue) == currentValue;
+
+    /// <summary>Just sets the new value</summary>
+    public void UnsafeSet(T newValue) => _value = newValue;
+}
+
+/// <summary>Provides optimistic-concurrency consistent <see cref="Swap{T}"/> operation.</summary>
+public static class Ref
+{
+    /// The default max retry count - can be overridden by `Swap` optional parameter 
+    public const int RETRY_COUNT_UNTIL_THROW = 50;
+
+    /// <summary>Factory for <see cref="Ref{T}"/> with type of value inference.</summary>
+    /// <typeparam name="T">Type of value to wrap.</typeparam>
+    /// <param name="value">Initial value to wrap.</param>
+    /// <returns>New ref.</returns>
+    public static Ref<T> Of<T>(T value) where T : class => new Ref<T>(value);
+
+    /// <summary>Creates new ref to the value of original ref.</summary> <typeparam name="T">Ref value type.</typeparam>
+    /// <param name="original">Original ref.</param> <returns>New ref to original value.</returns>
+    public static Ref<T> NewRef<T>(this Ref<T> original) where T : class => Of(original.Value);
+
+    /// <summary>First, it evaluates new value using <paramref name="getNewValue"/> function. 
+    /// Second, it checks that original value is not changed. 
+    /// If it is changed it will retry first step, otherwise it assigns new value and returns original (the one used for <paramref name="getNewValue"/>).</summary>
+    /// <typeparam name="T">Type of value to swap.</typeparam>
+    /// <param name="value">Reference to change to new value</param>
+    /// <param name="getNewValue">Delegate to get value from old one.</param>
+    /// <param name="retryCountUntilThrow">(optional)</param>
+    /// <returns>Old/original value. By analogy with <see cref="Interlocked.Exchange(ref int,int)"/>.</returns>
+    /// <remarks>Important: <paramref name="getNewValue"/> May be called multiple times to retry update with value concurrently changed by other code.</remarks>
+    [MethodImpl((MethodImplOptions)256)]
+    public static T Swap<T>(ref T value, Func<T, T> getNewValue,
+        int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
+        where T : class
+    {
+        var spinWait = new SpinWait();
+        var retryCount = 0;
+        while (true)
+        {
+            var oldValue = value;
+            var newValue = getNewValue(oldValue);
+            if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
+                return oldValue;
+
+            if (++retryCount > retryCountUntilThrow)
+                ThrowRetryCountExceeded(retryCountUntilThrow);
+            spinWait.SpinOnce();
+        }
+    }
+
+    internal static void ThrowRetryCountExceeded(int retryCountExceeded) =>
+        throw new InvalidOperationException(
+            $"Ref retried to Update for {retryCountExceeded} times But there is always someone else intervened.");
+
+    /// <summary>Swap with the additional state <paramref name="a"/> required for the delegate <paramref name="getNewValue"/>.
+    /// May prevent closure creation for the delegate</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static T Swap<T, A>(ref T value, A a, Func<T, A, T> getNewValue,
+        int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
+        where T : class
+    {
+        var spinWait = new SpinWait();
+        var retryCount = 0;
+        while (true)
+        {
+            var oldValue = value;
+            var newValue = getNewValue(oldValue, a);
+            if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
+                return oldValue;
+            if (++retryCount > retryCountUntilThrow)
+                ThrowRetryCountExceeded(retryCountUntilThrow);
+            spinWait.SpinOnce();
+        }
+    }
+
+    /// <summary>Swap returning the last created value</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static T SwapAndGetNewValue<T>(ref T value, Func<T, T> getNewValue,
+        int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
+        where T : class
+    {
+        var spinWait = new SpinWait();
+        var retryCount = 0;
+        while (true)
+        {
+            var oldValue = value;
+            var newValue = getNewValue(oldValue);
+            if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
+                return newValue;
+            if (++retryCount > retryCountUntilThrow)
+                ThrowRetryCountExceeded(retryCountUntilThrow);
+            spinWait.SpinOnce();
+        }
+    }
+
+    /// <summary>Swap returning the last created value with additional state `A` parameter</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static T SwapAndGetNewValue<T, A>(ref T value, A a, Func<T, A, T> getNewValue,
+        int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
+        where T : class
+    {
+        var spinWait = new SpinWait();
+        var retryCount = 0;
+        while (true)
+        {
+            var oldValue = value;
+            var newValue = getNewValue(oldValue, a);
+            if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
+                return newValue;
+            if (++retryCount > retryCountUntilThrow)
+                ThrowRetryCountExceeded(retryCountUntilThrow);
+            spinWait.SpinOnce();
+        }
+    }
+
+    /// <summary>Get the interrupted result</summary>
+    public delegate R GetInterrupted<T, A, R>(T oldValue, T newValue, A a, R result);
+
+    /// <summary>
+    /// If interrupted (is checked by the <paramref name="getInterrupted"/> delegate),
+    /// then avoid the swap completely and returns the interrupted result.
+    /// Otherwise, tries to swap with the new value and returns the origina result.
+    /// See the usages to understand the purpose.
+    /// </summary>
+    public static R Swap<T, A, R>(ref T value, A a, R result,
+        Func<T, A, R, T> update, GetInterrupted<T, A, R> getInterrupted)
             where T : class
+            where R : class
+    {
+        var spinWait = new SpinWait();
+        var retryCount = 0;
+        while (true)
         {
-            var spinWait = new SpinWait();
-            var retryCount = 0;
-            while (true)
-            {
-                var oldValue = value;
-                var newValue = getNewValue(oldValue);
-                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
-                    return oldValue;
-
-                if (++retryCount > retryCountUntilThrow)
-                    ThrowRetryCountExceeded(retryCountUntilThrow);
-                spinWait.SpinOnce();
-            }
-        }
-
-        internal static void ThrowRetryCountExceeded(int retryCountExceeded) =>
-            throw new InvalidOperationException(
-                $"Ref retried to Update for {retryCountExceeded} times But there is always someone else intervened.");
-
-        /// <summary>Swap with the additional state <paramref name="a"/> required for the delegate <paramref name="getNewValue"/>.
-        /// May prevent closure creation for the delegate</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static T Swap<T, A>(ref T value, A a, Func<T, A, T> getNewValue,
-            int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
-            where T : class
-        {
-            var spinWait = new SpinWait();
-            var retryCount = 0;
-            while (true)
-            {
-                var oldValue = value;
-                var newValue = getNewValue(oldValue, a);
-                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
-                    return oldValue;
-                if (++retryCount > retryCountUntilThrow)
-                    ThrowRetryCountExceeded(retryCountUntilThrow);
-                spinWait.SpinOnce();
-            }
-        }
-
-        /// <summary>Swap returning the last created value</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static T SwapAndGetNewValue<T>(ref T value, Func<T, T> getNewValue,
-            int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
-            where T : class
-        {
-            var spinWait = new SpinWait();
-            var retryCount = 0;
-            while (true)
-            {
-                var oldValue = value;
-                var newValue = getNewValue(oldValue);
-                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
-                    return newValue;
-                if (++retryCount > retryCountUntilThrow)
-                    ThrowRetryCountExceeded(retryCountUntilThrow);
-                spinWait.SpinOnce();
-            }
-        }
-
-        /// <summary>Swap returning the last created value with additional state `A` parameter</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static T SwapAndGetNewValue<T, A>(ref T value, A a, Func<T, A, T> getNewValue,
-            int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
-            where T : class
-        {
-            var spinWait = new SpinWait();
-            var retryCount = 0;
-            while (true)
-            {
-                var oldValue = value;
-                var newValue = getNewValue(oldValue, a);
-                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
-                    return newValue;
-                if (++retryCount > retryCountUntilThrow)
-                    ThrowRetryCountExceeded(retryCountUntilThrow);
-                spinWait.SpinOnce();
-            }
-        }
-
-        /// <summary>Get the interrupted result</summary>
-        public delegate R GetInterrupted<T, A, R>(T oldValue, T newValue, A a, R result);
-
-        /// <summary>
-        /// If interrupted (is checked by the <paramref name="getInterrupted"/> delegate),
-        /// then avoid the swap completely and returns the interrupted result.
-        /// Otherwise, tries to swap with the new value and returns the origina result.
-        /// See the usages to understand the purpose.
-        /// </summary>
-        public static R Swap<T, A, R>(ref T value, A a, R result,
-            Func<T, A, R, T> update, GetInterrupted<T, A, R> getInterrupted)
-                where T : class
-                where R : class
-        {
-            var spinWait = new SpinWait();
-            var retryCount = 0;
-            while (true)
-            {
-                var oldValue = value;
-                var newValue = update(oldValue, a, result);
-                var existingResult = getInterrupted(oldValue, newValue, a, result);
-                if (existingResult != result)
-                    return existingResult;
-                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
-                    return result;
-                if (++retryCount > Ref.RETRY_COUNT_UNTIL_THROW)
-                    Ref.ThrowRetryCountExceeded(Ref.RETRY_COUNT_UNTIL_THROW);
-                spinWait.SpinOnce();
-            }
-        }
-
-        /// <summary>Swap with the additional state a, b required for the delegate.
-        /// Helps to avoid closure creation for the delegate</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static T Swap<T, A, B>(ref T value, A a, B b, Func<T, A, B, T> getNewValue,
-            int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
-            where T : class
-        {
-            var spinWait = new SpinWait();
-            var retryCount = 0;
-            while (true)
-            {
-                var oldValue = value;
-                var newValue = getNewValue(oldValue, a, b);
-                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
-                    return oldValue;
-                if (++retryCount > retryCountUntilThrow)
-                    ThrowRetryCountExceeded(retryCountUntilThrow);
-                spinWait.SpinOnce();
-            }
-        }
-
-        /// <summary>Swap with the additional state a, b passed by ref, and so may be modified by the delegate implementation.</summary>
-        public delegate T GetNewValue<T, A, B>(T oldValue, ref A a, ref B b);
-
-        /// <summary>Swap with the additional state a, b required for the delegate.
-        /// Helps to avoid closure creation, and unnecessary memory allocation for the delegate</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static T Swap<T, A, B>(ref T value, ref A a, ref B b, GetNewValue<T, A, B> getNewValue,
-            int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
-            where T : class
-        {
-            var spinWait = new SpinWait();
-            var retryCount = 0;
-            while (true)
-            {
-                var oldValue = value;
-                var newValue = getNewValue(oldValue, ref a, ref b);
-                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
-                    return oldValue;
-                if (++retryCount > retryCountUntilThrow)
-                    ThrowRetryCountExceeded(retryCountUntilThrow);
-                spinWait.SpinOnce();
-            }
-        }
-
-        /// <summary>Swap with the additional state a, b, c required for the delegate.
-        /// Helps to avoid closure creation for the delegate</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static T Swap<T, A, B, C>(ref T value, A a, B b, C c, Func<T, A, B, C, T> getNewValue,
-            int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
-            where T : class
-        {
-            var spinWait = new SpinWait();
-            var retryCount = 0;
-            while (true)
-            {
-                var oldValue = value;
-                var newValue = getNewValue(oldValue, a, b, c);
-                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
-                    return oldValue;
-                if (++retryCount > retryCountUntilThrow)
-                    ThrowRetryCountExceeded(retryCountUntilThrow);
-                spinWait.SpinOnce();
-            }
-        }
-
-        /// <summary>Swap with the additional state a, b, c, d` required for the delegate.
-        /// Helps to avoid closure creation for the delegate</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static T Swap<T, A, B, C, D>(ref T value, A a, B b, C c, D d, Func<T, A, B, C, D, T> getNewValue,
-            int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
-            where T : class
-        {
-            var spinWait = new SpinWait();
-            var retryCount = 0;
-            while (true)
-            {
-                var oldValue = value;
-                var newValue = getNewValue(oldValue, a, b, c, d);
-                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
-                    return oldValue;
-                if (++retryCount > retryCountUntilThrow)
-                    ThrowRetryCountExceeded(retryCountUntilThrow);
-                spinWait.SpinOnce();
-            }
+            var oldValue = value;
+            var newValue = update(oldValue, a, result);
+            var existingResult = getInterrupted(oldValue, newValue, a, result);
+            if (existingResult != result)
+                return existingResult;
+            if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
+                return result;
+            if (++retryCount > Ref.RETRY_COUNT_UNTIL_THROW)
+                Ref.ThrowRetryCountExceeded(Ref.RETRY_COUNT_UNTIL_THROW);
+            spinWait.SpinOnce();
         }
     }
 
-    /// <summary>Printable thing via provided printer </summary>
-    public interface IPrintable
+    /// <summary>Swap with the additional state a, b required for the delegate.
+    /// Helps to avoid closure creation for the delegate</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static T Swap<T, A, B>(ref T value, A a, B b, Func<T, A, B, T> getNewValue,
+        int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
+        where T : class
     {
-        /// <summary>Print to the provided string builder via the provided printer.</summary>
-        StringBuilder Print(StringBuilder s, Func<StringBuilder, object, StringBuilder> printer);
-    }
-
-    /// <summary>Produces good enough hash codes for the fields</summary>
-    public static class Hasher
-    {
-        /// <summary>Combines hashes of two fields</summary>
-        public static int Combine<T1, T2>(T1 a, T2 b)
+        var spinWait = new SpinWait();
+        var retryCount = 0;
+        while (true)
         {
-            var bh = b?.GetHashCode() ?? 0;
-            if (ReferenceEquals(a, null))
-                return bh;
-            var ah = a.GetHashCode();
-            if (ah == 0)
-                return bh;
-            return Combine(ah, bh);
-        }
-
-        /// <summary>Inspired by System.Tuple.CombineHashCodes</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static int Combine(int h1, int h2)
-        {
-            unchecked
-            {
-                return (h1 << 5) + h1 ^ h2;
-            }
+            var oldValue = value;
+            var newValue = getNewValue(oldValue, a, b);
+            if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
+                return oldValue;
+            if (++retryCount > retryCountUntilThrow)
+                ThrowRetryCountExceeded(retryCountUntilThrow);
+            spinWait.SpinOnce();
         }
     }
 
-    ///<summary>Simple unbounded object pool</summary>
-    public sealed class StackPool<T> where T : class
+    /// <summary>Swap with the additional state a, b passed by ref, and so may be modified by the delegate implementation.</summary>
+    public delegate T GetNewValue<T, A, B>(T oldValue, ref A a, ref B b);
+
+    /// <summary>Swap with the additional state a, b required for the delegate.
+    /// Helps to avoid closure creation, and unnecessary memory allocation for the delegate</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static T Swap<T, A, B>(ref T value, ref A a, ref B b, GetNewValue<T, A, B> getNewValue,
+        int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
+        where T : class
     {
-        /// <summary>Give me an object</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public T RentOrNull() => Interlocked.Exchange(ref _s, _s?.Tail)?.Head;
-
-        /// <summary>Give it back</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public void Return(T x) => _s = new Stack(x, _s); // we don't need to interlocked here because it is fine to abandon the one Stack item
-
-        private Stack _s;
-        private sealed class Stack
+        var spinWait = new SpinWait();
+        var retryCount = 0;
+        while (true)
         {
-            public readonly T Head;
-            public readonly Stack Tail;
-            public Stack(T h, Stack t) { Head = h; Tail = t; }
+            var oldValue = value;
+            var newValue = getNewValue(oldValue, ref a, ref b);
+            if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
+                return oldValue;
+            if (++retryCount > retryCountUntilThrow)
+                ThrowRetryCountExceeded(retryCountUntilThrow);
+            spinWait.SpinOnce();
         }
     }
 
-    /// <summary>A pool of small arrays of increasing length from 1 to `MaxArrayLength`.
-    /// It may be useful to store types or objects for reflection calls.</summary>
-    public struct SmallArrayPool<T>
+    /// <summary>Swap with the additional state a, b, c required for the delegate.
+    /// Helps to avoid closure creation for the delegate</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static T Swap<T, A, B, C>(ref T value, A a, B b, C c, Func<T, A, B, C, T> getNewValue,
+        int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
+        where T : class
     {
-        /// <summary>The max length of array and the number of arrays that can be rented from the pool</summary>
-        public const byte MaxSmallArrayLength = 7;
-
-        private readonly static T[][] SmallArrays = new T[MaxSmallArrayLength][]
+        var spinWait = new SpinWait();
+        var retryCount = 0;
+        while (true)
         {
-            new T[1],
-            new T[2],
-            new T[3],
-            new T[4],
-            new T[5],
-            new T[6],
-            new T[7],
-        };
-
-        /// <summary>Rent the existing static array or create a new array if it is already rented.
-        /// The method does not check the `requiredLength` is in the pool bounds to avoid performance cost.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static T[] RentOrNew(int requiredLength) =>
-            Interlocked.Exchange(ref SmallArrays[requiredLength - 1], null) ?? new T[requiredLength];
-
-        /// <summary>Returns the array back. If array length is greater than `MaxArrayLength` then we will do nothing.
-        /// Also to avoid memory leaks the passed array will be cleared before returning to the pool.
-        /// The method does not check the `arr.Length` is in the pool bounds to avoid performance cost.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static void Return(T[] arr)
-        {
-            for (var i = 0; (uint)i < arr.Length; ++i)
-                arr[i] = default;
-            SmallArrays[arr.Length - 1] = arr;
+            var oldValue = value;
+            var newValue = getNewValue(oldValue, a, b, c);
+            if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
+                return oldValue;
+            if (++retryCount > retryCountUntilThrow)
+                ThrowRetryCountExceeded(retryCountUntilThrow);
+            spinWait.SpinOnce();
         }
     }
 
-    /// <summary>Immutable Key-Value pair. It is reference type (could be check for null), 
-    /// which is different from System value type <see cref="KeyValuePair{TKey,TValue}"/>.
-    /// In addition provides <see cref="Equals"/> and <see cref="GetHashCode"/> implementations.</summary>
-    /// <typeparam name="K">Type of Key.</typeparam><typeparam name="V">Type of Value.</typeparam>
-    public sealed class KV<K, V> : IPrintable
+    /// <summary>Swap with the additional state a, b, c, d` required for the delegate.
+    /// Helps to avoid closure creation for the delegate</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static T Swap<T, A, B, C, D>(ref T value, A a, B b, C c, D d, Func<T, A, B, C, D, T> getNewValue,
+        int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
+        where T : class
     {
-        /// <summary>Key.</summary>
-        public readonly K Key;
-
-        /// <summary>Value.</summary>
-        public readonly V Value;
-
-        /// <summary>Creates Key-Value object by providing key and value. Does Not check either one for null.</summary>
-        /// <param name="key">key.</param><param name="value">value.</param>
-        public KV(K key, V value)
+        var spinWait = new SpinWait();
+        var retryCount = 0;
+        while (true)
         {
-            Key = key;
-            Value = value;
+            var oldValue = value;
+            var newValue = getNewValue(oldValue, a, b, c, d);
+            if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
+                return oldValue;
+            if (++retryCount > retryCountUntilThrow)
+                ThrowRetryCountExceeded(retryCountUntilThrow);
+            spinWait.SpinOnce();
         }
+    }
+}
 
-        /// <inheritdoc />
-        public StringBuilder Print(StringBuilder s, Func<StringBuilder, object, StringBuilder> printer)
-        {
-            s.Append("(");
-            if (Key != null)
-                s = printer(s, Key);
-            s.Append(", ");
-            if (Value != null)
-                s = printer(s, Value);
-            return s.Append(')');
-        }
+/// <summary>Printable thing via provided printer </summary>
+public interface IPrintable
+{
+    /// <summary>Print to the provided string builder via the provided printer.</summary>
+    StringBuilder Print(StringBuilder s, Func<StringBuilder, object, StringBuilder> printer);
+}
 
-        /// <summary>Creates a nice string view.</summary>
-        public override string ToString() =>
-            Print(new StringBuilder(), static (s, x) => s.Append(x)).ToString();
-
-        /// <summary>Returns true if both key and value are equal to corresponding key-value of other object.</summary>
-        public override bool Equals(object obj) => obj is KV<K, V> other &&
-            (ReferenceEquals(other.Key, Key) || Equals(other.Key, Key)) &&
-            (ReferenceEquals(other.Value, Value) || Equals(other.Value, Value));
-
-        /// <summary>Combines key and value hash code</summary>
-        public override int GetHashCode() => Hasher.Combine(Key, Value);
+/// <summary>Produces good enough hash codes for the fields</summary>
+public static class Hasher
+{
+    /// <summary>Combines hashes of two fields</summary>
+    public static int Combine<T1, T2>(T1 a, T2 b)
+    {
+        var bh = b?.GetHashCode() ?? 0;
+        if (ReferenceEquals(a, null))
+            return bh;
+        var ah = a.GetHashCode();
+        if (ah == 0)
+            return bh;
+        return Combine(ah, bh);
     }
 
-    /// <summary>Helpers for <see cref="KV{K,V}"/>.</summary>
-    public static class KV
+    /// <summary>Inspired by System.Tuple.CombineHashCodes</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static int Combine(int h1, int h2)
     {
-        /// <summary>Creates the key value pair.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static KV<K, V> Of<K, V>(K key, V value) => new KV<K, V>(key, value);
-
-        /// <summary>Creates the pair with the new value</summary>
-        public static KV<K, V> WithValue<K, V>(this KV<K, V> kv, V value) => new KV<K, V>(kv.Key, value);
+        unchecked
+        {
+            return (h1 << 5) + h1 ^ h2;
+        }
     }
+}
 
-    /// Simple helper for creation of the pair of two parts.
-    public static class KeyValuePair
+///<summary>Simple unbounded object pool</summary>
+public sealed class StackPool<T> where T : class
+{
+    /// <summary>Give me an object</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public T RentOrNull() => Interlocked.Exchange(ref _s, _s?.Tail)?.Head;
+
+    /// <summary>Give it back</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public void Return(T x) => _s = new Stack(x, _s); // we don't need to interlocked here because it is fine to abandon the one Stack item
+
+    private Stack _s;
+    private sealed class Stack
     {
-        /// Pairs key with value.
-        public static KeyValuePair<K, V> Pair<K, V>(this K key, V value) => new KeyValuePair<K, V>(key, value);
-    }
-
-    /// <summary>Helper structure which allows to distinguish null value from the default value for optional parameter.</summary>
-    public struct Opt<T>
-    {
-        /// <summary>Allows to transparently convert parameter argument to opt structure.</summary>
-        public static implicit operator Opt<T>(T value) => new Opt<T>(value);
-
-        /// <summary>Argument value.</summary>
-        public readonly T Value;
-
-        /// <summary>Indicates that value is provided.</summary>
-        public readonly bool HasValue;
-
-        /// <summary>Wraps passed value in structure. Sets the flag that value is present.</summary>
-        public Opt(T value)
-        {
-            HasValue = true;
-            Value = value;
-        }
-
-        /// <summary>Helper to get value or default value if value is not present.</summary>
-        public T OrDefault(T defaultValue = default) => HasValue ? Value : defaultValue;
-    }
-
-    /// <summary>Ever growing list methods</summary>
-    public static class GrowingList
-    {
-        /// <summary>Default initial capacity </summary>
-        public const int DefaultInitialCapacity = 2;
-
-        /// Push the new slot and return the ref to it
-        public static ref T PushSlot<T>(ref T[] items, int count)
-        {
-            if (items == null)
-                items = new T[DefaultInitialCapacity];
-            else if (count >= items.Length)
-                Expand(ref items);
-            return ref items[count];
-        }
-
-        /// Adds the new item possibly extending the item collection
-        public static void Push<T>(ref T[] items, int count, T item)
-        {
-            if (items == null)
-                items = new T[DefaultInitialCapacity];
-            else if (count >= items.Length)
-                Expand(ref items);
-            items[count] = item;
-        }
-
-        /// <summary>Expands the items starting with 2</summary>
-        internal static void Expand<T>(ref T[] items)
-        {
-            var count = items.Length;
-            var newItems = new T[count << 1]; // count x 2
-            if (count < 6)
-                for (var i = 0; i < count; ++i)
-                    newItems[i] = items[i];
-            else
-                Array.Copy(items, 0, newItems, 0, count);
-        }
-
-        ///<summary>Creates the final array out of the list, so that you cannot use after that!</summary>
-        public static T[] ResizeToArray<T>(T[] items, int count)
-        {
-            if (count < items.Length)
-                Array.Resize(ref items, count);
-            return items;
-        }
-
-        /// <inheritdoc />
-        public static string ToString<T>(T[] items, int count) =>
-            $"Count {count} of {(count == 0 || items == null || items.Length == 0 ? "empty" : "first (" + items[0] + ") and last (" + items[count - 1] + ")")}";
-    }
-
-    /// <summary>Ever growing list</summary>
-    public struct GrowingList<T>
-    {
-        /// <summary>Default initial capacity </summary>
-        public const int DefaultInitialCapacity = 2;
-
-        /// <summary>The items array</summary>
-        public T[] Items;
-
-        /// <summary>The count</summary>
-        public int Count;
-
-        /// <summary>Constructs the thing</summary>
-        public GrowingList(T[] items, int count = 0)
-        {
-            Items = items;
-            Count = count;
-        }
-
-        /// <summary>Push the new slot and return the ref to it</summary>
-        public ref T PushSlot()
-        {
-            if (Items == null)
-                Items = new T[DefaultInitialCapacity];
-            else if (Count >= Items.Length)
-                GrowingList.Expand(ref Items);
-            return ref Items[Count++];
-        }
-
-        /// <summary>Adds the new item possibly extending the item collection</summary>
-        public void Push(T item)
-        {
-            if (Items == null)
-                Items = new T[DefaultInitialCapacity];
-            else if (Count >= Items.Length)
-                GrowingList.Expand(ref Items);
-            Items[Count++] = item;
-        }
-
-        /// <summary>Pops the item - just moving the counter back</summary>
-        public void Pop() => --Count;
-
-        ///<summary>Creates the final array out of the list, so that you cannot use after that!</summary>
-        public T[] ResizeToArray()
-        {
-            var items = Items;
-            if (Count < items.Length)
-                Array.Resize(ref items, Count);
-            return items;
-        }
-
-        // todo: @naming think of the better name
-        /// <summary>Pops the item - just moving the counter back</summary>
-        public T PopItem() => Items[--Count];
-
-        /// <inheritdoc />
-        public override string ToString() =>
-            $"Count {Count} of {(Count == 0 || Items == null || Items.Length == 0 ? "empty" : "first (" + Items[0] + ") and last (" + Items[Count - 1] + ")")}";
-    }
-
-    /// <summary>Immutable list - simplest linked list with the Head and the Tail.</summary>
-    public sealed class ImList<T>
-    {
-        /// <summary>Empty list to Push to.</summary>
-        public static readonly ImList<T> Empty = new ImList<T>();
-
-        /// <summary>True for empty list.</summary>
-        public bool IsEmpty => Tail == null;
-
-        /// <summary>First value in a list.</summary>
         public readonly T Head;
+        public readonly Stack Tail;
+        public Stack(T h, Stack t) { Head = h; Tail = t; }
+    }
+}
 
-        /// <summary>The rest of values or Empty if list has a single value.</summary>
-        public readonly ImList<T> Tail;
+/// <summary>A pool of small arrays of increasing length from 1 to `MaxArrayLength`.
+/// It may be useful to store types or objects for reflection calls.</summary>
+public struct SmallArrayPool<T>
+{
+    /// <summary>The max length of array and the number of arrays that can be rented from the pool</summary>
+    public const byte MaxSmallArrayLength = 7;
 
-        /// <summary>Prepends new value and returns new list.</summary>
-        public ImList<T> Push(T head) => new ImList<T>(head, this);
+    private readonly static T[][] SmallArrays = new T[MaxSmallArrayLength][]
+    {
+        new T[1],
+        new T[2],
+        new T[3],
+        new T[4],
+        new T[5],
+        new T[6],
+        new T[7],
+    };
 
-        /// <summary>Enumerates the list.</summary>
-        public IEnumerable<T> Enumerate()
-        {
-            if (Tail == null)
-                yield break;
-            for (var list = this; list.Tail != null; list = list.Tail)
-                yield return list.Head;
-        }
+    /// <summary>Rent the existing static array or create a new array if it is already rented.
+    /// The method does not check the `requiredLength` is in the pool bounds to avoid performance cost.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static T[] RentOrNew(int requiredLength) =>
+        Interlocked.Exchange(ref SmallArrays[requiredLength - 1], null) ?? new T[requiredLength];
 
-        /// <summary>String representation for debugging purposes</summary>
-        public override string ToString() => IsEmpty
-            ? "[]" : Tail.IsEmpty
-            ? "[" + Head + "]" : Tail.Tail.IsEmpty
-            ? "[" + Head + "," + Tail.Head + "]" : Tail.Tail.Tail.IsEmpty
-            ? "[" + Head + "," + Tail.Head + "," + Tail.Tail.Head + "]"
-            : "[" + Head + "," + Tail.Head + "," + Tail.Tail.Head + ", ...]";
+    /// <summary>Returns the array back. If array length is greater than `MaxArrayLength` then we will do nothing.
+    /// Also to avoid memory leaks the passed array will be cleared before returning to the pool.
+    /// The method does not check the `arr.Length` is in the pool bounds to avoid performance cost.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static void Return(T[] arr)
+    {
+        for (var i = 0; (uint)i < arr.Length; ++i)
+            arr[i] = default;
+        SmallArrays[arr.Length - 1] = arr;
+    }
+}
 
-        private ImList() { }
-        private ImList(T head, ImList<T> tail)
-        {
-            Head = head;
-            Tail = tail;
-        }
+/// <summary>Immutable Key-Value pair. It is reference type (could be check for null), 
+/// which is different from System value type <see cref="KeyValuePair{TKey,TValue}"/>.
+/// In addition provides <see cref="Equals"/> and <see cref="GetHashCode"/> implementations.</summary>
+/// <typeparam name="K">Type of Key.</typeparam><typeparam name="V">Type of Value.</typeparam>
+public sealed class KV<K, V> : IPrintable
+{
+    /// <summary>Key.</summary>
+    public readonly K Key;
+
+    /// <summary>Value.</summary>
+    public readonly V Value;
+
+    /// <summary>Creates Key-Value object by providing key and value. Does Not check either one for null.</summary>
+    /// <param name="key">key.</param><param name="value">value.</param>
+    public KV(K key, V value)
+    {
+        Key = key;
+        Value = value;
     }
 
-    /// <summary>Extension methods providing basic operations on a list.</summary>
-    public static class ImList
+    /// <inheritdoc />
+    public StringBuilder Print(StringBuilder s, Func<StringBuilder, object, StringBuilder> printer)
     {
-        /// Split list into (Head, Tail, IsEmpty) tuple
-        public static void Deconstruct<T>(this ImList<T> list, out T head, out ImList<T> tail, out bool isEmpty)
-        {
-            head = list.Head;
-            tail = list.Tail;
-            isEmpty = list.IsEmpty;
-        }
-
-        /// <summary>
-        /// Constructs the reversed list from the parameter array of items
-        /// </summary>
-        public static ImList<T> List<T>(params T[] items)
-        {
-            var l = ImList<T>.Empty;
-            if (items != null)
-                for (var i = items.Length - 1; i >= 0; --i)
-                    l = l.Push(items[i]);
-            return l;
-        }
-
-        /// <summary>
-        /// Constructs the list as the reversed input list
-        /// </summary>
-        public static ImList<T> ToImList<T>(this IList<T> source)
-        {
-            var l = ImList<T>.Empty;
-            if (source != null)
-                for (var i = source.Count - 1; i >= 0; --i)
-                    l = l.Push(source[i]);
-            return l;
-        }
-
-        /// <summary>
-        /// Constructs the list as the reversed enumerable
-        /// </summary>
-        public static ImList<T> ToImList<T>(this IEnumerable<T> source)
-        {
-            if (source is IList<T> list)
-                return list.ToImList();
-            var l = ImList<T>.Empty;
-
-            if (source != null)
-                foreach (var item in source)
-                    l = l.Push(item);
-            return l.Reverse();
-        }
-
-        /// <summary>Constructs list of one element</summary>
-        public static ImList<T> List<T>(this T head) => ImList<T>.Empty.Push(head);
-
-        /// <summary>Constructs list from head and tail</summary>
-        public static ImList<T> List<T>(this T head, ImList<T> tail) => tail.Push(head);
-
-        /// <summary>Apples some effect action to each element</summary>
-        public static void ForEach<T>(this ImList<T> list, Action<T> effect)
-        {
-            for (; !list.IsEmpty; list = list.Tail)
-                effect(list.Head);
-        }
-
-        /// <summary>Fold list to a single value. The respective name for it in LINQ is Aggregate</summary>
-        public static S Fold<T, S>(this ImList<T> list, S state, Func<T, S, S> handler)
-        {
-            if (list.IsEmpty)
-                return state;
-            var result = state;
-            for (; !list.IsEmpty; list = list.Tail)
-                result = handler(list.Head, result);
-            return result;
-        }
-
-        /// <summary>Fold list to a single value with index of item. The respective name for it in LINQ is Aggregate.</summary>
-        public static S Fold<T, S>(this ImList<T> list, S state, Func<T, int, S, S> handler)
-        {
-            if (list.IsEmpty)
-                return state;
-            var result = state;
-            for (var i = 0; !list.IsEmpty; list = list.Tail, ++i)
-                result = handler(list.Head, i, result);
-            return result;
-        }
-
-        /// <summary>Returns new list in reverse order.</summary>
-        public static ImList<T> Reverse<T>(this ImList<T> list)
-        {
-            if (list.IsEmpty || list.Tail.IsEmpty)
-                return list;
-            var reversed = ImList<T>.Empty;
-            for (; !list.IsEmpty; list = list.Tail)
-                reversed = reversed.Push(list.Head);
-            return reversed;
-        }
-
-        /// <summary>Maps the items from the first list to the result list.</summary>
-        public static ImList<R> Map<T, R>(this ImList<T> list, Func<T, R> map) =>
-            list.Fold(ImList<R>.Empty, (x, r) => List(map(x), r)).Reverse();
-
-        /// <summary>Maps with index</summary>
-        public static ImList<R> Map<T, R>(this ImList<T> list, Func<T, int, R> map) =>
-            list.Fold(ImList<R>.Empty, (x, i, r) => List(map(x, i), r)).Reverse();
-
-        /// <summary>Copies list to array.</summary>
-        public static T[] ToArray<T>(this ImList<T> source) =>
-            source.IsEmpty ? ArrayTools.Empty<T>()
-            : source.Tail.IsEmpty ? new[] { source.Head } : source.Enumerate().ToArray();
+        s.Append("(");
+        if (Key != null)
+            s = printer(s, Key);
+        s.Append(", ");
+        if (Value != null)
+            s = printer(s, Value);
+        return s.Append(')');
     }
 
-    /// Zipper is an immutable persistent data structure, to represent collection with single focused (selected, active) element.
-    /// Consist of REVERSED `Left` immutable list, `Focus` element, and the `Right` immutable list. That's why a Zipper name,
-    /// where left and right part are joined / zipped in focus item.
-    public sealed class ImZipper<T>
+    /// <summary>Creates a nice string view.</summary>
+    public override string ToString() =>
+        Print(new StringBuilder(), static (s, x) => s.Append(x)).ToString();
+
+    /// <summary>Returns true if both key and value are equal to corresponding key-value of other object.</summary>
+    public override bool Equals(object obj) => obj is KV<K, V> other &&
+        (ReferenceEquals(other.Key, Key) || Equals(other.Key, Key)) &&
+        (ReferenceEquals(other.Value, Value) || Equals(other.Value, Value));
+
+    /// <summary>Combines key and value hash code</summary>
+    public override int GetHashCode() => Hasher.Combine(Key, Value);
+}
+
+/// <summary>Helpers for <see cref="KV{K,V}"/>.</summary>
+public static class KV
+{
+    /// <summary>Creates the key value pair.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static KV<K, V> Of<K, V>(K key, V value) => new KV<K, V>(key, value);
+
+    /// <summary>Creates the pair with the new value</summary>
+    public static KV<K, V> WithValue<K, V>(this KV<K, V> kv, V value) => new KV<K, V>(kv.Key, value);
+}
+
+/// Simple helper for creation of the pair of two parts.
+public static class KeyValuePair
+{
+    /// Pairs key with value.
+    public static KeyValuePair<K, V> Pair<K, V>(this K key, V value) => new KeyValuePair<K, V>(key, value);
+}
+
+/// <summary>Helper structure which allows to distinguish null value from the default value for optional parameter.</summary>
+public struct Opt<T>
+{
+    /// <summary>Allows to transparently convert parameter argument to opt structure.</summary>
+    public static implicit operator Opt<T>(T value) => new Opt<T>(value);
+
+    /// <summary>Argument value.</summary>
+    public readonly T Value;
+
+    /// <summary>Indicates that value is provided.</summary>
+    public readonly bool HasValue;
+
+    /// <summary>Wraps passed value in structure. Sets the flag that value is present.</summary>
+    public Opt(T value)
     {
-        /// Empty singleton instance to start building your zipper
-        public static readonly ImZipper<T> Empty = new ImZipper<T>();
+        HasValue = true;
+        Value = value;
+    }
 
-        /// True is zipper does not contain items
-        public bool IsEmpty => Count == 0;
+    /// <summary>Helper to get value or default value if value is not present.</summary>
+    public T OrDefault(T defaultValue = default) => HasValue ? Value : defaultValue;
+}
 
-        /// Index of Focus item, from `0` to `Count-1`
-        public readonly int Index;
+/// <summary>Ever growing list methods</summary>
+public static class GrowingList
+{
+    /// <summary>Default initial capacity </summary>
+    public const int DefaultInitialCapacity = 2;
 
-        /// Number of items
-        public readonly int Count;
+    /// Push the new slot and return the ref to it
+    public static ref T PushSlot<T>(ref T[] items, int count)
+    {
+        if (items == null)
+            items = new T[DefaultInitialCapacity];
+        else if (count >= items.Length)
+            Expand(ref items);
+        return ref items[count];
+    }
 
-        /// Left REVERSED list, so the Head of the list is just prior the Focus item 
-        public readonly ImList<T> Left;
+    /// Adds the new item possibly extending the item collection
+    public static void Push<T>(ref T[] items, int count, T item)
+    {
+        if (items == null)
+            items = new T[DefaultInitialCapacity];
+        else if (count >= items.Length)
+            Expand(ref items);
+        items[count] = item;
+    }
 
-        /// Right list, where Head is just after the Focus item
-        public readonly ImList<T> Right;
+    /// <summary>Expands the items starting with 2</summary>
+    internal static void Expand<T>(ref T[] items)
+    {
+        var count = items.Length;
+        var newItems = new T[count << 1]; // count x 2
+        if (count < 6)
+            for (var i = 0; i < count; ++i)
+                newItems[i] = items[i];
+        else
+            Array.Copy(items, 0, newItems, 0, count);
+    }
 
-        /// Single focus item
-        public readonly T Focus;
+    ///<summary>Creates the final array out of the list, so that you cannot use after that!</summary>
+    public static T[] ResizeToArray<T>(T[] items, int count)
+    {
+        if (count < items.Length)
+            Array.Resize(ref items, count);
+        return items;
+    }
 
-        /// <inheritdoc />
-        public override string ToString() =>
-            IsEmpty ? "[||]" : Count + ":" + Left.Reverse() + "|" + Index + ":" + Focus + "|" + Right;
+    /// <inheritdoc />
+    public static string ToString<T>(T[] items, int count) =>
+        $"Count {count} of {(count == 0 || items == null || items.Length == 0 ? "empty" : "first (" + items[0] + ") and last (" + items[count - 1] + ")")}";
+}
 
-        /// Sets a new focus and pushes the old focus to the Left list. 
-        public ImZipper<T> Append(T focus) => PushLeft(focus);
+/// <summary>Ever growing list</summary>
+public struct GrowingList<T>
+{
+    /// <summary>Default initial capacity </summary>
+    public const int DefaultInitialCapacity = 2;
 
-        /// Sets a new focus and pushes the old focus to the Left list.
-        public ImZipper<T> PushLeft(T focus) =>
+    /// <summary>The items array</summary>
+    public T[] Items;
+
+    /// <summary>The count</summary>
+    public int Count;
+
+    /// <summary>Constructs the thing</summary>
+    public GrowingList(T[] items, int count = 0)
+    {
+        Items = items;
+        Count = count;
+    }
+
+    /// <summary>Push the new slot and return the ref to it</summary>
+    public ref T PushSlot()
+    {
+        if (Items == null)
+            Items = new T[DefaultInitialCapacity];
+        else if (Count >= Items.Length)
+            GrowingList.Expand(ref Items);
+        return ref Items[Count++];
+    }
+
+    /// <summary>Adds the new item possibly extending the item collection</summary>
+    public void Push(T item)
+    {
+        if (Items == null)
+            Items = new T[DefaultInitialCapacity];
+        else if (Count >= Items.Length)
+            GrowingList.Expand(ref Items);
+        Items[Count++] = item;
+    }
+
+    /// <summary>Pops the item - just moving the counter back</summary>
+    public void Pop() => --Count;
+
+    ///<summary>Creates the final array out of the list, so that you cannot use after that!</summary>
+    public T[] ResizeToArray()
+    {
+        var items = Items;
+        if (Count < items.Length)
+            Array.Resize(ref items, Count);
+        return items;
+    }
+
+    // todo: @naming think of the better name
+    /// <summary>Pops the item - just moving the counter back</summary>
+    public T PopItem() => Items[--Count];
+
+    /// <inheritdoc />
+    public override string ToString() =>
+        $"Count {Count} of {(Count == 0 || Items == null || Items.Length == 0 ? "empty" : "first (" + Items[0] + ") and last (" + Items[Count - 1] + ")")}";
+}
+
+/// <summary>Immutable list - simplest linked list with the Head and the Tail.</summary>
+public sealed class ImList<T>
+{
+    /// <summary>Empty list to Push to.</summary>
+    public static readonly ImList<T> Empty = new ImList<T>();
+
+    /// <summary>True for empty list.</summary>
+    public bool IsEmpty => Tail == null;
+
+    /// <summary>First value in a list.</summary>
+    public readonly T Head;
+
+    /// <summary>The rest of values or Empty if list has a single value.</summary>
+    public readonly ImList<T> Tail;
+
+    /// <summary>Prepends new value and returns new list.</summary>
+    public ImList<T> Push(T head) => new ImList<T>(head, this);
+
+    /// <summary>Enumerates the list.</summary>
+    public IEnumerable<T> Enumerate()
+    {
+        if (Tail == null)
+            yield break;
+        for (var list = this; list.Tail != null; list = list.Tail)
+            yield return list.Head;
+    }
+
+    /// <summary>String representation for debugging purposes</summary>
+    public override string ToString() => IsEmpty
+        ? "[]" : Tail.IsEmpty
+        ? "[" + Head + "]" : Tail.Tail.IsEmpty
+        ? "[" + Head + "," + Tail.Head + "]" : Tail.Tail.Tail.IsEmpty
+        ? "[" + Head + "," + Tail.Head + "," + Tail.Tail.Head + "]"
+        : "[" + Head + "," + Tail.Head + "," + Tail.Tail.Head + ", ...]";
+
+    private ImList() { }
+    private ImList(T head, ImList<T> tail)
+    {
+        Head = head;
+        Tail = tail;
+    }
+}
+
+/// <summary>Extension methods providing basic operations on a list.</summary>
+public static class ImList
+{
+    /// Split list into (Head, Tail, IsEmpty) tuple
+    public static void Deconstruct<T>(this ImList<T> list, out T head, out ImList<T> tail, out bool isEmpty)
+    {
+        head = list.Head;
+        tail = list.Tail;
+        isEmpty = list.IsEmpty;
+    }
+
+    /// <summary>
+    /// Constructs the reversed list from the parameter array of items
+    /// </summary>
+    public static ImList<T> List<T>(params T[] items)
+    {
+        var l = ImList<T>.Empty;
+        if (items != null)
+            for (var i = items.Length - 1; i >= 0; --i)
+                l = l.Push(items[i]);
+        return l;
+    }
+
+    /// <summary>
+    /// Constructs the list as the reversed input list
+    /// </summary>
+    public static ImList<T> ToImList<T>(this IList<T> source)
+    {
+        var l = ImList<T>.Empty;
+        if (source != null)
+            for (var i = source.Count - 1; i >= 0; --i)
+                l = l.Push(source[i]);
+        return l;
+    }
+
+    /// <summary>
+    /// Constructs the list as the reversed enumerable
+    /// </summary>
+    public static ImList<T> ToImList<T>(this IEnumerable<T> source)
+    {
+        if (source is IList<T> list)
+            return list.ToImList();
+        var l = ImList<T>.Empty;
+
+        if (source != null)
+            foreach (var item in source)
+                l = l.Push(item);
+        return l.Reverse();
+    }
+
+    /// <summary>Constructs list of one element</summary>
+    public static ImList<T> List<T>(this T head) => ImList<T>.Empty.Push(head);
+
+    /// <summary>Constructs list from head and tail</summary>
+    public static ImList<T> List<T>(this T head, ImList<T> tail) => tail.Push(head);
+
+    /// <summary>Apples some effect action to each element</summary>
+    public static void ForEach<T>(this ImList<T> list, Action<T> effect)
+    {
+        for (; !list.IsEmpty; list = list.Tail)
+            effect(list.Head);
+    }
+
+    /// <summary>Fold list to a single value. The respective name for it in LINQ is Aggregate</summary>
+    public static S Fold<T, S>(this ImList<T> list, S state, Func<T, S, S> handler)
+    {
+        if (list.IsEmpty)
+            return state;
+        var result = state;
+        for (; !list.IsEmpty; list = list.Tail)
+            result = handler(list.Head, result);
+        return result;
+    }
+
+    /// <summary>Fold list to a single value with index of item. The respective name for it in LINQ is Aggregate.</summary>
+    public static S Fold<T, S>(this ImList<T> list, S state, Func<T, int, S, S> handler)
+    {
+        if (list.IsEmpty)
+            return state;
+        var result = state;
+        for (var i = 0; !list.IsEmpty; list = list.Tail, ++i)
+            result = handler(list.Head, i, result);
+        return result;
+    }
+
+    /// <summary>Returns new list in reverse order.</summary>
+    public static ImList<T> Reverse<T>(this ImList<T> list)
+    {
+        if (list.IsEmpty || list.Tail.IsEmpty)
+            return list;
+        var reversed = ImList<T>.Empty;
+        for (; !list.IsEmpty; list = list.Tail)
+            reversed = reversed.Push(list.Head);
+        return reversed;
+    }
+
+    /// <summary>Maps the items from the first list to the result list.</summary>
+    public static ImList<R> Map<T, R>(this ImList<T> list, Func<T, R> map) =>
+        list.Fold(ImList<R>.Empty, (x, r) => List(map(x), r)).Reverse();
+
+    /// <summary>Maps with index</summary>
+    public static ImList<R> Map<T, R>(this ImList<T> list, Func<T, int, R> map) =>
+        list.Fold(ImList<R>.Empty, (x, i, r) => List(map(x, i), r)).Reverse();
+
+    /// <summary>Copies list to array.</summary>
+    public static T[] ToArray<T>(this ImList<T> source) =>
+        source.IsEmpty ? ArrayTools.Empty<T>()
+        : source.Tail.IsEmpty ? new[] { source.Head } : source.Enumerate().ToArray();
+}
+
+/// Zipper is an immutable persistent data structure, to represent collection with single focused (selected, active) element.
+/// Consist of REVERSED `Left` immutable list, `Focus` element, and the `Right` immutable list. That's why a Zipper name,
+/// where left and right part are joined / zipped in focus item.
+public sealed class ImZipper<T>
+{
+    /// Empty singleton instance to start building your zipper
+    public static readonly ImZipper<T> Empty = new ImZipper<T>();
+
+    /// True is zipper does not contain items
+    public bool IsEmpty => Count == 0;
+
+    /// Index of Focus item, from `0` to `Count-1`
+    public readonly int Index;
+
+    /// Number of items
+    public readonly int Count;
+
+    /// Left REVERSED list, so the Head of the list is just prior the Focus item 
+    public readonly ImList<T> Left;
+
+    /// Right list, where Head is just after the Focus item
+    public readonly ImList<T> Right;
+
+    /// Single focus item
+    public readonly T Focus;
+
+    /// <inheritdoc />
+    public override string ToString() =>
+        IsEmpty ? "[||]" : Count + ":" + Left.Reverse() + "|" + Index + ":" + Focus + "|" + Right;
+
+    /// Sets a new focus and pushes the old focus to the Left list. 
+    public ImZipper<T> Append(T focus) => PushLeft(focus);
+
+    /// Sets a new focus and pushes the old focus to the Left list.
+    public ImZipper<T> PushLeft(T focus) =>
+    IsEmpty ? new ImZipper<T>(ImList<T>.Empty, focus, 0, ImList<T>.Empty, 1)
+            : new ImZipper<T>(Left.Push(Focus), focus, Index + 1, Right, Count + 1);
+
+    /// Sets a new focus and pushes the old focus to the right list. 
+    public ImZipper<T> Insert(T focus) => PushRight(focus);
+
+    /// Sets a new focus and pushes the old focus to the right list. 
+    public ImZipper<T> PushRight(T focus) =>
         IsEmpty ? new ImZipper<T>(ImList<T>.Empty, focus, 0, ImList<T>.Empty, 1)
-                : new ImZipper<T>(Left.Push(Focus), focus, Index + 1, Right, Count + 1);
+            : new ImZipper<T>(Left, focus, Index, Right.Push(Focus), Count + 1);
 
-        /// Sets a new focus and pushes the old focus to the right list. 
-        public ImZipper<T> Insert(T focus) => PushRight(focus);
+    /// Removes a focus, filling the hole with the item from the left list, or from the right if the left is empty
+    public ImZipper<T> PopLeft() =>
+        IsEmpty ? this
+        : Left.IsEmpty && Right.IsEmpty ? Empty
+        : !Left.IsEmpty ? new ImZipper<T>(Left.Tail, Left.Head, Index - 1, Right, Count - 1)
+        : new ImZipper<T>(Left, Right.Head, Index, Right.Tail, Count - 1);
 
-        /// Sets a new focus and pushes the old focus to the right list. 
-        public ImZipper<T> PushRight(T focus) =>
-            IsEmpty ? new ImZipper<T>(ImList<T>.Empty, focus, 0, ImList<T>.Empty, 1)
-                : new ImZipper<T>(Left, focus, Index, Right.Push(Focus), Count + 1);
+    /// Removes a focus, filling the hole with the item from the right list, or from the left if the right is empty
+    public ImZipper<T> PopRight() =>
+        IsEmpty ? this
+        : Left.IsEmpty && Right.IsEmpty ? Empty
+        : !Right.IsEmpty ? new ImZipper<T>(Left, Right.Head, Index, Right.Tail, Count - 1)
+        : new ImZipper<T>(Left.Tail, Left.Head, Index - 1, Right, Count - 1);
 
-        /// Removes a focus, filling the hole with the item from the left list, or from the right if the left is empty
-        public ImZipper<T> PopLeft() =>
-            IsEmpty ? this
-            : Left.IsEmpty && Right.IsEmpty ? Empty
-            : !Left.IsEmpty ? new ImZipper<T>(Left.Tail, Left.Head, Index - 1, Right, Count - 1)
-            : new ImZipper<T>(Left, Right.Head, Index, Right.Tail, Count - 1);
+    /// Shifts focus one element to the left (decrementing its Index).
+    public ImZipper<T> ShiftLeft() =>
+        IsEmpty || Left.IsEmpty ? this
+        : new ImZipper<T>(Left.Tail, Left.Head, Index - 1, Right.Push(Focus), Count);
 
-        /// Removes a focus, filling the hole with the item from the right list, or from the left if the right is empty
-        public ImZipper<T> PopRight() =>
-            IsEmpty ? this
-            : Left.IsEmpty && Right.IsEmpty ? Empty
-            : !Right.IsEmpty ? new ImZipper<T>(Left, Right.Head, Index, Right.Tail, Count - 1)
-            : new ImZipper<T>(Left.Tail, Left.Head, Index - 1, Right, Count - 1);
+    /// Shifts focus one element to the right (incrementing its Index).
+    public ImZipper<T> ShiftRight() =>
+        IsEmpty || Right.IsEmpty ? this
+        : new ImZipper<T>(Left.Push(Focus), Right.Head, Index + 1, Right.Tail, Count);
 
-        /// Shifts focus one element to the left (decrementing its Index).
-        public ImZipper<T> ShiftLeft() =>
-            IsEmpty || Left.IsEmpty ? this
-            : new ImZipper<T>(Left.Tail, Left.Head, Index - 1, Right.Push(Focus), Count);
+    /// Sets a new focus and returns a new zipper with the left and right lists unchanged
+    public ImZipper<T> WithFocus(T focus) =>
+        IsEmpty ? this : new ImZipper<T>(Left, focus, Index, Right, Count);
 
-        /// Shifts focus one element to the right (incrementing its Index).
-        public ImZipper<T> ShiftRight() =>
-            IsEmpty || Right.IsEmpty ? this
-            : new ImZipper<T>(Left.Push(Focus), Right.Head, Index + 1, Right.Tail, Count);
+    /// Maps over the zipper items producing a new zipper
+    public ImZipper<R> Map<R>(Func<T, R> map) =>
+        IsEmpty ? ImZipper<R>.Empty
+            : new ImZipper<R>(Left.Reverse().Fold(ImList<R>.Empty, (x, r) => r.Push(map(x))),
+                map(Focus), Index, Right.Map(map), Count);
 
-        /// Sets a new focus and returns a new zipper with the left and right lists unchanged
-        public ImZipper<T> WithFocus(T focus) =>
-            IsEmpty ? this : new ImZipper<T>(Left, focus, Index, Right, Count);
+    /// Maps over the zipper items with item index, producing a new zipper
+    public ImZipper<R> Map<R>(Func<T, int, R> map) =>
+        IsEmpty ? ImZipper<R>.Empty
+            : new ImZipper<R>(
+                Left.Reverse().Fold(ImList<R>.Empty, (x, i, r) => r.Push(map(x, i))),
+                map(Focus, Index), Index, Right.Map((x, i) => map(x, Index + 1 + i)), Count);
 
-        /// Maps over the zipper items producing a new zipper
-        public ImZipper<R> Map<R>(Func<T, R> map) =>
-            IsEmpty ? ImZipper<R>.Empty
-                : new ImZipper<R>(Left.Reverse().Fold(ImList<R>.Empty, (x, r) => r.Push(map(x))),
-                    map(Focus), Index, Right.Map(map), Count);
+    private ImZipper() => Index = -1;
 
-        /// Maps over the zipper items with item index, producing a new zipper
-        public ImZipper<R> Map<R>(Func<T, int, R> map) =>
-            IsEmpty ? ImZipper<R>.Empty
-                : new ImZipper<R>(
-                    Left.Reverse().Fold(ImList<R>.Empty, (x, i, r) => r.Push(map(x, i))),
-                    map(Focus, Index), Index, Right.Map((x, i) => map(x, Index + 1 + i)), Count);
+    private ImZipper(ImList<T> left, T focus, int index, ImList<T> right, int count)
+    {
+        Left = left;
+        Focus = focus;
+        Index = index;
+        Right = right;
+        Count = count;
+    }
+}
 
-        private ImZipper() => Index = -1;
-
-        private ImZipper(ImList<T> left, T focus, int index, ImList<T> right, int count)
-        {
-            Left = left;
-            Focus = focus;
-            Index = index;
-            Right = right;
-            Count = count;
-        }
+/// Other ImZipper methods
+public static class ImZipper
+{
+    /// Appends array items to zipper
+    public static ImZipper<T> Zip<T>(params T[] items)
+    {
+        if (items.IsNullOrEmpty())
+            return ImZipper<T>.Empty;
+        var z = ImZipper<T>.Empty;
+        for (var i = 0; i < items.Length; ++i)
+            z = z.PushLeft(items[i]);
+        return z;
     }
 
-    /// Other ImZipper methods
-    public static class ImZipper
+    /// Converts to array.
+    public static T[] ToArray<T>(this ImZipper<T> z)
     {
-        /// Appends array items to zipper
-        public static ImZipper<T> Zip<T>(params T[] items)
+        if (z.IsEmpty)
+            return ArrayTools.Empty<T>();
+        var a = new T[z.Count];
+        z.Fold(a, (x, i, xs) =>
         {
-            if (items.IsNullOrEmpty())
-                return ImZipper<T>.Empty;
-            var z = ImZipper<T>.Empty;
-            for (var i = 0; i < items.Length; ++i)
-                z = z.PushLeft(items[i]);
-            return z;
-        }
-
-        /// Converts to array.
-        public static T[] ToArray<T>(this ImZipper<T> z)
-        {
-            if (z.IsEmpty)
-                return ArrayTools.Empty<T>();
-            var a = new T[z.Count];
-            z.Fold(a, (x, i, xs) =>
-            {
-                xs[i] = x;
-                return xs;
-            });
-            return a;
-        }
-
-        /// Shifts focus to a specified index, e.g. a random access
-        public static ImZipper<T> ShiftTo<T>(this ImZipper<T> z, int i)
-        {
-            if (i < 0 || i >= z.Count || i == z.Index)
-                return z;
-            while (i < z.Index)
-                z = z.ShiftLeft();
-            while (i > z.Index)
-                z = z.ShiftRight();
-            return z;
-        }
-
-        /// Updates a focus element if it is present, otherwise does nothing.
-        /// If the focus item is the equal one, then returns the same zipper back.
-        public static ImZipper<T> Update<T>(this ImZipper<T> z, Func<T, T> update)
-        {
-            if (z.IsEmpty)
-                return z;
-            var result = update(z.Focus);
-            if (ReferenceEquals(z.Focus, result) || result != null && result.Equals(z.Focus))
-                return z;
-            return z.WithFocus(result);
-        }
-
-        /// Update the item at random index, by shifting and updating it
-        public static ImZipper<T> UpdateAt<T>(this ImZipper<T> z, int i, Func<T, T> update) =>
-            i < 0 || i >= z.Count ? z : z.ShiftTo(i).Update(update);
-
-        /// Update the item at random index, by shifting and updating it
-        public static ImZipper<T> RemoveAt<T>(this ImZipper<T> z, int i) =>
-            i < 0 || i >= z.Count ? z : z.ShiftTo(i).PopLeft();
-
-        /// Folds zipper to a single value
-        public static S Fold<T, S>(this ImZipper<T> z, S state, Func<T, S, S> handler) =>
-            z.IsEmpty ? state :
-            z.Right.Fold(handler(z.Focus, z.Left.Reverse().Fold(state, handler)), handler);
-
-        /// Folds zipper to a single value by using an item index
-        public static S Fold<T, S>(this ImZipper<T> z, S state, Func<T, int, S, S> handler)
-        {
-            if (z.IsEmpty)
-                return state;
-            var focusIndex = z.Index;
-            var reducedLeft = z.Left.Reverse().Fold(state, handler);
-            return z.Right.Fold(handler(z.Focus, focusIndex, reducedLeft),
-                (x, i, r) => handler(x, focusIndex + i + 1, r));
-        }
-
-        /// <summary>Apply some effect action on each element</summary>
-        public static void ForEach<T>(this ImZipper<T> z, Action<T> effect)
-        {
-            if (!z.IsEmpty)
-            {
-                if (!z.Left.IsEmpty)
-                    z.Left.Reverse().ForEach(effect);
-                effect(z.Focus);
-                if (!z.Right.IsEmpty)
-                    z.Right.ForEach(effect);
-            }
-        }
+            xs[i] = x;
+            return xs;
+        });
+        return a;
     }
 
-    /// Given the old value should and the new value should return result updated value.
-    public delegate V Update<V>(V oldValue, V newValue);
-
-    /// Update handler including the key
-    public delegate V Update<K, V>(K key, V oldValue, V newValue);
-
-    /// Update handler including the key
-    public delegate V Update<K, V, R>(K key, V oldValue, V newValue, ref R result);
-
-    /// <summary>Entry containing the Value in addition to the Hash</summary>
-    public abstract class ImHashMapEntry<K, V> : ImHashMap<K, V>.Entry
+    /// Shifts focus to a specified index, e.g. a random access
+    public static ImZipper<T> ShiftTo<T>(this ImZipper<T> z, int i)
     {
-        /// <summary>The value. Maybe modified if you need the Ref{Value} semantics. 
-        /// You may add the entry with the default Value to the map, and calculate and set it later (e.g. using the CAS).</summary>
-        public V Value;
+        if (i < 0 || i >= z.Count || i == z.Index)
+            return z;
+        while (i < z.Index)
+            z = z.ShiftLeft();
+        while (i > z.Index)
+            z = z.ShiftRight();
+        return z;
+    }
 
-        /// <summary>Constructs the entry with the default value</summary>
-        protected ImHashMapEntry(int hash) : base(hash) { }
-        /// <summary>Constructs the entry with the value</summary>
-        protected ImHashMapEntry(int hash, V value) : base(hash) => Value = value;
+    /// Updates a focus element if it is present, otherwise does nothing.
+    /// If the focus item is the equal one, then returns the same zipper back.
+    public static ImZipper<T> Update<T>(this ImZipper<T> z, Func<T, T> update)
+    {
+        if (z.IsEmpty)
+            return z;
+        var result = update(z.Focus);
+        if (ReferenceEquals(z.Focus, result) || result != null && result.Equals(z.Focus))
+            return z;
+        return z.WithFocus(result);
+    }
+
+    /// Update the item at random index, by shifting and updating it
+    public static ImZipper<T> UpdateAt<T>(this ImZipper<T> z, int i, Func<T, T> update) =>
+        i < 0 || i >= z.Count ? z : z.ShiftTo(i).Update(update);
+
+    /// Update the item at random index, by shifting and updating it
+    public static ImZipper<T> RemoveAt<T>(this ImZipper<T> z, int i) =>
+        i < 0 || i >= z.Count ? z : z.ShiftTo(i).PopLeft();
+
+    /// Folds zipper to a single value
+    public static S Fold<T, S>(this ImZipper<T> z, S state, Func<T, S, S> handler) =>
+        z.IsEmpty ? state :
+        z.Right.Fold(handler(z.Focus, z.Left.Reverse().Fold(state, handler)), handler);
+
+    /// Folds zipper to a single value by using an item index
+    public static S Fold<T, S>(this ImZipper<T> z, S state, Func<T, int, S, S> handler)
+    {
+        if (z.IsEmpty)
+            return state;
+        var focusIndex = z.Index;
+        var reducedLeft = z.Left.Reverse().Fold(state, handler);
+        return z.Right.Fold(handler(z.Focus, focusIndex, reducedLeft),
+            (x, i, r) => handler(x, focusIndex + i + 1, r));
+    }
+
+    /// <summary>Apply some effect action on each element</summary>
+    public static void ForEach<T>(this ImZipper<T> z, Action<T> effect)
+    {
+        if (!z.IsEmpty)
+        {
+            if (!z.Left.IsEmpty)
+                z.Left.Reverse().ForEach(effect);
+            effect(z.Focus);
+            if (!z.Right.IsEmpty)
+                z.Right.ForEach(effect);
+        }
+    }
+}
+
+/// Given the old value should and the new value should return result updated value.
+public delegate V Update<V>(V oldValue, V newValue);
+
+/// Update handler including the key
+public delegate V Update<K, V>(K key, V oldValue, V newValue);
+
+/// Update handler including the key
+public delegate V Update<K, V, R>(K key, V oldValue, V newValue, ref R result);
+
+/// <summary>Entry containing the Value in addition to the Hash</summary>
+public abstract class ImHashMapEntry<K, V> : ImHashMap<K, V>.Entry
+{
+    /// <summary>The value. Maybe modified if you need the Ref{Value} semantics. 
+    /// You may add the entry with the default Value to the map, and calculate and set it later (e.g. using the CAS).</summary>
+    public V Value;
+
+    /// <summary>Constructs the entry with the default value</summary>
+    protected ImHashMapEntry(int hash) : base(hash) { }
+    /// <summary>Constructs the entry with the value</summary>
+    protected ImHashMapEntry(int hash, V value) : base(hash) => Value = value;
 
 #if !DEBUG
-        /// <inheritdoc />
-        public override string ToString() => "{K:" + Hash + ",V:" + Value + "}";
+    /// <inheritdoc />
+    public override string ToString() => "{K:" + Hash + ",V:" + Value + "}";
 #endif
 
-        /// <inheritdoc />
-        public sealed override int Count() => 1;
+    /// <inheritdoc />
+    public sealed override int Count() => 1;
 
-        internal override int ForEach<S>(S state, int startIndex, Action<ImHashMapEntry<K, V>, int, S> handler)
-        {
-            handler(this, startIndex, state);
-            return startIndex + 1;
-        }
-    }
-
-    /// <summary>Entry containing the Value in addition to the Hash</summary>
-    public sealed class VEntry<V> : ImHashMapEntry<int, V>
+    internal override int ForEach<S>(S state, int startIndex, Action<ImHashMapEntry<K, V>, int, S> handler)
     {
-        /// <summary>The Key is actually the Hash for this entry and the vice versa.</summary>
-        public override int Key => Hash;
-
-        /// <summary>Constructs the entry with the default value</summary>
-        public VEntry(int hash) : base(hash) { }
-        /// <summary>Constructs the entry with the value</summary>
-        public VEntry(int hash, V value) : base(hash, value) { }
-
-        internal override StringBuilder ToMermaidNodeItem(StringBuilder s) =>
-            s.Append('`').Append(Hash).Append("`,`").Append(Value).Append('`');
-
-        internal override ImHashMapEntry<int, V> GetOrNullWithTheSameHash(int key) => this;
-        internal override ImHashMapEntry<int, V> GetOrNullWithTheSameHashByReferenceEquals(int key) => this;
-        internal override V GetValueOrDefaultWithTheSameHashByReferenceEquals(int key) => Value;
-        internal override Entry AddOrUpdateWithTheSameHash(ImHashMapEntry<int, V> newEntry) => newEntry;
-        internal override Entry AddOrUpdateWithTheSameHashByReferenceEquals(ImHashMapEntry<int, V> newEntry) => newEntry;
-        internal override Entry AddOrUpdateWithTheSameHash(ImHashMapEntry<int, V> newEntry, Update<int, V> update) =>
-            ImHashMap.Entry(Hash, update(Hash, Value, newEntry.Value));
-        internal override Entry AddOrUpdateWithTheSameHash<R>(ImHashMapEntry<int, V> newEntry, ref R result, Update<int, V, R> update) =>
-            ImHashMap.Entry(Hash, update(Hash, Value, newEntry.Value, ref result));
-        internal override Entry AddOrUpdateWithTheSameHashByReferenceEquals(ImHashMapEntry<int, V> newEntry, Update<int, V> update) =>
-            ImHashMap.Entry(Hash, update(Hash, Value, newEntry.Value));
-        internal override ImHashMap<int, V> GetMapOrReplaceWithEntry(ImHashMap<int, V> oldMap, ImHashMapEntry<int, V> newEntry) =>
-            this == newEntry ? this : oldMap.ReplaceEntry(this, newEntry);
-        internal override ImHashMap<int, V> AddOrKeepWithTheSameHash(ImHashMap<int, V> oldMap, ImHashMapEntry<int, V> newEntry) =>
-            this == newEntry ? this : oldMap;
-        internal override Entry UpdatedOrNullWithTheSameHash(ImHashMapEntry<int, V> newEntry) => newEntry;
-        internal override Entry UpdatedOrNullWithTheSameHash(int key, V value, Update<int, V> update) =>
-            ImHashMap.Entry(Hash, update(Hash, Value, value));
-        internal override Entry RemovedOrNullWithTheSameHash(int key) => this;
-        /// <inheritdoc/>
-        public override Entry AppendOrUpdateInPlaceOrKeep<S>(S state, ImHashMapEntry<int, V> newEntry, UpdaterInPlaceOrKeeper<S> updateOrKeep) =>
-            updateOrKeep(state, this, newEntry) != this ? newEntry : this;
-        /// <inheritdoc/>
-        public override Entry AppendOrUpdateInPlaceOrKeepByReferenceEquals<S>(S state, ImHashMapEntry<int, V> newEntry, UpdaterInPlaceOrKeeper<S> updateOrKeep) =>
-            updateOrKeep(state, this, newEntry) != this ? newEntry : this;
+        handler(this, startIndex, state);
+        return startIndex + 1;
     }
+}
 
-    /// <summary>Entry containing the Key and Value in addition to the Hash</summary>
-    public sealed class KVEntry<K, V> : ImHashMapEntry<K, V>
-    {
-        /// <summary>The key</summary>
-        public override K Key => _key;
-        internal readonly K _key;
+/// <summary>Entry containing the Value in addition to the Hash</summary>
+public sealed class VEntry<V> : ImHashMapEntry<int, V>
+{
+    /// <summary>The Key is actually the Hash for this entry and the vice versa.</summary>
+    public override int Key => Hash;
 
-        /// <summary>Constructs the entry with the key and default value</summary>
-        public KVEntry(int hash, K key) : base(hash) => _key = key;
-        /// <summary>Constructs the entry with the key and value</summary>
-        public KVEntry(int hash, K key, V value) : base(hash, value) => _key = key;
+    /// <summary>Constructs the entry with the default value</summary>
+    public VEntry(int hash) : base(hash) { }
+    /// <summary>Constructs the entry with the value</summary>
+    public VEntry(int hash, V value) : base(hash, value) { }
+
+    internal override StringBuilder ToMermaidNodeItem(StringBuilder s) =>
+        s.Append('`').Append(Hash).Append("`,`").Append(Value).Append('`');
+
+    internal override ImHashMapEntry<int, V> GetOrNullWithTheSameHash(int key) => this;
+    internal override ImHashMapEntry<int, V> GetOrNullWithTheSameHashByReferenceEquals(int key) => this;
+    internal override V GetValueOrDefaultWithTheSameHashByReferenceEquals(int key) => Value;
+    internal override Entry AddOrUpdateWithTheSameHash(ImHashMapEntry<int, V> newEntry) => newEntry;
+    internal override Entry AddOrUpdateWithTheSameHashByReferenceEquals(ImHashMapEntry<int, V> newEntry) => newEntry;
+    internal override Entry AddOrUpdateWithTheSameHash(ImHashMapEntry<int, V> newEntry, Update<int, V> update) =>
+        ImHashMap.Entry(Hash, update(Hash, Value, newEntry.Value));
+    internal override Entry AddOrUpdateWithTheSameHash<R>(ImHashMapEntry<int, V> newEntry, ref R result, Update<int, V, R> update) =>
+        ImHashMap.Entry(Hash, update(Hash, Value, newEntry.Value, ref result));
+    internal override Entry AddOrUpdateWithTheSameHashByReferenceEquals(ImHashMapEntry<int, V> newEntry, Update<int, V> update) =>
+        ImHashMap.Entry(Hash, update(Hash, Value, newEntry.Value));
+    internal override ImHashMap<int, V> GetMapOrReplaceWithEntry(ImHashMap<int, V> oldMap, ImHashMapEntry<int, V> newEntry) =>
+        this == newEntry ? this : oldMap.ReplaceEntry(this, newEntry);
+    internal override ImHashMap<int, V> AddOrKeepWithTheSameHash(ImHashMap<int, V> oldMap, ImHashMapEntry<int, V> newEntry) =>
+        this == newEntry ? this : oldMap;
+    internal override Entry UpdatedOrNullWithTheSameHash(ImHashMapEntry<int, V> newEntry) => newEntry;
+    internal override Entry UpdatedOrNullWithTheSameHash(int key, V value, Update<int, V> update) =>
+        ImHashMap.Entry(Hash, update(Hash, Value, value));
+    internal override Entry RemovedOrNullWithTheSameHash(int key) => this;
+    /// <inheritdoc/>
+    public override Entry AppendOrUpdateInPlaceOrKeep<S>(S state, ImHashMapEntry<int, V> newEntry, UpdaterInPlaceOrKeeper<S> updateOrKeep) =>
+        updateOrKeep(state, this, newEntry) != this ? newEntry : this;
+    /// <inheritdoc/>
+    public override Entry AppendOrUpdateInPlaceOrKeepByReferenceEquals<S>(S state, ImHashMapEntry<int, V> newEntry, UpdaterInPlaceOrKeeper<S> updateOrKeep) =>
+        updateOrKeep(state, this, newEntry) != this ? newEntry : this;
+}
+
+/// <summary>Entry containing the Key and Value in addition to the Hash</summary>
+public sealed class KVEntry<K, V> : ImHashMapEntry<K, V>
+{
+    /// <summary>The key</summary>
+    public override K Key => _key;
+    internal readonly K _key;
+
+    /// <summary>Constructs the entry with the key and default value</summary>
+    public KVEntry(int hash, K key) : base(hash) => _key = key;
+    /// <summary>Constructs the entry with the key and value</summary>
+    public KVEntry(int hash, K key, V value) : base(hash, value) => _key = key;
 
 #if !DEBUG
-        /// <inheritdoc />
-        public override string ToString() => "{H: " + Hash + ", K: " + _key + ", V: " + Value + "}";
+    /// <inheritdoc />
+    public override string ToString() => "{H: " + Hash + ", K: " + _key + ", V: " + Value + "}";
 #endif
 
-        internal override StringBuilder ToMermaidNodeItem(StringBuilder s) =>
-            s.Append('`').Append(Hash).Append("`,`").Append(_key).Append("`,`").Append(Value).Append('`');
+    internal override StringBuilder ToMermaidNodeItem(StringBuilder s) =>
+        s.Append('`').Append(Hash).Append("`,`").Append(_key).Append("`,`").Append(Value).Append('`');
 
-        internal override ImHashMapEntry<K, V> GetOrNullWithTheSameHash(K key) =>
-            _key.Equals(key) ? this : null;
+    internal override ImHashMapEntry<K, V> GetOrNullWithTheSameHash(K key) =>
+        _key.Equals(key) ? this : null;
 
-        internal override ImHashMapEntry<K, V> GetOrNullWithTheSameHashByReferenceEquals(K key) =>
-            ReferenceEquals(_key, key) ? this : null;
+    internal override ImHashMapEntry<K, V> GetOrNullWithTheSameHashByReferenceEquals(K key) =>
+        ReferenceEquals(_key, key) ? this : null;
 
-        internal override V GetValueOrDefaultWithTheSameHashByReferenceEquals(K key) =>
-            ReferenceEquals(_key, key) ? Value : default;
+    internal override V GetValueOrDefaultWithTheSameHashByReferenceEquals(K key) =>
+        ReferenceEquals(_key, key) ? Value : default;
 
-        internal override Entry AddOrUpdateWithTheSameHash(ImHashMapEntry<K, V> newEntry)
+    internal override Entry AddOrUpdateWithTheSameHash(ImHashMapEntry<K, V> newEntry)
+    {
+        var e = (KVEntry<K, V>)newEntry;
+        return _key.Equals(e._key) ? e : new HashConflictingEntry(Hash, this, e);
+    }
+
+    internal override Entry AddOrUpdateWithTheSameHashByReferenceEquals(ImHashMapEntry<K, V> newEntry)
+    {
+        var e = (KVEntry<K, V>)newEntry;
+        return ReferenceEquals(e._key, _key) ? e : new HashConflictingEntry(Hash, this, e);
+    }
+
+    internal override Entry AddOrUpdateWithTheSameHash(ImHashMapEntry<K, V> newEntry, Update<K, V> update)
+    {
+        var e = (KVEntry<K, V>)newEntry;
+        var key = _key;
+        return key.Equals(e._key) ? ImHashMap.Entry(Hash, key, update(key, Value, e.Value)) : new HashConflictingEntry(Hash, this, e);
+    }
+
+    internal override Entry AddOrUpdateWithTheSameHash<R>(ImHashMapEntry<K, V> newEntry, ref R result, Update<K, V, R> update)
+    {
+        var e = (KVEntry<K, V>)newEntry;
+        var key = _key;
+        return key.Equals(e._key) ? ImHashMap.Entry(Hash, key, update(key, Value, e.Value, ref result)) : new HashConflictingEntry(Hash, this, e);
+    }
+
+    internal override Entry AddOrUpdateWithTheSameHashByReferenceEquals(ImHashMapEntry<K, V> newEntry, Update<K, V> update)
+    {
+        var e = (KVEntry<K, V>)newEntry;
+        var key = _key;
+        return ReferenceEquals(key, e._key) ? ImHashMap.Entry(Hash, key, update(key, Value, e.Value)) : new HashConflictingEntry(Hash, this, e);
+    }
+
+    // todo: @naming better method names aligned with the calling side
+    internal override ImHashMap<K, V> GetMapOrReplaceWithEntry(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry)
+    {
+        var e = (KVEntry<K, V>)newEntry;
+        return this == e ? e : oldMap.ReplaceEntry(this, _key.Equals(e._key) ? e : new HashConflictingEntry(Hash, this, e));
+    }
+
+    internal override ImHashMap<K, V> GetMapOrReplaceWithEntryByReferenceEquals(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry)
+    {
+        var e = (KVEntry<K, V>)newEntry;
+        return this == e ? e : oldMap.ReplaceEntry(this, ReferenceEquals(_key, e._key) ? e : new HashConflictingEntry(Hash, this, e));
+    }
+
+    internal override ImHashMap<K, V> GetEntryOrReplacedMapWithTheSameHash(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry)
+    {
+        var e = (KVEntry<K, V>)newEntry;
+        return this == e ? e : _key.Equals(e._key) ? this : oldMap.ReplaceEntry(this, new HashConflictingEntry(Hash, this, e));
+    }
+
+    internal override ImHashMap<K, V> GetEntryOrReplacedMapWithTheSameHashByReferenceEquals(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry)
+    {
+        var e = (KVEntry<K, V>)newEntry;
+        return this == e ? e : ReferenceEquals(_key, e._key) ? this : oldMap.ReplaceEntry(this, new HashConflictingEntry(Hash, this, e));
+    }
+
+    internal override ImHashMap<K, V> AddOrKeepWithTheSameHash(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry)
+    {
+        var e = (KVEntry<K, V>)newEntry;
+        return this == e ? e : _key.Equals(e._key) ? oldMap : oldMap.ReplaceEntry(this, new HashConflictingEntry(Hash, this, e));
+    }
+
+    internal override ImHashMap<K, V> AddOrKeepWithTheSameHashByReferenceEquals(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry)
+    {
+        var e = (KVEntry<K, V>)newEntry;
+        return this == e ? e : ReferenceEquals(_key, e._key) ? oldMap : oldMap.ReplaceEntry(this, new HashConflictingEntry(Hash, this, e));
+    }
+
+    internal override Entry UpdatedOrNullWithTheSameHash(ImHashMapEntry<K, V> newEntry)
+    {
+        var e = (KVEntry<K, V>)newEntry;
+        return _key.Equals(e._key) ? e : null;
+    }
+
+    internal override Entry UpdatedOrNullWithTheSameHash(K key, V value, Update<K, V> update)
+    {
+        if (!_key.Equals(key))
+            return null;
+        value = update(key, Value, value);
+        return ReferenceEquals(Value, value) ? null : ImHashMap.Entry(Hash, key, value);
+    }
+
+    internal override Entry RemovedOrNullWithTheSameHash(K key) => _key.Equals(key) ? this : null;
+
+    /// <inheritdoc/>
+    public override Entry AppendOrUpdateInPlaceOrKeep<S>(S state, ImHashMapEntry<K, V> newEntry, UpdaterInPlaceOrKeeper<S> updateOrKeep)
+    {
+        var e = (KVEntry<K, V>)newEntry;
+        return !_key.Equals(e._key) ? new HashConflictingEntry(Hash, this, e) : updateOrKeep(state, this, e) != this ? e : this;
+    }
+
+    /// <inheritdoc/>
+    public override Entry AppendOrUpdateInPlaceOrKeepByReferenceEquals<S>(S state, ImHashMapEntry<K, V> newEntry, UpdaterInPlaceOrKeeper<S> updateOrKeep)
+    {
+        var e = (KVEntry<K, V>)newEntry;
+        return !ReferenceEquals(_key, e._key) ? new HashConflictingEntry(Hash, this, e) : updateOrKeep(state, this, e) != this ? e : this;
+    }
+}
+
+/// <summary>The base and the holder class for the map tree leafs and branches, also defines the Empty tree.
+/// The map implementation is based on the "modified" 2-3 tree.</summary>
+public class ImHashMap<K, V>
+{
+    /// <summary>Hide the base constructor to prevent the multiple Empty trees creation</summary>
+    protected ImHashMap() { }
+
+    /// <summary>Empty map to start with. Exists as a single instance.</summary>
+    public static readonly ImHashMap<K, V> Empty = new ImHashMap<K, V>();
+
+    /// <summary>Prints the map tree in JSON-ish format in release mode and enumerates the keys in DEBUG.</summary>
+    public override string ToString()
+    {
+#if DEBUG
+        // for the debug purposes we just output the first N keys in array
+        const int n = 50;
+        var count = this.Count();
+        var hashes = typeof(K) == typeof(int)
+            ? ((ImHashMap<int, V>)(object)this).Enumerate().Take(n).Select(x => x.Hash).ToList()
+            : this.Enumerate().Take(n).Select(x => x.Hash).ToList();
+        return $"{{hashes: new int[{(count > n ? $"{n}/{count}" : "" + count)}] {{{(string.Join(", ", hashes))}}}}}";
+#else
+        return "{}";
+#endif
+    }
+
+    internal virtual StringBuilder ToMermaidNodeId(StringBuilder s) => s.Append('M');
+    internal virtual StringBuilder ToMermaidNodeItem(StringBuilder s) => s.Append(Count()).Append(" entries");
+    internal virtual StringBuilder ToMermaidString(StringBuilder s) =>
+        ToMermaidNodeItem(ToMermaidNodeId(s).Append('(')).Append(')');
+
+    /// <summary>Indicates that the map is empty</summary>
+    public bool IsEmpty => this == Empty;
+
+    /// <summary>The count of entries in the map</summary>
+    public virtual int Count() => 0;
+
+    internal virtual bool MayTurnToBranch2 => false;
+
+    internal virtual Entry GetMinHashEntryOrDefault() => null;
+    internal virtual Entry GetMaxHashEntryOrDefault() => null;
+
+    /// <summary>Lookup for the entry by hash. 
+    /// The returned entry maybe either single entry or the `HashConflictEntry` with multiple key-value entries for the same hash.
+    /// If hash does not match the method returns `null`</summary>
+    internal virtual Entry GetEntryOrNull(int hash) => null;
+
+    /// <summary>Assumes the hash is present in the map (because the map is immutable if we know the hash is present then it cannot disappear) 
+    /// otherwise the result. Returns the Entry with the `hash` though it may be a `HashConflictingEntry`</summary>
+    internal virtual Entry GetSurePresentEntry(int hash) => throw new InvalidOperationException("The sure present hash does not exist in the empty map");
+
+    /// <summary>Returns the found entry with the same hash or the new map with added new entry.
+    /// Note that the empty map will return the entry the same as if the entry was found - so the consumer should check for the empty map.
+    /// Note that the method cannot return the `null` - when the existing entry is not found it will always be the new map with the added entry.</summary>
+    internal virtual ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry) => entry;
+
+    internal virtual ImHashMap<K, V> AddSureNotPresentEntry(Entry entry) => entry;
+
+    /// <summary>Returns the new map with old entry replaced by the new entry. 
+    /// Note that the old entry should be present.</summary>
+    internal virtual ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry) => Empty;
+
+    /// <summary>Removes the certainly present old entry and returns the new map without it.</summary>
+    internal virtual ImHashMap<K, V> RemoveEntry(Entry entry) => Empty;
+
+    /// this will have a different implementation for KVEntry and HashConflictingEntry, for the VEntry returning `this` is correct as for the map
+    internal virtual ImHashMap<K, V> GetMapOrReplaceWithEntry(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) => this;
+    internal virtual ImHashMap<K, V> GetMapOrReplaceWithEntryByReferenceEquals(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) => this;
+    internal virtual ImHashMap<K, V> GetEntryOrReplacedMapWithTheSameHash(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) => this;
+    internal virtual ImHashMap<K, V> GetEntryOrReplacedMapWithTheSameHashByReferenceEquals(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) => this;
+    internal virtual ImHashMap<K, V> AddOrKeepWithTheSameHash(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) => this;
+    internal virtual ImHashMap<K, V> AddOrKeepWithTheSameHashByReferenceEquals(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) => this;
+
+    /// <summary>The delegate is supposed to return entry different from the oldEntry to update, and return the oldEntry to keep it.</summary>
+    public delegate ImHashMapEntry<K, V> UpdaterInPlaceOrKeeper<S>(S state, ImHashMapEntry<K, V> oldEntry, ImHashMapEntry<K, V> newEntry);
+
+    /// <summary>The base map entry for holding the Hash (or int key)</summary>
+    public abstract class Entry : ImHashMap<K, V>
+    {
+        /// <summary>The Hash</summary>
+        public readonly int Hash;
+
+        /// <summary>The Key (possibly the same as Hash)</summary>
+        public abstract K Key { get; }
+
+        /// <summary>Constructs the entry with the hash</summary>
+        protected Entry(int hash) => Hash = hash;
+
+        internal override StringBuilder ToMermaidNodeId(StringBuilder s) => s.Append("E_").Append(Hash);
+
+        /// <summary>Get entry if it has the equal key, assuming the entry has the same hash already.</summary>
+        internal abstract ImHashMapEntry<K, V> GetOrNullWithTheSameHash(K key);
+
+        /// <summary>Get entry if it has the reference equal key, assuming the entry has the same hash already.</summary>
+        internal abstract ImHashMapEntry<K, V> GetOrNullWithTheSameHashByReferenceEquals(K key);
+
+        /// <summary>Get entry if it has the reference equal key, assuming the entry has the same hash already.</summary>
+        internal abstract V GetValueOrDefaultWithTheSameHashByReferenceEquals(K key);
+
+        /// <summary>Always returns updated entry or the updated (hash-conflicting) entry with added `newEntry`.</summary>
+        internal abstract Entry AddOrUpdateWithTheSameHash(ImHashMapEntry<K, V> newEntry);
+
+        /// <summary>Always returns updated entry or the updated (hash-conflicting) entry with added `newEntry`.
+        /// Comparing the key by `ReferenceEquals`</summary>
+        internal abstract Entry AddOrUpdateWithTheSameHashByReferenceEquals(ImHashMapEntry<K, V> newEntry);
+
+        /// <summary>Always returns updated entry with the updated value or the updated (hash-conflicting) entry with added `newEntry`</summary>
+        internal abstract Entry AddOrUpdateWithTheSameHash(ImHashMapEntry<K, V> newEntry, Update<K, V> update);
+
+        /// <summary>Always returns updated entry with the updated value or the updated (hash-conflicting) entry with added `newEntry`</summary>
+        internal abstract Entry AddOrUpdateWithTheSameHash<R>(ImHashMapEntry<K, V> newEntry, ref R result, Update<K, V, R> update);
+
+        /// <summary>Always returns updated entry with the updated value or the updated (hash-conflicting) entry with added `newEntry`.
+        /// Comparing the key by `ReferenceEquals`</summary>
+        internal abstract Entry AddOrUpdateWithTheSameHashByReferenceEquals(ImHashMapEntry<K, V> newEntry, Update<K, V> update);
+
+        /// <summary>Returns either updated entry or `null` if `newEntry.Key` is not found inside</summary>
+        internal abstract Entry UpdatedOrNullWithTheSameHash(ImHashMapEntry<K, V> newEntry);
+
+        /// <summary>Returns either updated entry or `null` if `newEntry.Key` is not found inside</summary>
+        internal abstract Entry UpdatedOrNullWithTheSameHash(K key, V value, Update<K, V> update);
+
+        /// <summary>Returns the `this` entry if the `key` is equals to its key, otherwise null</summary>
+        internal abstract Entry RemovedOrNullWithTheSameHash(K key);
+
+        /// <summary>Updating the newEntry in place via the passed delegate based on the current (old) entry or
+        /// adding the newEntry to the hash-conflicting entry, or keeping the old one.</summary>
+        public abstract Entry AppendOrUpdateInPlaceOrKeep<S>(S state, ImHashMapEntry<K, V> newEntry, UpdaterInPlaceOrKeeper<S> updateOrKeep);
+
+        /// <summary>Updating the newEntry in place via the passed delegate based on the current (old) entry or
+        /// adding the newEntry to the hash-conflicting entry, or keeping the old one. The key is compared by the ReferenceEquals.</summary>
+        public abstract Entry AppendOrUpdateInPlaceOrKeepByReferenceEquals<S>(S state, ImHashMapEntry<K, V> newEntry, UpdaterInPlaceOrKeeper<S> updateOrKeep);
+
+        internal override Entry GetMinHashEntryOrDefault() => this;
+        internal override Entry GetMaxHashEntryOrDefault() => this;
+
+        internal sealed override Entry GetEntryOrNull(int hash) => hash == Hash ? this : null;
+
+        internal sealed override Entry GetSurePresentEntry(int hash) => this;
+
+        internal sealed override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry) =>
+            hash > Hash ? new Leaf2(this, entry) : hash < Hash ? new Leaf2(entry, this) : this;
+
+        internal sealed override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry) =>
+            entry.Hash > Hash ? new Leaf2(this, entry) : new Leaf2(entry, this);
+
+        internal sealed override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry)
         {
-            var e = (KVEntry<K, V>)newEntry;
-            return _key.Equals(e._key) ? e : new HashConflictingEntry(Hash, this, e);
+            Debug.Assert(this == oldEntry, "When down to the entry, the oldEntry should be present in the entry.");
+            return newEntry;
         }
 
-        internal override Entry AddOrUpdateWithTheSameHashByReferenceEquals(ImHashMapEntry<K, V> newEntry)
+        internal sealed override ImHashMap<K, V> RemoveEntry(Entry removedEntry)
         {
-            var e = (KVEntry<K, V>)newEntry;
-            return ReferenceEquals(e._key, _key) ? e : new HashConflictingEntry(Hash, this, e);
+            Debug.Assert(this == removedEntry, "When down to the entry, the removedEntry should be present in the entry.");
+            return Empty;
         }
+
+        internal abstract int ForEach<S>(S state, int startIndex, Action<ImHashMapEntry<K, V>, int, S> handler);
+    }
+
+    /// <summary>The composite containing the list of entries with the same conflicting Hash.</summary>
+    internal sealed class HashConflictingEntry : Entry
+    {
+        public KVEntry<K, V>[] Conflicts;
+
+        public override K Key => throw new NotSupportedException("The Key does not make sense foe multi-key entry: " + this);
+
+        internal HashConflictingEntry(int hash, params KVEntry<K, V>[] conflicts) : base(hash) => Conflicts = conflicts;
+
+#if !DEBUG
+        public override string ToString()
+        {
+            var sb = new System.Text.StringBuilder("HashConflictingEntry: [");
+            foreach (var x in Conflicts)
+                sb.Append(x.ToString()).Append(", ");
+            return sb.Append("]").ToString();
+        }
+#endif
+
+        internal override StringBuilder ToMermaidNodeItem(StringBuilder s)
+        {
+            s.Append('`').Append(Hash);
+            foreach (var c in Conflicts)
+                s.Append("`,`").Append(c._key).Append("`,`").Append(c.Value);
+            return s.Append('`');
+        }
+
+        public override int Count() => Conflicts.Length;
+
+        internal override ImHashMapEntry<K, V> GetOrNullWithTheSameHash(K key)
+        {
+            var cs = Conflicts;
+            var i = cs.Length - 1;
+            while (i != -1 && !cs[i]._key.Equals(key)) --i;
+            return i != -1 ? cs[i] : null;
+        }
+
+        internal override ImHashMapEntry<K, V> GetOrNullWithTheSameHashByReferenceEquals(K key)
+        {
+            var cs = Conflicts;
+            var i = cs.Length - 1;
+            while (i != -1 && !ReferenceEquals(cs[i]._key, key)) --i;
+            return i != -1 ? cs[i] : null;
+        }
+
+        internal override V GetValueOrDefaultWithTheSameHashByReferenceEquals(K key)
+        {
+            var cs = Conflicts;
+            var i = cs.Length - 1;
+            while (i != -1 && !ReferenceEquals(cs[i]._key, key)) --i;
+            return i != -1 ? cs[i].Value : default;
+        }
+
+        internal override Entry AddOrUpdateWithTheSameHash(ImHashMapEntry<K, V> newEntry) =>
+            AddOrUpdateWithTheSameHash(newEntry, null);
 
         internal override Entry AddOrUpdateWithTheSameHash(ImHashMapEntry<K, V> newEntry, Update<K, V> update)
         {
             var e = (KVEntry<K, V>)newEntry;
-            var key = _key;
-            return key.Equals(e._key) ? ImHashMap.Entry(Hash, key, update(key, Value, e.Value)) : new HashConflictingEntry(Hash, this, e);
+            var key = e._key;
+            var cs = Conflicts;
+            var i = cs.Length - 1;
+            while (i != -1 && !cs[i]._key.Equals(key)) --i;
+            if (i == -1)
+                return new HashConflictingEntry(Hash, cs.AppendToNonEmpty(e));
+            if (update != null)
+                e = new KVEntry<K, V>(Hash, key, update(key, cs[i].Value, e.Value));
+            return new HashConflictingEntry(Hash, cs.UpdateNonEmpty(e, i));
         }
 
         internal override Entry AddOrUpdateWithTheSameHash<R>(ImHashMapEntry<K, V> newEntry, ref R result, Update<K, V, R> update)
         {
             var e = (KVEntry<K, V>)newEntry;
-            var key = _key;
-            return key.Equals(e._key) ? ImHashMap.Entry(Hash, key, update(key, Value, e.Value, ref result)) : new HashConflictingEntry(Hash, this, e);
+            var key = e._key;
+            var cs = Conflicts;
+            var i = cs.Length - 1;
+            while (i != -1 && !cs[i]._key.Equals(key)) --i;
+            if (i == -1)
+                return new HashConflictingEntry(Hash, cs.AppendToNonEmpty(e));
+            if (update != null)
+                e = new KVEntry<K, V>(Hash, key, update(key, cs[i].Value, e.Value, ref result));
+            return new HashConflictingEntry(Hash, cs.UpdateNonEmpty(e, i));
         }
+
+        internal override Entry AddOrUpdateWithTheSameHashByReferenceEquals(ImHashMapEntry<K, V> newEntry) =>
+            AddOrUpdateWithTheSameHashByReferenceEquals(newEntry, null);
 
         internal override Entry AddOrUpdateWithTheSameHashByReferenceEquals(ImHashMapEntry<K, V> newEntry, Update<K, V> update)
         {
             var e = (KVEntry<K, V>)newEntry;
-            var key = _key;
-            return ReferenceEquals(key, e._key) ? ImHashMap.Entry(Hash, key, update(key, Value, e.Value)) : new HashConflictingEntry(Hash, this, e);
+            var key = e._key;
+            var cs = Conflicts;
+            var i = cs.Length - 1;
+            while (i != -1 && !ReferenceEquals(cs[i]._key, key)) --i;
+            if (i == -1)
+                return new HashConflictingEntry(Hash, cs.AppendToNonEmpty(e));
+            if (update != null)
+                e = new KVEntry<K, V>(Hash, key, update(key, cs[i].Value, e.Value));
+            return new HashConflictingEntry(Hash, cs.UpdateNonEmpty(e, i));
         }
 
-        // todo: @naming better method names aligned with the calling side
-        internal override ImHashMap<K, V> GetMapOrReplaceWithEntry(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry)
-        {
-            var e = (KVEntry<K, V>)newEntry;
-            return this == e ? e : oldMap.ReplaceEntry(this, _key.Equals(e._key) ? e : new HashConflictingEntry(Hash, this, e));
-        }
+        internal override ImHashMap<K, V> GetMapOrReplaceWithEntry(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) =>
+            oldMap.ReplaceEntry(this, AddOrUpdateWithTheSameHash(newEntry, null));
 
-        internal override ImHashMap<K, V> GetMapOrReplaceWithEntryByReferenceEquals(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry)
-        {
-            var e = (KVEntry<K, V>)newEntry;
-            return this == e ? e : oldMap.ReplaceEntry(this, ReferenceEquals(_key, e._key) ? e : new HashConflictingEntry(Hash, this, e));
-        }
+        internal override ImHashMap<K, V> GetMapOrReplaceWithEntryByReferenceEquals(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) =>
+            oldMap.ReplaceEntry(this, AddOrUpdateWithTheSameHashByReferenceEquals(newEntry, null));
 
         internal override ImHashMap<K, V> GetEntryOrReplacedMapWithTheSameHash(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry)
         {
             var e = (KVEntry<K, V>)newEntry;
-            return this == e ? e : _key.Equals(e._key) ? this : oldMap.ReplaceEntry(this, new HashConflictingEntry(Hash, this, e));
+            var key = e._key;
+            var cs = Conflicts;
+            var i = cs.Length - 1;
+            while (i != -1 && !cs[i]._key.Equals(key)) --i;
+            return i != -1 ? cs[i] : oldMap.ReplaceEntry(this, new HashConflictingEntry(Hash, cs.AppendToNonEmpty(e)));
         }
 
         internal override ImHashMap<K, V> GetEntryOrReplacedMapWithTheSameHashByReferenceEquals(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry)
         {
             var e = (KVEntry<K, V>)newEntry;
-            return this == e ? e : ReferenceEquals(_key, e._key) ? this : oldMap.ReplaceEntry(this, new HashConflictingEntry(Hash, this, e));
+            var key = e._key;
+            var cs = Conflicts;
+            var i = cs.Length - 1;
+            while (i != -1 && !ReferenceEquals(cs[i]._key, key)) --i;
+            return i != -1 ? cs[i] : oldMap.ReplaceEntry(this, new HashConflictingEntry(Hash, cs.AppendToNonEmpty(e)));
         }
 
         internal override ImHashMap<K, V> AddOrKeepWithTheSameHash(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry)
         {
             var e = (KVEntry<K, V>)newEntry;
-            return this == e ? e : _key.Equals(e._key) ? oldMap : oldMap.ReplaceEntry(this, new HashConflictingEntry(Hash, this, e));
+            var key = e._key;
+            var cs = Conflicts;
+            var i = cs.Length - 1;
+            while (i != -1 && !cs[i]._key.Equals(key)) --i;
+            return i != -1 ? oldMap : oldMap.ReplaceEntry(this, new HashConflictingEntry(Hash, cs.AppendToNonEmpty(e)));
         }
 
         internal override ImHashMap<K, V> AddOrKeepWithTheSameHashByReferenceEquals(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry)
         {
             var e = (KVEntry<K, V>)newEntry;
-            return this == e ? e : ReferenceEquals(_key, e._key) ? oldMap : oldMap.ReplaceEntry(this, new HashConflictingEntry(Hash, this, e));
+            var key = e._key;
+            var cs = Conflicts;
+            var i = cs.Length - 1;
+            while (i != -1 && !ReferenceEquals(cs[i]._key, key)) --i;
+            return i != -1 ? oldMap : oldMap.ReplaceEntry(this, new HashConflictingEntry(Hash, cs.AppendToNonEmpty(e)));
         }
 
         internal override Entry UpdatedOrNullWithTheSameHash(ImHashMapEntry<K, V> newEntry)
         {
             var e = (KVEntry<K, V>)newEntry;
-            return _key.Equals(e._key) ? e : null;
+            var key = e._key;
+            var cs = Conflicts;
+            var i = cs.Length - 1;
+            while (i != -1 && !cs[i]._key.Equals(key)) --i;
+            return i == -1 ? null : new HashConflictingEntry(Hash, cs.UpdateNonEmpty(e, i));
         }
 
         internal override Entry UpdatedOrNullWithTheSameHash(K key, V value, Update<K, V> update)
         {
-            if (!_key.Equals(key))
+            var cs = Conflicts;
+            var i = cs.Length - 1;
+            while (i != -1 && !cs[i]._key.Equals(key)) --i;
+            if (i == -1)
                 return null;
-            value = update(key, Value, value);
-            return ReferenceEquals(Value, value) ? null : ImHashMap.Entry(Hash, key, value);
+            if (update != null)
+            {
+                var oldValue = cs[i].Value;
+                value = update(key, oldValue, value);
+                if (ReferenceEquals(oldValue, value))
+                    return null;
+            }
+            return new HashConflictingEntry(Hash, cs.UpdateNonEmpty(new KVEntry<K, V>(Hash, key, value), i));
         }
 
-        internal override Entry RemovedOrNullWithTheSameHash(K key) => _key.Equals(key) ? this : null;
+        internal override Entry RemovedOrNullWithTheSameHash(K key)
+        {
+            var cs = Conflicts;
+            var n = cs.Length;
+            var i = n - 1;
+            while (i != -1 && !cs[i]._key.Equals(key)) --i;
+            if (i == -1)
+                return null;
+            if (n == 2)
+                return i == 0 ? cs[1] : cs[0];
+            var newConflicts = new KVEntry<K, V>[n -= 1]; // the new n is less by one
+            if (i > 0) // copy the 1st part
+                Array.Copy(cs, 0, newConflicts, 0, i);
+            if (i < n) // copy the 2nd part
+                Array.Copy(cs, i + 1, newConflicts, i, n - i);
+            return new HashConflictingEntry(Hash, newConflicts);
+        }
 
         /// <inheritdoc/>
         public override Entry AppendOrUpdateInPlaceOrKeep<S>(S state, ImHashMapEntry<K, V> newEntry, UpdaterInPlaceOrKeeper<S> updateOrKeep)
         {
             var e = (KVEntry<K, V>)newEntry;
-            return !_key.Equals(e._key) ? new HashConflictingEntry(Hash, this, e) : updateOrKeep(state, this, e) != this ? e : this;
+            var key = e._key;
+            var cs = Conflicts;
+            var i = cs.Length - 1;
+            while (i != -1 && !key.Equals(cs[i]._key)) --i;
+            return i == -1
+                ? new HashConflictingEntry(Hash, cs.AppendToNonEmpty(e))
+                : updateOrKeep(state, cs[i], e) != cs[i]
+                ? new HashConflictingEntry(Hash, cs.UpdateNonEmpty(e, i))
+                : this;
         }
 
         /// <inheritdoc/>
         public override Entry AppendOrUpdateInPlaceOrKeepByReferenceEquals<S>(S state, ImHashMapEntry<K, V> newEntry, UpdaterInPlaceOrKeeper<S> updateOrKeep)
         {
             var e = (KVEntry<K, V>)newEntry;
-            return !ReferenceEquals(_key, e._key) ? new HashConflictingEntry(Hash, this, e) : updateOrKeep(state, this, e) != this ? e : this;
+            var key = e._key;
+            var cs = Conflicts;
+            var i = cs.Length - 1;
+            while (i != -1 && !ReferenceEquals(key, cs[i]._key)) --i;
+            return i == -1
+                ? new HashConflictingEntry(Hash, cs.AppendToNonEmpty(e))
+                : updateOrKeep(state, cs[i], e) != cs[i]
+                ? new HashConflictingEntry(Hash, cs.UpdateNonEmpty(e, i))
+                : this;
+        }
+
+        internal override int ForEach<S>(S state, int startIndex, Action<ImHashMapEntry<K, V>, int, S> handler)
+        {
+            var i = startIndex;
+            foreach (var e in Conflicts)
+                handler(e, i++, state);
+            return i;
         }
     }
 
-    /// <summary>The base and the holder class for the map tree leafs and branches, also defines the Empty tree.
-    /// The map implementation is based on the "modified" 2-3 tree.</summary>
-    public class ImHashMap<K, V>
+    /// <summary>Leaf with 2 hash-ordered entries. Important: the both or either of entries may be null for the removed entries</summary>
+    internal sealed class Leaf2 : ImHashMap<K, V>
     {
-        /// <summary>Hide the base constructor to prevent the multiple Empty trees creation</summary>
-        protected ImHashMap() { }
-
-        /// <summary>Empty map to start with. Exists as a single instance.</summary>
-        public static readonly ImHashMap<K, V> Empty = new ImHashMap<K, V>();
-
-        /// <summary>Prints the map tree in JSON-ish format in release mode and enumerates the keys in DEBUG.</summary>
-        public override string ToString()
+        public readonly Entry Entry0, Entry1;
+        public Leaf2(Entry e0, Entry e1)
         {
-#if DEBUG
-            // for the debug purposes we just output the first N keys in array
-            const int n = 50;
-            var count = this.Count();
-            var hashes = typeof(K) == typeof(int)
-                ? ((ImHashMap<int, V>)(object)this).Enumerate().Take(n).Select(x => x.Hash).ToList()
-                : this.Enumerate().Take(n).Select(x => x.Hash).ToList();
-            return $"{{hashes: new int[{(count > n ? $"{n}/{count}" : "" + count)}] {{{(string.Join(", ", hashes))}}}}}";
-#else
-            return "{}";
-#endif
+            Debug.Assert(e0.Hash < e1.Hash);
+            Entry0 = e0; Entry1 = e1;
         }
 
-        internal virtual StringBuilder ToMermaidNodeId(StringBuilder s) => s.Append('M');
-        internal virtual StringBuilder ToMermaidNodeItem(StringBuilder s) => s.Append(Count()).Append(" entries");
-        internal virtual StringBuilder ToMermaidString(StringBuilder s) =>
-            ToMermaidNodeItem(ToMermaidNodeId(s).Append('(')).Append(')');
-
-        /// <summary>Indicates that the map is empty</summary>
-        public bool IsEmpty => this == Empty;
-
-        /// <summary>The count of entries in the map</summary>
-        public virtual int Count() => 0;
-
-        internal virtual bool MayTurnToBranch2 => false;
-
-        internal virtual Entry GetMinHashEntryOrDefault() => null;
-        internal virtual Entry GetMaxHashEntryOrDefault() => null;
-
-        /// <summary>Lookup for the entry by hash. 
-        /// The returned entry maybe either single entry or the `HashConflictEntry` with multiple key-value entries for the same hash.
-        /// If hash does not match the method returns `null`</summary>
-        internal virtual Entry GetEntryOrNull(int hash) => null;
-
-        /// <summary>Assumes the hash is present in the map (because the map is immutable if we know the hash is present then it cannot disappear) 
-        /// otherwise the result. Returns the Entry with the `hash` though it may be a `HashConflictingEntry`</summary>
-        internal virtual Entry GetSurePresentEntry(int hash) => throw new InvalidOperationException("The sure present hash does not exist in the empty map");
-
-        /// <summary>Returns the found entry with the same hash or the new map with added new entry.
-        /// Note that the empty map will return the entry the same as if the entry was found - so the consumer should check for the empty map.
-        /// Note that the method cannot return the `null` - when the existing entry is not found it will always be the new map with the added entry.</summary>
-        internal virtual ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry) => entry;
-
-        internal virtual ImHashMap<K, V> AddSureNotPresentEntry(Entry entry) => entry;
-
-        /// <summary>Returns the new map with old entry replaced by the new entry. 
-        /// Note that the old entry should be present.</summary>
-        internal virtual ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry) => Empty;
-
-        /// <summary>Removes the certainly present old entry and returns the new map without it.</summary>
-        internal virtual ImHashMap<K, V> RemoveEntry(Entry entry) => Empty;
-
-        /// this will have a different implementation for KVEntry and HashConflictingEntry, for the VEntry returning `this` is correct as for the map
-        internal virtual ImHashMap<K, V> GetMapOrReplaceWithEntry(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) => this;
-        internal virtual ImHashMap<K, V> GetMapOrReplaceWithEntryByReferenceEquals(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) => this;
-        internal virtual ImHashMap<K, V> GetEntryOrReplacedMapWithTheSameHash(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) => this;
-        internal virtual ImHashMap<K, V> GetEntryOrReplacedMapWithTheSameHashByReferenceEquals(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) => this;
-        internal virtual ImHashMap<K, V> AddOrKeepWithTheSameHash(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) => this;
-        internal virtual ImHashMap<K, V> AddOrKeepWithTheSameHashByReferenceEquals(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) => this;
-
-        /// <summary>The delegate is supposed to return entry different from the oldEntry to update, and return the oldEntry to keep it.</summary>
-        public delegate ImHashMapEntry<K, V> UpdaterInPlaceOrKeeper<S>(S state, ImHashMapEntry<K, V> oldEntry, ImHashMapEntry<K, V> newEntry);
-
-        /// <summary>The base map entry for holding the Hash (or int key)</summary>
-        public abstract class Entry : ImHashMap<K, V>
-        {
-            /// <summary>The Hash</summary>
-            public readonly int Hash;
-
-            /// <summary>The Key (possibly the same as Hash)</summary>
-            public abstract K Key { get; }
-
-            /// <summary>Constructs the entry with the hash</summary>
-            protected Entry(int hash) => Hash = hash;
-
-            internal override StringBuilder ToMermaidNodeId(StringBuilder s) => s.Append("E_").Append(Hash);
-
-            /// <summary>Get entry if it has the equal key, assuming the entry has the same hash already.</summary>
-            internal abstract ImHashMapEntry<K, V> GetOrNullWithTheSameHash(K key);
-
-            /// <summary>Get entry if it has the reference equal key, assuming the entry has the same hash already.</summary>
-            internal abstract ImHashMapEntry<K, V> GetOrNullWithTheSameHashByReferenceEquals(K key);
-
-            /// <summary>Get entry if it has the reference equal key, assuming the entry has the same hash already.</summary>
-            internal abstract V GetValueOrDefaultWithTheSameHashByReferenceEquals(K key);
-
-            /// <summary>Always returns updated entry or the updated (hash-conflicting) entry with added `newEntry`.</summary>
-            internal abstract Entry AddOrUpdateWithTheSameHash(ImHashMapEntry<K, V> newEntry);
-
-            /// <summary>Always returns updated entry or the updated (hash-conflicting) entry with added `newEntry`.
-            /// Comparing the key by `ReferenceEquals`</summary>
-            internal abstract Entry AddOrUpdateWithTheSameHashByReferenceEquals(ImHashMapEntry<K, V> newEntry);
-
-            /// <summary>Always returns updated entry with the updated value or the updated (hash-conflicting) entry with added `newEntry`</summary>
-            internal abstract Entry AddOrUpdateWithTheSameHash(ImHashMapEntry<K, V> newEntry, Update<K, V> update);
-
-            /// <summary>Always returns updated entry with the updated value or the updated (hash-conflicting) entry with added `newEntry`</summary>
-            internal abstract Entry AddOrUpdateWithTheSameHash<R>(ImHashMapEntry<K, V> newEntry, ref R result, Update<K, V, R> update);
-
-            /// <summary>Always returns updated entry with the updated value or the updated (hash-conflicting) entry with added `newEntry`.
-            /// Comparing the key by `ReferenceEquals`</summary>
-            internal abstract Entry AddOrUpdateWithTheSameHashByReferenceEquals(ImHashMapEntry<K, V> newEntry, Update<K, V> update);
-
-            /// <summary>Returns either updated entry or `null` if `newEntry.Key` is not found inside</summary>
-            internal abstract Entry UpdatedOrNullWithTheSameHash(ImHashMapEntry<K, V> newEntry);
-
-            /// <summary>Returns either updated entry or `null` if `newEntry.Key` is not found inside</summary>
-            internal abstract Entry UpdatedOrNullWithTheSameHash(K key, V value, Update<K, V> update);
-
-            /// <summary>Returns the `this` entry if the `key` is equals to its key, otherwise null</summary>
-            internal abstract Entry RemovedOrNullWithTheSameHash(K key);
-
-            /// <summary>Updating the newEntry in place via the passed delegate based on the current (old) entry or
-            /// adding the newEntry to the hash-conflicting entry, or keeping the old one.</summary>
-            public abstract Entry AppendOrUpdateInPlaceOrKeep<S>(S state, ImHashMapEntry<K, V> newEntry, UpdaterInPlaceOrKeeper<S> updateOrKeep);
-
-            /// <summary>Updating the newEntry in place via the passed delegate based on the current (old) entry or
-            /// adding the newEntry to the hash-conflicting entry, or keeping the old one. The key is compared by the ReferenceEquals.</summary>
-            public abstract Entry AppendOrUpdateInPlaceOrKeepByReferenceEquals<S>(S state, ImHashMapEntry<K, V> newEntry, UpdaterInPlaceOrKeeper<S> updateOrKeep);
-
-            internal override Entry GetMinHashEntryOrDefault() => this;
-            internal override Entry GetMaxHashEntryOrDefault() => this;
-
-            internal sealed override Entry GetEntryOrNull(int hash) => hash == Hash ? this : null;
-
-            internal sealed override Entry GetSurePresentEntry(int hash) => this;
-
-            internal sealed override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry) =>
-                hash > Hash ? new Leaf2(this, entry) : hash < Hash ? new Leaf2(entry, this) : this;
-
-            internal sealed override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry) =>
-                entry.Hash > Hash ? new Leaf2(this, entry) : new Leaf2(entry, this);
-
-            internal sealed override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry)
-            {
-                Debug.Assert(this == oldEntry, "When down to the entry, the oldEntry should be present in the entry.");
-                return newEntry;
-            }
-
-            internal sealed override ImHashMap<K, V> RemoveEntry(Entry removedEntry)
-            {
-                Debug.Assert(this == removedEntry, "When down to the entry, the removedEntry should be present in the entry.");
-                return Empty;
-            }
-
-            internal abstract int ForEach<S>(S state, int startIndex, Action<ImHashMapEntry<K, V>, int, S> handler);
-        }
-
-        /// <summary>The composite containing the list of entries with the same conflicting Hash.</summary>
-        internal sealed class HashConflictingEntry : Entry
-        {
-            public KVEntry<K, V>[] Conflicts;
-
-            public override K Key => throw new NotSupportedException("The Key does not make sense foe multi-key entry: " + this);
-
-            internal HashConflictingEntry(int hash, params KVEntry<K, V>[] conflicts) : base(hash) => Conflicts = conflicts;
+        public override int Count() => Entry0.Count() + Entry1.Count();
 
 #if !DEBUG
-            public override string ToString()
-            {
-                var sb = new System.Text.StringBuilder("HashConflictingEntry: [");
-                foreach (var x in Conflicts)
-                    sb.Append(x.ToString()).Append(", ");
-                return sb.Append("]").ToString();
-            }
+        public override string ToString() => "{L2:{E0: " + Entry0 + ",E1:" + Entry1 + "}}";
+#endif
+        internal override StringBuilder ToMermaidNodeId(StringBuilder s) =>
+            s.Append("L2_").Append(Entry0.Hash);
+        internal override StringBuilder ToMermaidNodeItem(StringBuilder s) =>
+            Entry1.ToMermaidNodeItem(Entry0.ToMermaidNodeItem(s).Append('/'));
+
+        internal override Entry GetMinHashEntryOrDefault() => Entry0;
+        internal override Entry GetMaxHashEntryOrDefault() => Entry1;
+
+        internal override Entry GetEntryOrNull(int hash) =>
+            hash == Entry0.Hash ? Entry0 : Entry1.Hash == hash ? Entry1 : null;
+
+        internal override Entry GetSurePresentEntry(int hash) =>
+            hash == Entry0.Hash ? Entry0 : Entry1;
+
+        internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry) =>
+            hash == Entry0.Hash ? Entry0 : hash == Entry1.Hash ? Entry1 : new Leaf2Plus(entry, this);
+
+        internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry) => new Leaf2Plus(entry, this);
+
+        internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry) =>
+            oldEntry == Entry0 ? new Leaf2(newEntry, Entry1) : new Leaf2(Entry0, newEntry);
+
+        internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry) =>
+            Entry0 == removedEntry ? Entry1 : Entry0;
+    }
+
+    /// <summary>The leaf containing the Leaf2 plus the newest added entry.</summary>
+    internal sealed class Leaf2Plus : ImHashMap<K, V>
+    {
+        public readonly Entry Plus;
+        public readonly Leaf2 L;
+        public Leaf2Plus(Entry plus, Leaf2 leaf) { Plus = plus; L = leaf; }
+
+        public override int Count() => Plus.Count() + L.Entry0.Count() + L.Entry1.Count();
+
+#if !DEBUG
+        public override string ToString() => "{L21: {P: " + Plus + ", L: " + L + "}}";
+#endif
+        internal override StringBuilder ToMermaidNodeId(StringBuilder s) =>
+            s.Append("L2P_").Append(Plus.Hash);
+        internal override StringBuilder ToMermaidString(StringBuilder s)
+        {
+            L.ToMermaidString(s).AppendLine();
+
+            ToMermaidNodeId(s).Append('>');
+            Plus.ToMermaidNodeItem(s).Append("]-->");
+            return L.ToMermaidNodeId(s);
+        }
+
+        internal override Entry GetMinHashEntryOrDefault() => Plus.Hash < L.Entry0.Hash ? Plus : L.Entry0;
+        internal override Entry GetMaxHashEntryOrDefault() => Plus.Hash > L.Entry1.Hash ? Plus : L.Entry1;
+
+        internal override Entry GetEntryOrNull(int hash) =>
+            hash == Plus.Hash ? Plus : hash == L.Entry0.Hash ? L.Entry0 : hash == L.Entry1.Hash ? L.Entry1 : null;
+
+        internal override Entry GetSurePresentEntry(int hash) =>
+            hash == Plus.Hash ? Plus : hash == L.Entry0.Hash ? L.Entry0 : L.Entry1;
+
+        internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
+        {
+            var p = Plus;
+            if (hash == p.Hash)
+                return p;
+            var l = L;
+            return hash == l.Entry0.Hash ? l.Entry0 : hash == l.Entry1.Hash ? l.Entry1 : new Leaf2PlusPlus(entry, this);
+        }
+
+        internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry) => new Leaf2PlusPlus(entry, this);
+
+        internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry) =>
+            oldEntry == Plus ? new Leaf2Plus(newEntry, L) :
+            oldEntry == L.Entry0 ? new Leaf2Plus(Plus, new Leaf2(newEntry, L.Entry1)) :
+                                    new Leaf2Plus(Plus, new Leaf2(L.Entry0, newEntry));
+
+        internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry) =>
+            removedEntry == Plus ? L :
+            removedEntry == L.Entry0 ?
+                (Plus.Hash < L.Entry1.Hash ? new Leaf2(Plus, L.Entry1) : new Leaf2(L.Entry1, Plus)) :
+                (Plus.Hash < L.Entry0.Hash ? new Leaf2(Plus, L.Entry0) : new Leaf2(L.Entry0, Plus));
+    }
+
+    /// <summary>Leaf with the Leaf2 plus added entry, plus added entry</summary>
+    internal sealed class Leaf2PlusPlus : ImHashMap<K, V>
+    {
+        public readonly Entry Plus;
+        public readonly Leaf2Plus L;
+        public Leaf2PlusPlus(Entry plus, Leaf2Plus l) { Plus = plus; L = l; }
+
+        public override int Count() => Plus.Count() + L.Count();
+
+#if !DEBUG
+        public override string ToString() => "{L211:{P:" + Plus + ",L:" + L + "}}";
 #endif
 
-            internal override StringBuilder ToMermaidNodeItem(StringBuilder s)
+        internal override StringBuilder ToMermaidNodeId(StringBuilder s) =>
+            s.Append("L2PP_").Append(Plus.Hash);
+        internal override StringBuilder ToMermaidString(StringBuilder s)
+        {
+            L.ToMermaidString(s).AppendLine();
+
+            ToMermaidNodeId(s).Append('>');
+            Plus.ToMermaidNodeItem(s).Append("]-->");
+            return L.ToMermaidNodeId(s);
+        }
+
+        internal override Entry GetMinHashEntryOrDefault()
+        {
+            Entry p = Plus, pp = L.Plus, e0 = L.L.Entry0;
+            return p.Hash < pp.Hash ? (p.Hash < e0.Hash ? p : e0) : (pp.Hash < e0.Hash ? pp : e0);
+        }
+        internal override Entry GetMaxHashEntryOrDefault()
+        {
+            Entry p = Plus, pp = L.Plus, e1 = L.L.Entry1;
+            return p.Hash > pp.Hash ? (p.Hash > e1.Hash ? p : e1) : (pp.Hash > e1.Hash ? pp : e1);
+        }
+
+        internal override Entry GetEntryOrNull(int hash) =>
+            hash == Plus.Hash ? Plus : hash == L.Plus.Hash ? L.Plus : L.L.Entry0.Hash == hash ? L.L.Entry0 : L.L.Entry1.Hash == hash ? L.L.Entry1 : null;
+
+        internal override Entry GetSurePresentEntry(int hash) =>
+            hash == Plus.Hash ? Plus : hash == L.Plus.Hash ? L.Plus : L.L.Entry0.Hash == hash ? L.L.Entry0 : L.L.Entry1;
+
+        internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
+        {
+            var p = Plus;
+            var ph = p.Hash;
+            if (ph == hash)
+                return p;
+
+            var pp = L.Plus;
+            var pph = pp.Hash;
+            if (pph == hash)
+                return pp;
+
+            var l = L.L;
+            Entry e0 = l.Entry0, e1 = l.Entry1;
+
+            if (hash == e0.Hash)
+                return e0;
+            if (hash == e1.Hash)
+                return e1;
+
+            // can we combine and speedup those methods
+            ImHashMap.InsertInOrder(pph, ref pp, ref e0, ref e1);
+            ImHashMap.InsertInOrder(ph, ref p, ref e0, ref e1, ref pp);
+            ImHashMap.InsertInOrder(hash, ref entry, ref e0, ref e1, ref pp, ref p);
+            return new Leaf5(e0, e1, pp, p, entry);
+        }
+
+        internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry)
+        {
+            var l = L.L;
+            Entry e0 = l.Entry0, e1 = l.Entry1, p = Plus, pp = L.Plus;
+            ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1);
+            ImHashMap.InsertInOrder(p.Hash, ref p, ref e0, ref e1, ref pp);
+            ImHashMap.InsertInOrder(entry.Hash, ref entry, ref e0, ref e1, ref pp, ref p);
+            return new Leaf5(e0, e1, pp, p, entry);
+        }
+
+        internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry) =>
+            oldEntry == Plus ? new Leaf2PlusPlus(newEntry, L) :
+            oldEntry == L.Plus ? new Leaf2PlusPlus(Plus, new Leaf2Plus(newEntry, L.L)) :
+            oldEntry == L.L.Entry0 ? new Leaf2PlusPlus(Plus, new Leaf2Plus(L.Plus, new Leaf2(newEntry, L.L.Entry1))) :
+                                        new Leaf2PlusPlus(Plus, new Leaf2Plus(L.Plus, new Leaf2(L.L.Entry0, newEntry)));
+
+        internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry) =>
+            removedEntry == Plus ? L :
+            removedEntry == L.Plus ? new Leaf2Plus(Plus, L.L) :
+            removedEntry == L.L.Entry0 ?
+                (L.Plus.Hash < L.L.Entry1.Hash ? new Leaf2Plus(Plus, new Leaf2(L.Plus, L.L.Entry1)) : new Leaf2Plus(Plus, new Leaf2(L.L.Entry1, L.Plus))) :
+                (L.Plus.Hash < L.L.Entry0.Hash ? new Leaf2Plus(Plus, new Leaf2(L.Plus, L.L.Entry0)) : new Leaf2Plus(Plus, new Leaf2(L.L.Entry0, L.Plus)));
+    }
+
+    /// <summary>Leaf with 5 hash-ordered entries</summary>
+    internal sealed class Leaf5 : ImHashMap<K, V>
+    {
+        public readonly Entry Entry0, Entry1, Entry2, Entry3, Entry4;
+
+        public Leaf5(Entry e0, Entry e1, Entry e2, Entry e3, Entry e4)
+        {
+            Debug.Assert(e0.Hash < e1.Hash, "e0 < e1");
+            Debug.Assert(e1.Hash < e2.Hash, "e1 < e2");
+            Debug.Assert(e2.Hash < e3.Hash, "e2 < e3");
+            Debug.Assert(e3.Hash < e4.Hash, "e3 < e4");
+            Entry0 = e0; Entry1 = e1; Entry2 = e2; Entry3 = e3; Entry4 = e4;
+        }
+
+        public override int Count() => Entry0.Count() + Entry1.Count() + Entry2.Count() + Entry3.Count() + Entry4.Count();
+
+#if !DEBUG
+        public override string ToString() =>
+            "{L2:{E0:" + Entry0 + ",E1:" + Entry1 + ",E2:" + Entry2 + ",E3:" + Entry3 + ",E4:" + Entry4 + "}}";
+#endif
+
+        internal override StringBuilder ToMermaidNodeId(StringBuilder s) =>
+            s.Append("L5_").Append(Entry0.Hash);
+        internal override StringBuilder ToMermaidNodeItem(StringBuilder s)
+        {
+            Entry0.ToMermaidNodeItem(s).Append('/');
+            Entry1.ToMermaidNodeItem(s).Append('/');
+            Entry2.ToMermaidNodeItem(s).Append('/');
+            Entry3.ToMermaidNodeItem(s).Append('/');
+            Entry4.ToMermaidNodeItem(s);
+            return s;
+        }
+
+        internal override Entry GetMinHashEntryOrDefault() => Entry0;
+        internal override Entry GetMaxHashEntryOrDefault() => Entry4;
+
+        internal override Entry GetEntryOrNull(int hash) =>
+            hash == Entry0.Hash ? Entry0 : hash == Entry1.Hash ? Entry1 : hash == Entry2.Hash ? Entry2 : hash == Entry3.Hash ? Entry3 : hash == Entry4.Hash ? Entry4 : null;
+
+        internal override Entry GetSurePresentEntry(int hash) =>
+            hash == Entry0.Hash ? Entry0 : hash == Entry1.Hash ? Entry1 : hash == Entry2.Hash ? Entry2 : hash == Entry3.Hash ? Entry3 : Entry4;
+
+        internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry) =>
+            hash == Entry0.Hash ? Entry0 : hash == Entry1.Hash ? Entry1 : hash == Entry2.Hash ? Entry2 : hash == Entry3.Hash ? Entry3 :
+            hash == Entry4.Hash ? Entry4 : new Leaf5Plus(entry, this);
+
+        internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry) => new Leaf5Plus(entry, this);
+
+        internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry) =>
+            oldEntry == Entry0 ? new Leaf5(newEntry, Entry1, Entry2, Entry3, Entry4) :
+            oldEntry == Entry1 ? new Leaf5(Entry0, newEntry, Entry2, Entry3, Entry4) :
+            oldEntry == Entry2 ? new Leaf5(Entry0, Entry1, newEntry, Entry3, Entry4) :
+            oldEntry == Entry3 ? new Leaf5(Entry0, Entry1, Entry2, newEntry, Entry4) :
+                                    new Leaf5(Entry0, Entry1, Entry2, Entry3, newEntry);
+
+        internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry) =>
+            removedEntry == Entry0 ? new Leaf2PlusPlus(Entry4, new Leaf2Plus(Entry3, new Leaf2(Entry1, Entry2))) :
+            removedEntry == Entry1 ? new Leaf2PlusPlus(Entry4, new Leaf2Plus(Entry3, new Leaf2(Entry0, Entry2))) :
+            removedEntry == Entry2 ? new Leaf2PlusPlus(Entry4, new Leaf2Plus(Entry3, new Leaf2(Entry0, Entry1))) :
+            removedEntry == Entry3 ? new Leaf2PlusPlus(Entry4, new Leaf2Plus(Entry2, new Leaf2(Entry0, Entry1))) :
+                                        new Leaf2PlusPlus(Entry3, new Leaf2Plus(Entry2, new Leaf2(Entry0, Entry1)));
+    }
+
+    /// <summary>Leaf with 5 existing ordered entries plus 1 newly added entry.</summary>
+    internal sealed class Leaf5Plus : ImHashMap<K, V>
+    {
+        public readonly Entry Plus;
+        public readonly Leaf5 L;
+        public Leaf5Plus(Entry plus, Leaf5 l) { Plus = plus; L = l; }
+
+        public override int Count() => Plus.Count() + L.Count();
+
+#if !DEBUG
+        public override string ToString() => "{L51:{P:" + Plus + ",L:" + L + "}}";
+#endif
+        internal override StringBuilder ToMermaidNodeId(StringBuilder s) =>
+            s.Append("L5P_").Append(Plus.Hash);
+        internal override StringBuilder ToMermaidString(StringBuilder s)
+        {
+            L.ToMermaidString(s).AppendLine();
+
+            ToMermaidNodeId(s).Append('>');
+            Plus.ToMermaidNodeItem(s).Append("]-->");
+            return L.ToMermaidNodeId(s);
+        }
+
+        internal override Entry GetMinHashEntryOrDefault() => Plus.Hash < L.Entry0.Hash ? Plus : L.Entry0;
+        internal override Entry GetMaxHashEntryOrDefault() => Plus.Hash > L.Entry4.Hash ? Plus : L.Entry4;
+
+        internal override Entry GetEntryOrNull(int hash)
+        {
+            if (hash == Plus.Hash)
+                return Plus;
+            var l = L;
+            return hash == l.Entry0.Hash ? l.Entry0 : hash == l.Entry1.Hash ? l.Entry1 : hash == l.Entry2.Hash ? l.Entry2 : hash == l.Entry3.Hash ? l.Entry3
+                    : hash == l.Entry4.Hash ? l.Entry4 : null;
+        }
+
+        internal override Entry GetSurePresentEntry(int hash)
+        {
+            if (hash == Plus.Hash)
+                return Plus;
+            var l = L;
+            return hash == l.Entry0.Hash ? l.Entry0 : hash == l.Entry1.Hash ? l.Entry1 : hash == l.Entry2.Hash ? l.Entry2 : hash == l.Entry3.Hash ? l.Entry3 : l.Entry4;
+        }
+
+        internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
+        {
+            var p = Plus;
+            var ph = p.Hash;
+            if (ph == hash)
+                return p;
+            var l = L;
+            return hash == l.Entry0.Hash ? l.Entry0 : hash == l.Entry1.Hash ? l.Entry1 : hash == l.Entry2.Hash ? l.Entry2 : hash == l.Entry3.Hash ? l.Entry3
+                    : hash == l.Entry4.Hash ? l.Entry4 : new Leaf5PlusPlus(entry, this);
+        }
+
+        internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry) => new Leaf5PlusPlus(entry, this);
+
+        internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry)
+        {
+            var p = Plus;
+            if (oldEntry == p)
+                return new Leaf5Plus(newEntry, L);
+            var l = L;
+            Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4;
+            return oldEntry == e0 ? new Leaf5Plus(p, new Leaf5(newEntry, e1, e2, e3, e4))
+                : oldEntry == e1 ? new Leaf5Plus(p, new Leaf5(e0, newEntry, e2, e3, e4))
+                : oldEntry == e2 ? new Leaf5Plus(p, new Leaf5(e0, e1, newEntry, e3, e4))
+                : oldEntry == e3 ? new Leaf5Plus(p, new Leaf5(e0, e1, e2, newEntry, e4))
+                : new Leaf5Plus(p, new Leaf5(e0, e1, e2, e3, newEntry));
+        }
+
+        internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry)
+        {
+            var p = Plus;
+            if (p == removedEntry)
+                return L;
+
+            var l = L;
+            Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4;
+            ImHashMap.InsertInOrder(p.Hash, ref p, ref e0, ref e1, ref e2, ref e3, ref e4);
+
+            return removedEntry == e0 ? new Leaf5(e1, e2, e3, e4, p)
+                : removedEntry == e1 ? new Leaf5(e0, e2, e3, e4, p)
+                : removedEntry == e2 ? new Leaf5(e0, e1, e3, e4, p)
+                : removedEntry == e3 ? new Leaf5(e0, e1, e2, e4, p)
+                : removedEntry == e4 ? new Leaf5(e0, e1, e2, e3, p)
+                : new Leaf5(e0, e1, e2, e3, e4);
+        }
+    }
+
+    /// <summary>Leaf with 5 existing ordered entries plus 1 newly added, plus 1 newly added.</summary>
+    internal sealed class Leaf5PlusPlus : ImHashMap<K, V>
+    {
+        public readonly Entry Plus;
+        public readonly Leaf5Plus L;
+        public Leaf5PlusPlus(Entry plus, Leaf5Plus l) { Plus = plus; L = l; }
+
+        public sealed override int Count() => Plus.Count() + L.Count();
+
+        internal override bool MayTurnToBranch2 => true;
+
+#if !DEBUG
+        public override string ToString() => "{L511:{P:" + Plus + ",L:" + L + "}}";
+#endif
+        internal override StringBuilder ToMermaidNodeId(StringBuilder s) =>
+            s.Append("L5PP_").Append(Plus.Hash);
+        internal override StringBuilder ToMermaidString(StringBuilder s)
+        {
+            L.ToMermaidString(s).AppendLine();
+
+            ToMermaidNodeId(s).Append('>');
+            Plus.ToMermaidNodeItem(s).Append("]-->");
+            return L.ToMermaidNodeId(s);
+        }
+
+        internal sealed override Entry GetMinHashEntryOrDefault()
+        {
+            Entry p = Plus, pp = L.Plus, e0 = L.L.Entry0;
+            return p.Hash < pp.Hash ? (p.Hash < e0.Hash ? p : e0) : (pp.Hash < e0.Hash ? pp : e0);
+        }
+        internal sealed override Entry GetMaxHashEntryOrDefault()
+        {
+            Entry p = Plus, pp = L.Plus, e4 = L.L.Entry4;
+            return p.Hash > pp.Hash ? (p.Hash > e4.Hash ? p : e4) : (pp.Hash > e4.Hash ? pp : e4);
+        }
+
+        internal override Entry GetEntryOrNull(int hash)
+        {
+            if (hash == Plus.Hash)
+                return Plus;
+            if (hash == L.Plus.Hash)
+                return L.Plus;
+            var l = L.L;
+            return hash == l.Entry0.Hash ? l.Entry0 : hash == l.Entry1.Hash ? l.Entry1 : hash == l.Entry2.Hash ? l.Entry2 : hash == l.Entry3.Hash ? l.Entry3
+                    : hash == l.Entry4.Hash ? l.Entry4 : null;
+        }
+
+        internal override Entry GetSurePresentEntry(int hash)
+        {
+            if (hash == Plus.Hash)
+                return Plus;
+            if (hash == L.Plus.Hash)
+                return L.Plus;
+            var l = L.L;
+            return hash == l.Entry0.Hash ? l.Entry0 : hash == l.Entry1.Hash ? l.Entry1 : hash == l.Entry2.Hash ? l.Entry2 : hash == l.Entry3.Hash ? l.Entry3 : l.Entry4;
+        }
+
+        internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
+        {
+            var p = Plus;
+            var ph = p.Hash;
+            if (ph == hash)
+                return p;
+
+            var pp = L.Plus;
+            var pph = pp.Hash;
+            if (pph == hash)
+                return pp;
+
+            var l = L.L;
+            var e0 = l.Entry0;
+            if (hash == e0.Hash)
+                return e0;
+            var e1 = l.Entry1;
+            if (hash == e1.Hash)
+                return e1;
+            var e2 = l.Entry2;
+            if (hash == e2.Hash)
+                return e2;
+            var e3 = l.Entry3;
+            if (hash == e3.Hash)
+                return e3;
+            var e4 = l.Entry4;
+            if (hash == e4.Hash)
+                return e4;
+
+            var right = hash > e4.Hash && ph > e4.Hash && pph > e4.Hash;
+            var left = !right && hash < e0.Hash && ph < e0.Hash && pph < e0.Hash;
+
+            Entry e = entry; // store the entry original value cause we may change it for the result
+            ImHashMap.InsertInOrder(pph, ref pp, ref e0, ref e1, ref e2, ref e3, ref e4);
+            ImHashMap.InsertInOrder(ph, ref p, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp);
+            ImHashMap.InsertInOrder(hash, ref e, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp, ref p);
+
+            return left
+                ? new Branch2(new Leaf2(e0, e1), e2, l)
+                : new Branch2(right ? l : new Leaf5(e0, e1, e2, e3, e4), pp, new Leaf2(p, e));
+        }
+
+        internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry)
+        {
+            var p = Plus; var pp = L.Plus;
+            var l = L.L; var e0 = l.Entry0; var e1 = l.Entry1; var e2 = l.Entry2; var e3 = l.Entry3; var e4 = l.Entry4;
+
+            var hash = entry.Hash;
+            var right = hash > e4.Hash && p.Hash > e4.Hash && pp.Hash > e4.Hash;
+            var left = !right && hash < e0.Hash && p.Hash < e0.Hash && pp.Hash < e0.Hash;
+
+            ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1, ref e2, ref e3, ref e4);
+            ImHashMap.InsertInOrder(p.Hash, ref p, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp);
+            ImHashMap.InsertInOrder(hash, ref entry, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp, ref p);
+            return left
+                ? new Branch2(new Leaf2(e0, e1), e2, l)
+                : new Branch2(right ? l : new Leaf5(e0, e1, e2, e3, e4), pp, new Leaf2(p, entry));
+        }
+
+        internal ImHashMap<K, V> AddEntry(int hash, ref Entry entry, ref ImHashMap<K, V> splitRight)
+        {
+            var l = L.L;
+            Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, pp = L.Plus, p = Plus;
+            int ph = p.Hash, pph = pp.Hash;
+
+            var right = hash > e4.Hash && ph > e4.Hash && pph > e4.Hash;
+            var left = !right && hash < e0.Hash && ph < e0.Hash && pph < e0.Hash;
+
+            var e = entry; // store the entry original value cause we may change it for the result
+            ImHashMap.InsertInOrder(pph, ref pp, ref e0, ref e1, ref e2, ref e3, ref e4);
+            ImHashMap.InsertInOrder(ph, ref p, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp);
+            ImHashMap.InsertInOrder(hash, ref e, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp, ref p);
+
+            if (left)
             {
-                s.Append('`').Append(Hash);
-                foreach (var c in Conflicts)
-                    s.Append("`,`").Append(c._key).Append("`,`").Append(c.Value);
-                return s.Append('`');
+                entry = e2;
+                splitRight = l;
+                return new Leaf2(e0, e1);
             }
 
-            public override int Count() => Conflicts.Length;
+            entry = pp;
+            splitRight = new Leaf2(p, e);
+            return right ? l : new Leaf5(e0, e1, e2, e3, e4);
+        }
 
-            internal override ImHashMapEntry<K, V> GetOrNullWithTheSameHash(K key)
+        internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry)
+        {
+            var p = Plus;
+            if (p == oldEntry)
+                return new Leaf5PlusPlus(newEntry, L);
+
+            var pp = L.Plus;
+            if (pp == oldEntry)
+                return new Leaf5PlusPlus(p, new Leaf5Plus(newEntry, L.L));
+
+            var l = L.L;
+            Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4;
+            return
+                oldEntry == e0 ? new Leaf5PlusPlus(p, new Leaf5Plus(pp, new Leaf5(newEntry, e1, e2, e3, e4))) :
+                oldEntry == e1 ? new Leaf5PlusPlus(p, new Leaf5Plus(pp, new Leaf5(e0, newEntry, e2, e3, e4))) :
+                oldEntry == e2 ? new Leaf5PlusPlus(p, new Leaf5Plus(pp, new Leaf5(e0, e1, newEntry, e3, e4))) :
+                oldEntry == e3 ? new Leaf5PlusPlus(p, new Leaf5Plus(pp, new Leaf5(e0, e1, e2, newEntry, e4))) :
+                                    new Leaf5PlusPlus(p, new Leaf5Plus(pp, new Leaf5(e0, e1, e2, e3, newEntry)));
+        }
+
+        internal ImHashMap<K, V> RemoveMinHashEntryAndAddNewEntry(Entry minEntry, Entry newEntry)
+        {
+            var p = Plus;
+            if (p == minEntry)
+                return new Leaf5PlusPlus(newEntry, L);
+
+            var pp = L.Plus;
+            if (pp == minEntry)
+                return new Leaf5PlusPlus(p, new Leaf5Plus(newEntry, L.L));
+
+            var l = L.L;
+            Entry e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4;
+            var hash = newEntry.Hash;
+            l = hash < e1.Hash ? new Leaf5(newEntry, e1, e2, e3, e4)
+            : hash < e2.Hash ? new Leaf5(e1, newEntry, e2, e3, e4)
+            : hash < e3.Hash ? new Leaf5(e1, e2, newEntry, e3, e4)
+            : hash < e4.Hash ? new Leaf5(e1, e2, e3, newEntry, e4)
+            : new Leaf5(e1, e2, e3, e4, newEntry);
+
+            return new Leaf5PlusPlus(p, new Leaf5Plus(pp, l));
+        }
+
+        internal ImHashMap<K, V> RemoveMaxHashEntryAndAddNewEntry(Entry maxEntry, Entry newEntry)
+        {
+            var p = Plus;
+            if (p == maxEntry)
+                return new Leaf5PlusPlus(newEntry, L);
+
+            var pp = L.Plus;
+            if (pp == maxEntry)
+                return new Leaf5PlusPlus(p, new Leaf5Plus(newEntry, L.L));
+
+            var l = L.L;
+            Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3;
+            var hash = newEntry.Hash;
+            l = hash < e0.Hash ? new Leaf5(newEntry, e0, e1, e2, e3)
+            : hash < e1.Hash ? new Leaf5(e0, newEntry, e1, e2, e3)
+            : hash < e2.Hash ? new Leaf5(e0, e1, newEntry, e2, e3)
+            : hash < e3.Hash ? new Leaf5(e0, e1, e2, newEntry, e3)
+            : new Leaf5(e0, e1, e2, e3, newEntry);
+
+            return new Leaf5PlusPlus(p, new Leaf5Plus(pp, l));
+        }
+
+        internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry)
+        {
+            var p = Plus;
+            if (p == removedEntry)
+                return L;
+
+            var pp = L.Plus;
+            if (pp == removedEntry)
+                return new Leaf5Plus(p, L.L);
+
+            var l = L.L;
+            Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4;
+            int pph = pp.Hash, ph = p.Hash;
+
+            ImHashMap.InsertInOrder(pph, ref pp, ref e0, ref e1, ref e2, ref e3, ref e4);
+            ImHashMap.InsertInOrder(ph, ref p, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp);
+
+            return removedEntry == e0 ? new Leaf5Plus(p, new Leaf5(e1, e2, e3, e4, pp))
+                : removedEntry == e1 ? new Leaf5Plus(p, new Leaf5(e0, e2, e3, e4, pp))
+                : removedEntry == e2 ? new Leaf5Plus(p, new Leaf5(e0, e1, e3, e4, pp))
+                : removedEntry == e3 ? new Leaf5Plus(p, new Leaf5(e0, e1, e2, e4, pp))
+                : removedEntry == e4 ? new Leaf5Plus(p, new Leaf5(e0, e1, e2, e3, pp))
+                : removedEntry == pp ? new Leaf5Plus(p, new Leaf5(e0, e1, e2, e3, e4))
+                : new Leaf5Plus(pp, new Leaf5(e0, e1, e2, e3, e4));
+        }
+    }
+
+    /// <summary>The 2 branches with the node in between</summary>
+    internal abstract class Branch2Base : ImHashMap<K, V>
+    {
+        public abstract Entry MidEntry { get; }
+        public abstract ImHashMap<K, V> Left { get; }
+        public abstract ImHashMap<K, V> Right { get; }
+
+#if !DEBUG
+        public override string ToString() => "{B2:{E:" + MidEntry + ",L:" + Left + ",R:" + Right + "}}";
+#endif
+        internal override StringBuilder ToMermaidNodeId(StringBuilder s) =>
+            s.Append("B2_").Append(MidEntry.Hash);
+        internal override StringBuilder ToMermaidString(StringBuilder s)
+        {
+            Left.ToMermaidString(s).AppendLine();
+            Right.ToMermaidString(s).AppendLine();
+
+            ToMermaidNodeId(s).Append('[');
+            MidEntry.ToMermaidNodeItem(s).Append("]-->");
+            Left.ToMermaidNodeId(s).AppendLine();
+
+            ToMermaidNodeId(s).Append("-->");
+            Right.ToMermaidNodeId(s);
+
+            return s;
+        }
+
+        internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry)
+        {
+            // The downward phase for deleting an element from a 2-3 tree is the same as the downward phase
+            // for inserting an element except for the case when the element to be deleted is equal to the value in
+            // a 2-node or a 3-node. In this case, if the value is not part of a terminal node, the value is replaced
+            // by its in-order predecessor or in-order successor, just as in binary search tree deletion. So in any
+            // case, deletion leaves a hole in a terminal node.
+            // The goal of the rest of the deletion algorithm is to remove the hole without violating the other
+            // invariants of the 2-3 tree.
+
+            var mid = MidEntry;
+            if (removedEntry.Hash > mid.Hash)
             {
-                var cs = Conflicts;
-                var i = cs.Length - 1;
-                while (i != -1 && !cs[i]._key.Equals(key)) --i;
-                return i != -1 ? cs[i] : null;
-            }
-
-            internal override ImHashMapEntry<K, V> GetOrNullWithTheSameHashByReferenceEquals(K key)
-            {
-                var cs = Conflicts;
-                var i = cs.Length - 1;
-                while (i != -1 && !ReferenceEquals(cs[i]._key, key)) --i;
-                return i != -1 ? cs[i] : null;
-            }
-
-            internal override V GetValueOrDefaultWithTheSameHashByReferenceEquals(K key)
-            {
-                var cs = Conflicts;
-                var i = cs.Length - 1;
-                while (i != -1 && !ReferenceEquals(cs[i]._key, key)) --i;
-                return i != -1 ? cs[i].Value : default;
-            }
-
-            internal override Entry AddOrUpdateWithTheSameHash(ImHashMapEntry<K, V> newEntry) =>
-                AddOrUpdateWithTheSameHash(newEntry, null);
-
-            internal override Entry AddOrUpdateWithTheSameHash(ImHashMapEntry<K, V> newEntry, Update<K, V> update)
-            {
-                var e = (KVEntry<K, V>)newEntry;
-                var key = e._key;
-                var cs = Conflicts;
-                var i = cs.Length - 1;
-                while (i != -1 && !cs[i]._key.Equals(key)) --i;
-                if (i == -1)
-                    return new HashConflictingEntry(Hash, cs.AppendToNonEmpty(e));
-                if (update != null)
-                    e = new KVEntry<K, V>(Hash, key, update(key, cs[i].Value, e.Value));
-                return new HashConflictingEntry(Hash, cs.UpdateNonEmpty(e, i));
-            }
-
-            internal override Entry AddOrUpdateWithTheSameHash<R>(ImHashMapEntry<K, V> newEntry, ref R result, Update<K, V, R> update)
-            {
-                var e = (KVEntry<K, V>)newEntry;
-                var key = e._key;
-                var cs = Conflicts;
-                var i = cs.Length - 1;
-                while (i != -1 && !cs[i]._key.Equals(key)) --i;
-                if (i == -1)
-                    return new HashConflictingEntry(Hash, cs.AppendToNonEmpty(e));
-                if (update != null)
-                    e = new KVEntry<K, V>(Hash, key, update(key, cs[i].Value, e.Value, ref result));
-                return new HashConflictingEntry(Hash, cs.UpdateNonEmpty(e, i));
-            }
-
-            internal override Entry AddOrUpdateWithTheSameHashByReferenceEquals(ImHashMapEntry<K, V> newEntry) =>
-                AddOrUpdateWithTheSameHashByReferenceEquals(newEntry, null);
-
-            internal override Entry AddOrUpdateWithTheSameHashByReferenceEquals(ImHashMapEntry<K, V> newEntry, Update<K, V> update)
-            {
-                var e = (KVEntry<K, V>)newEntry;
-                var key = e._key;
-                var cs = Conflicts;
-                var i = cs.Length - 1;
-                while (i != -1 && !ReferenceEquals(cs[i]._key, key)) --i;
-                if (i == -1)
-                    return new HashConflictingEntry(Hash, cs.AppendToNonEmpty(e));
-                if (update != null)
-                    e = new KVEntry<K, V>(Hash, key, update(key, cs[i].Value, e.Value));
-                return new HashConflictingEntry(Hash, cs.UpdateNonEmpty(e, i));
-            }
-
-            internal override ImHashMap<K, V> GetMapOrReplaceWithEntry(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) =>
-                oldMap.ReplaceEntry(this, AddOrUpdateWithTheSameHash(newEntry, null));
-
-            internal override ImHashMap<K, V> GetMapOrReplaceWithEntryByReferenceEquals(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) =>
-                oldMap.ReplaceEntry(this, AddOrUpdateWithTheSameHashByReferenceEquals(newEntry, null));
-
-            internal override ImHashMap<K, V> GetEntryOrReplacedMapWithTheSameHash(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry)
-            {
-                var e = (KVEntry<K, V>)newEntry;
-                var key = e._key;
-                var cs = Conflicts;
-                var i = cs.Length - 1;
-                while (i != -1 && !cs[i]._key.Equals(key)) --i;
-                return i != -1 ? cs[i] : oldMap.ReplaceEntry(this, new HashConflictingEntry(Hash, cs.AppendToNonEmpty(e)));
-            }
-
-            internal override ImHashMap<K, V> GetEntryOrReplacedMapWithTheSameHashByReferenceEquals(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry)
-            {
-                var e = (KVEntry<K, V>)newEntry;
-                var key = e._key;
-                var cs = Conflicts;
-                var i = cs.Length - 1;
-                while (i != -1 && !ReferenceEquals(cs[i]._key, key)) --i;
-                return i != -1 ? cs[i] : oldMap.ReplaceEntry(this, new HashConflictingEntry(Hash, cs.AppendToNonEmpty(e)));
-            }
-
-            internal override ImHashMap<K, V> AddOrKeepWithTheSameHash(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry)
-            {
-                var e = (KVEntry<K, V>)newEntry;
-                var key = e._key;
-                var cs = Conflicts;
-                var i = cs.Length - 1;
-                while (i != -1 && !cs[i]._key.Equals(key)) --i;
-                return i != -1 ? oldMap : oldMap.ReplaceEntry(this, new HashConflictingEntry(Hash, cs.AppendToNonEmpty(e)));
-            }
-
-            internal override ImHashMap<K, V> AddOrKeepWithTheSameHashByReferenceEquals(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry)
-            {
-                var e = (KVEntry<K, V>)newEntry;
-                var key = e._key;
-                var cs = Conflicts;
-                var i = cs.Length - 1;
-                while (i != -1 && !ReferenceEquals(cs[i]._key, key)) --i;
-                return i != -1 ? oldMap : oldMap.ReplaceEntry(this, new HashConflictingEntry(Hash, cs.AppendToNonEmpty(e)));
-            }
-
-            internal override Entry UpdatedOrNullWithTheSameHash(ImHashMapEntry<K, V> newEntry)
-            {
-                var e = (KVEntry<K, V>)newEntry;
-                var key = e._key;
-                var cs = Conflicts;
-                var i = cs.Length - 1;
-                while (i != -1 && !cs[i]._key.Equals(key)) --i;
-                return i == -1 ? null : new HashConflictingEntry(Hash, cs.UpdateNonEmpty(e, i));
-            }
-
-            internal override Entry UpdatedOrNullWithTheSameHash(K key, V value, Update<K, V> update)
-            {
-                var cs = Conflicts;
-                var i = cs.Length - 1;
-                while (i != -1 && !cs[i]._key.Equals(key)) --i;
-                if (i == -1)
-                    return null;
-                if (update != null)
+                // if we done to the Entry then we don't even need to call the Remove
+                if (Right is Entry)
                 {
-                    var oldValue = cs[i].Value;
-                    value = update(key, oldValue, value);
-                    if (ReferenceEquals(oldValue, value))
-                        return null;
-                }
-                return new HashConflictingEntry(Hash, cs.UpdateNonEmpty(new KVEntry<K, V>(Hash, key, value), i));
-            }
-
-            internal override Entry RemovedOrNullWithTheSameHash(K key)
-            {
-                var cs = Conflicts;
-                var n = cs.Length;
-                var i = n - 1;
-                while (i != -1 && !cs[i]._key.Equals(key)) --i;
-                if (i == -1)
-                    return null;
-                if (n == 2)
-                    return i == 0 ? cs[1] : cs[0];
-                var newConflicts = new KVEntry<K, V>[n -= 1]; // the new n is less by one
-                if (i > 0) // copy the 1st part
-                    Array.Copy(cs, 0, newConflicts, 0, i);
-                if (i < n) // copy the 2nd part
-                    Array.Copy(cs, i + 1, newConflicts, i, n - i);
-                return new HashConflictingEntry(Hash, newConflicts);
-            }
-
-            /// <inheritdoc/>
-            public override Entry AppendOrUpdateInPlaceOrKeep<S>(S state, ImHashMapEntry<K, V> newEntry, UpdaterInPlaceOrKeeper<S> updateOrKeep)
-            {
-                var e = (KVEntry<K, V>)newEntry;
-                var key = e._key;
-                var cs = Conflicts;
-                var i = cs.Length - 1;
-                while (i != -1 && !key.Equals(cs[i]._key)) --i;
-                return i == -1
-                    ? new HashConflictingEntry(Hash, cs.AppendToNonEmpty(e))
-                    : updateOrKeep(state, cs[i], e) != cs[i]
-                    ? new HashConflictingEntry(Hash, cs.UpdateNonEmpty(e, i))
-                    : this;
-            }
-
-            /// <inheritdoc/>
-            public override Entry AppendOrUpdateInPlaceOrKeepByReferenceEquals<S>(S state, ImHashMapEntry<K, V> newEntry, UpdaterInPlaceOrKeeper<S> updateOrKeep)
-            {
-                var e = (KVEntry<K, V>)newEntry;
-                var key = e._key;
-                var cs = Conflicts;
-                var i = cs.Length - 1;
-                while (i != -1 && !ReferenceEquals(key, cs[i]._key)) --i;
-                return i == -1
-                    ? new HashConflictingEntry(Hash, cs.AppendToNonEmpty(e))
-                    : updateOrKeep(state, cs[i], e) != cs[i]
-                    ? new HashConflictingEntry(Hash, cs.UpdateNonEmpty(e, i))
-                    : this;
-            }
-
-            internal override int ForEach<S>(S state, int startIndex, Action<ImHashMapEntry<K, V>, int, S> handler)
-            {
-                var i = startIndex;
-                foreach (var e in Conflicts)
-                    handler(e, i++, state);
-                return i;
-            }
-        }
-
-        /// <summary>Leaf with 2 hash-ordered entries. Important: the both or either of entries may be null for the removed entries</summary>
-        internal sealed class Leaf2 : ImHashMap<K, V>
-        {
-            public readonly Entry Entry0, Entry1;
-            public Leaf2(Entry e0, Entry e1)
-            {
-                Debug.Assert(e0.Hash < e1.Hash);
-                Entry0 = e0; Entry1 = e1;
-            }
-
-            public override int Count() => Entry0.Count() + Entry1.Count();
-
-#if !DEBUG
-            public override string ToString() => "{L2:{E0: " + Entry0 + ",E1:" + Entry1 + "}}";
-#endif
-            internal override StringBuilder ToMermaidNodeId(StringBuilder s) =>
-                s.Append("L2_").Append(Entry0.Hash);
-            internal override StringBuilder ToMermaidNodeItem(StringBuilder s) =>
-                Entry1.ToMermaidNodeItem(Entry0.ToMermaidNodeItem(s).Append('/'));
-
-            internal override Entry GetMinHashEntryOrDefault() => Entry0;
-            internal override Entry GetMaxHashEntryOrDefault() => Entry1;
-
-            internal override Entry GetEntryOrNull(int hash) =>
-                hash == Entry0.Hash ? Entry0 : Entry1.Hash == hash ? Entry1 : null;
-
-            internal override Entry GetSurePresentEntry(int hash) =>
-                hash == Entry0.Hash ? Entry0 : Entry1;
-
-            internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry) =>
-                hash == Entry0.Hash ? Entry0 : hash == Entry1.Hash ? Entry1 : new Leaf2Plus(entry, this);
-
-            internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry) => new Leaf2Plus(entry, this);
-
-            internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry) =>
-                oldEntry == Entry0 ? new Leaf2(newEntry, Entry1) : new Leaf2(Entry0, newEntry);
-
-            internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry) =>
-                Entry0 == removedEntry ? Entry1 : Entry0;
-        }
-
-        /// <summary>The leaf containing the Leaf2 plus the newest added entry.</summary>
-        internal sealed class Leaf2Plus : ImHashMap<K, V>
-        {
-            public readonly Entry Plus;
-            public readonly Leaf2 L;
-            public Leaf2Plus(Entry plus, Leaf2 leaf) { Plus = plus; L = leaf; }
-
-            public override int Count() => Plus.Count() + L.Entry0.Count() + L.Entry1.Count();
-
-#if !DEBUG
-            public override string ToString() => "{L21: {P: " + Plus + ", L: " + L + "}}";
-#endif
-            internal override StringBuilder ToMermaidNodeId(StringBuilder s) =>
-                s.Append("L2P_").Append(Plus.Hash);
-            internal override StringBuilder ToMermaidString(StringBuilder s)
-            {
-                L.ToMermaidString(s).AppendLine();
-
-                ToMermaidNodeId(s).Append('>');
-                Plus.ToMermaidNodeItem(s).Append("]-->");
-                return L.ToMermaidNodeId(s);
-            }
-
-            internal override Entry GetMinHashEntryOrDefault() => Plus.Hash < L.Entry0.Hash ? Plus : L.Entry0;
-            internal override Entry GetMaxHashEntryOrDefault() => Plus.Hash > L.Entry1.Hash ? Plus : L.Entry1;
-
-            internal override Entry GetEntryOrNull(int hash) =>
-                hash == Plus.Hash ? Plus : hash == L.Entry0.Hash ? L.Entry0 : hash == L.Entry1.Hash ? L.Entry1 : null;
-
-            internal override Entry GetSurePresentEntry(int hash) =>
-                hash == Plus.Hash ? Plus : hash == L.Entry0.Hash ? L.Entry0 : L.Entry1;
-
-            internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
-            {
-                var p = Plus;
-                if (hash == p.Hash)
-                    return p;
-                var l = L;
-                return hash == l.Entry0.Hash ? l.Entry0 : hash == l.Entry1.Hash ? l.Entry1 : new Leaf2PlusPlus(entry, this);
-            }
-
-            internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry) => new Leaf2PlusPlus(entry, this);
-
-            internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry) =>
-                oldEntry == Plus ? new Leaf2Plus(newEntry, L) :
-                oldEntry == L.Entry0 ? new Leaf2Plus(Plus, new Leaf2(newEntry, L.Entry1)) :
-                                       new Leaf2Plus(Plus, new Leaf2(L.Entry0, newEntry));
-
-            internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry) =>
-                removedEntry == Plus ? L :
-                removedEntry == L.Entry0 ?
-                    (Plus.Hash < L.Entry1.Hash ? new Leaf2(Plus, L.Entry1) : new Leaf2(L.Entry1, Plus)) :
-                    (Plus.Hash < L.Entry0.Hash ? new Leaf2(Plus, L.Entry0) : new Leaf2(L.Entry0, Plus));
-        }
-
-        /// <summary>Leaf with the Leaf2 plus added entry, plus added entry</summary>
-        internal sealed class Leaf2PlusPlus : ImHashMap<K, V>
-        {
-            public readonly Entry Plus;
-            public readonly Leaf2Plus L;
-            public Leaf2PlusPlus(Entry plus, Leaf2Plus l) { Plus = plus; L = l; }
-
-            public override int Count() => Plus.Count() + L.Count();
-
-#if !DEBUG
-            public override string ToString() => "{L211:{P:" + Plus + ",L:" + L + "}}";
-#endif
-
-            internal override StringBuilder ToMermaidNodeId(StringBuilder s) =>
-                s.Append("L2PP_").Append(Plus.Hash);
-            internal override StringBuilder ToMermaidString(StringBuilder s)
-            {
-                L.ToMermaidString(s).AppendLine();
-
-                ToMermaidNodeId(s).Append('>');
-                Plus.ToMermaidNodeItem(s).Append("]-->");
-                return L.ToMermaidNodeId(s);
-            }
-
-            internal override Entry GetMinHashEntryOrDefault()
-            {
-                Entry p = Plus, pp = L.Plus, e0 = L.L.Entry0;
-                return p.Hash < pp.Hash ? (p.Hash < e0.Hash ? p : e0) : (pp.Hash < e0.Hash ? pp : e0);
-            }
-            internal override Entry GetMaxHashEntryOrDefault()
-            {
-                Entry p = Plus, pp = L.Plus, e1 = L.L.Entry1;
-                return p.Hash > pp.Hash ? (p.Hash > e1.Hash ? p : e1) : (pp.Hash > e1.Hash ? pp : e1);
-            }
-
-            internal override Entry GetEntryOrNull(int hash) =>
-                hash == Plus.Hash ? Plus : hash == L.Plus.Hash ? L.Plus : L.L.Entry0.Hash == hash ? L.L.Entry0 : L.L.Entry1.Hash == hash ? L.L.Entry1 : null;
-
-            internal override Entry GetSurePresentEntry(int hash) =>
-                hash == Plus.Hash ? Plus : hash == L.Plus.Hash ? L.Plus : L.L.Entry0.Hash == hash ? L.L.Entry0 : L.L.Entry1;
-
-            internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
-            {
-                var p = Plus;
-                var ph = p.Hash;
-                if (ph == hash)
-                    return p;
-
-                var pp = L.Plus;
-                var pph = pp.Hash;
-                if (pph == hash)
-                    return pp;
-
-                var l = L.L;
-                Entry e0 = l.Entry0, e1 = l.Entry1;
-
-                if (hash == e0.Hash)
-                    return e0;
-                if (hash == e1.Hash)
-                    return e1;
-
-                // can we combine and speedup those methods
-                ImHashMap.InsertInOrder(pph, ref pp, ref e0, ref e1);
-                ImHashMap.InsertInOrder(ph, ref p, ref e0, ref e1, ref pp);
-                ImHashMap.InsertInOrder(hash, ref entry, ref e0, ref e1, ref pp, ref p);
-                return new Leaf5(e0, e1, pp, p, entry);
-            }
-
-            internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry)
-            {
-                var l = L.L;
-                Entry e0 = l.Entry0, e1 = l.Entry1, p = Plus, pp = L.Plus;
-                ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1);
-                ImHashMap.InsertInOrder(p.Hash, ref p, ref e0, ref e1, ref pp);
-                ImHashMap.InsertInOrder(entry.Hash, ref entry, ref e0, ref e1, ref pp, ref p);
-                return new Leaf5(e0, e1, pp, p, entry);
-            }
-
-            internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry) =>
-                oldEntry == Plus ? new Leaf2PlusPlus(newEntry, L) :
-                oldEntry == L.Plus ? new Leaf2PlusPlus(Plus, new Leaf2Plus(newEntry, L.L)) :
-                oldEntry == L.L.Entry0 ? new Leaf2PlusPlus(Plus, new Leaf2Plus(L.Plus, new Leaf2(newEntry, L.L.Entry1))) :
-                                         new Leaf2PlusPlus(Plus, new Leaf2Plus(L.Plus, new Leaf2(L.L.Entry0, newEntry)));
-
-            internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry) =>
-                removedEntry == Plus ? L :
-                removedEntry == L.Plus ? new Leaf2Plus(Plus, L.L) :
-                removedEntry == L.L.Entry0 ?
-                    (L.Plus.Hash < L.L.Entry1.Hash ? new Leaf2Plus(Plus, new Leaf2(L.Plus, L.L.Entry1)) : new Leaf2Plus(Plus, new Leaf2(L.L.Entry1, L.Plus))) :
-                    (L.Plus.Hash < L.L.Entry0.Hash ? new Leaf2Plus(Plus, new Leaf2(L.Plus, L.L.Entry0)) : new Leaf2Plus(Plus, new Leaf2(L.L.Entry0, L.Plus)));
-        }
-
-        /// <summary>Leaf with 5 hash-ordered entries</summary>
-        internal sealed class Leaf5 : ImHashMap<K, V>
-        {
-            public readonly Entry Entry0, Entry1, Entry2, Entry3, Entry4;
-
-            public Leaf5(Entry e0, Entry e1, Entry e2, Entry e3, Entry e4)
-            {
-                Debug.Assert(e0.Hash < e1.Hash, "e0 < e1");
-                Debug.Assert(e1.Hash < e2.Hash, "e1 < e2");
-                Debug.Assert(e2.Hash < e3.Hash, "e2 < e3");
-                Debug.Assert(e3.Hash < e4.Hash, "e3 < e4");
-                Entry0 = e0; Entry1 = e1; Entry2 = e2; Entry3 = e3; Entry4 = e4;
-            }
-
-            public override int Count() => Entry0.Count() + Entry1.Count() + Entry2.Count() + Entry3.Count() + Entry4.Count();
-
-#if !DEBUG
-            public override string ToString() =>
-                "{L2:{E0:" + Entry0 + ",E1:" + Entry1 + ",E2:" + Entry2 + ",E3:" + Entry3 + ",E4:" + Entry4 + "}}";
-#endif
-
-            internal override StringBuilder ToMermaidNodeId(StringBuilder s) =>
-                s.Append("L5_").Append(Entry0.Hash);
-            internal override StringBuilder ToMermaidNodeItem(StringBuilder s)
-            {
-                Entry0.ToMermaidNodeItem(s).Append('/');
-                Entry1.ToMermaidNodeItem(s).Append('/');
-                Entry2.ToMermaidNodeItem(s).Append('/');
-                Entry3.ToMermaidNodeItem(s).Append('/');
-                Entry4.ToMermaidNodeItem(s);
-                return s;
-            }
-
-            internal override Entry GetMinHashEntryOrDefault() => Entry0;
-            internal override Entry GetMaxHashEntryOrDefault() => Entry4;
-
-            internal override Entry GetEntryOrNull(int hash) =>
-                hash == Entry0.Hash ? Entry0 : hash == Entry1.Hash ? Entry1 : hash == Entry2.Hash ? Entry2 : hash == Entry3.Hash ? Entry3 : hash == Entry4.Hash ? Entry4 : null;
-
-            internal override Entry GetSurePresentEntry(int hash) =>
-                hash == Entry0.Hash ? Entry0 : hash == Entry1.Hash ? Entry1 : hash == Entry2.Hash ? Entry2 : hash == Entry3.Hash ? Entry3 : Entry4;
-
-            internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry) =>
-                hash == Entry0.Hash ? Entry0 : hash == Entry1.Hash ? Entry1 : hash == Entry2.Hash ? Entry2 : hash == Entry3.Hash ? Entry3 :
-                hash == Entry4.Hash ? Entry4 : new Leaf5Plus(entry, this);
-
-            internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry) => new Leaf5Plus(entry, this);
-
-            internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry) =>
-                oldEntry == Entry0 ? new Leaf5(newEntry, Entry1, Entry2, Entry3, Entry4) :
-                oldEntry == Entry1 ? new Leaf5(Entry0, newEntry, Entry2, Entry3, Entry4) :
-                oldEntry == Entry2 ? new Leaf5(Entry0, Entry1, newEntry, Entry3, Entry4) :
-                oldEntry == Entry3 ? new Leaf5(Entry0, Entry1, Entry2, newEntry, Entry4) :
-                                     new Leaf5(Entry0, Entry1, Entry2, Entry3, newEntry);
-
-            internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry) =>
-                removedEntry == Entry0 ? new Leaf2PlusPlus(Entry4, new Leaf2Plus(Entry3, new Leaf2(Entry1, Entry2))) :
-                removedEntry == Entry1 ? new Leaf2PlusPlus(Entry4, new Leaf2Plus(Entry3, new Leaf2(Entry0, Entry2))) :
-                removedEntry == Entry2 ? new Leaf2PlusPlus(Entry4, new Leaf2Plus(Entry3, new Leaf2(Entry0, Entry1))) :
-                removedEntry == Entry3 ? new Leaf2PlusPlus(Entry4, new Leaf2Plus(Entry2, new Leaf2(Entry0, Entry1))) :
-                                         new Leaf2PlusPlus(Entry3, new Leaf2Plus(Entry2, new Leaf2(Entry0, Entry1)));
-        }
-
-        /// <summary>Leaf with 5 existing ordered entries plus 1 newly added entry.</summary>
-        internal sealed class Leaf5Plus : ImHashMap<K, V>
-        {
-            public readonly Entry Plus;
-            public readonly Leaf5 L;
-            public Leaf5Plus(Entry plus, Leaf5 l) { Plus = plus; L = l; }
-
-            public override int Count() => Plus.Count() + L.Count();
-
-#if !DEBUG
-            public override string ToString() => "{L51:{P:" + Plus + ",L:" + L + "}}";
-#endif
-            internal override StringBuilder ToMermaidNodeId(StringBuilder s) =>
-                s.Append("L5P_").Append(Plus.Hash);
-            internal override StringBuilder ToMermaidString(StringBuilder s)
-            {
-                L.ToMermaidString(s).AppendLine();
-
-                ToMermaidNodeId(s).Append('>');
-                Plus.ToMermaidNodeItem(s).Append("]-->");
-                return L.ToMermaidNodeId(s);
-            }
-
-            internal override Entry GetMinHashEntryOrDefault() => Plus.Hash < L.Entry0.Hash ? Plus : L.Entry0;
-            internal override Entry GetMaxHashEntryOrDefault() => Plus.Hash > L.Entry4.Hash ? Plus : L.Entry4;
-
-            internal override Entry GetEntryOrNull(int hash)
-            {
-                if (hash == Plus.Hash)
-                    return Plus;
-                var l = L;
-                return hash == l.Entry0.Hash ? l.Entry0 : hash == l.Entry1.Hash ? l.Entry1 : hash == l.Entry2.Hash ? l.Entry2 : hash == l.Entry3.Hash ? l.Entry3
-                     : hash == l.Entry4.Hash ? l.Entry4 : null;
-            }
-
-            internal override Entry GetSurePresentEntry(int hash)
-            {
-                if (hash == Plus.Hash)
-                    return Plus;
-                var l = L;
-                return hash == l.Entry0.Hash ? l.Entry0 : hash == l.Entry1.Hash ? l.Entry1 : hash == l.Entry2.Hash ? l.Entry2 : hash == l.Entry3.Hash ? l.Entry3 : l.Entry4;
-            }
-
-            internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
-            {
-                var p = Plus;
-                var ph = p.Hash;
-                if (ph == hash)
-                    return p;
-                var l = L;
-                return hash == l.Entry0.Hash ? l.Entry0 : hash == l.Entry1.Hash ? l.Entry1 : hash == l.Entry2.Hash ? l.Entry2 : hash == l.Entry3.Hash ? l.Entry3
-                     : hash == l.Entry4.Hash ? l.Entry4 : new Leaf5PlusPlus(entry, this);
-            }
-
-            internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry) => new Leaf5PlusPlus(entry, this);
-
-            internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry)
-            {
-                var p = Plus;
-                if (oldEntry == p)
-                    return new Leaf5Plus(newEntry, L);
-                var l = L;
-                Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4;
-                return oldEntry == e0 ? new Leaf5Plus(p, new Leaf5(newEntry, e1, e2, e3, e4))
-                    : oldEntry == e1 ? new Leaf5Plus(p, new Leaf5(e0, newEntry, e2, e3, e4))
-                    : oldEntry == e2 ? new Leaf5Plus(p, new Leaf5(e0, e1, newEntry, e3, e4))
-                    : oldEntry == e3 ? new Leaf5Plus(p, new Leaf5(e0, e1, e2, newEntry, e4))
-                    : new Leaf5Plus(p, new Leaf5(e0, e1, e2, e3, newEntry));
-            }
-
-            internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry)
-            {
-                var p = Plus;
-                if (p == removedEntry)
-                    return L;
-
-                var l = L;
-                Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4;
-                ImHashMap.InsertInOrder(p.Hash, ref p, ref e0, ref e1, ref e2, ref e3, ref e4);
-
-                return removedEntry == e0 ? new Leaf5(e1, e2, e3, e4, p)
-                    : removedEntry == e1 ? new Leaf5(e0, e2, e3, e4, p)
-                    : removedEntry == e2 ? new Leaf5(e0, e1, e3, e4, p)
-                    : removedEntry == e3 ? new Leaf5(e0, e1, e2, e4, p)
-                    : removedEntry == e4 ? new Leaf5(e0, e1, e2, e3, p)
-                    : new Leaf5(e0, e1, e2, e3, e4);
-            }
-        }
-
-        /// <summary>Leaf with 5 existing ordered entries plus 1 newly added, plus 1 newly added.</summary>
-        internal sealed class Leaf5PlusPlus : ImHashMap<K, V>
-        {
-            public readonly Entry Plus;
-            public readonly Leaf5Plus L;
-            public Leaf5PlusPlus(Entry plus, Leaf5Plus l) { Plus = plus; L = l; }
-
-            public sealed override int Count() => Plus.Count() + L.Count();
-
-            internal override bool MayTurnToBranch2 => true;
-
-#if !DEBUG
-            public override string ToString() => "{L511:{P:" + Plus + ",L:" + L + "}}";
-#endif
-            internal override StringBuilder ToMermaidNodeId(StringBuilder s) =>
-                s.Append("L5PP_").Append(Plus.Hash);
-            internal override StringBuilder ToMermaidString(StringBuilder s)
-            {
-                L.ToMermaidString(s).AppendLine();
-
-                ToMermaidNodeId(s).Append('>');
-                Plus.ToMermaidNodeItem(s).Append("]-->");
-                return L.ToMermaidNodeId(s);
-            }
-
-            internal sealed override Entry GetMinHashEntryOrDefault()
-            {
-                Entry p = Plus, pp = L.Plus, e0 = L.L.Entry0;
-                return p.Hash < pp.Hash ? (p.Hash < e0.Hash ? p : e0) : (pp.Hash < e0.Hash ? pp : e0);
-            }
-            internal sealed override Entry GetMaxHashEntryOrDefault()
-            {
-                Entry p = Plus, pp = L.Plus, e4 = L.L.Entry4;
-                return p.Hash > pp.Hash ? (p.Hash > e4.Hash ? p : e4) : (pp.Hash > e4.Hash ? pp : e4);
-            }
-
-            internal override Entry GetEntryOrNull(int hash)
-            {
-                if (hash == Plus.Hash)
-                    return Plus;
-                if (hash == L.Plus.Hash)
-                    return L.Plus;
-                var l = L.L;
-                return hash == l.Entry0.Hash ? l.Entry0 : hash == l.Entry1.Hash ? l.Entry1 : hash == l.Entry2.Hash ? l.Entry2 : hash == l.Entry3.Hash ? l.Entry3
-                     : hash == l.Entry4.Hash ? l.Entry4 : null;
-            }
-
-            internal override Entry GetSurePresentEntry(int hash)
-            {
-                if (hash == Plus.Hash)
-                    return Plus;
-                if (hash == L.Plus.Hash)
-                    return L.Plus;
-                var l = L.L;
-                return hash == l.Entry0.Hash ? l.Entry0 : hash == l.Entry1.Hash ? l.Entry1 : hash == l.Entry2.Hash ? l.Entry2 : hash == l.Entry3.Hash ? l.Entry3 : l.Entry4;
-            }
-
-            internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
-            {
-                var p = Plus;
-                var ph = p.Hash;
-                if (ph == hash)
-                    return p;
-
-                var pp = L.Plus;
-                var pph = pp.Hash;
-                if (pph == hash)
-                    return pp;
-
-                var l = L.L;
-                var e0 = l.Entry0;
-                if (hash == e0.Hash)
-                    return e0;
-                var e1 = l.Entry1;
-                if (hash == e1.Hash)
-                    return e1;
-                var e2 = l.Entry2;
-                if (hash == e2.Hash)
-                    return e2;
-                var e3 = l.Entry3;
-                if (hash == e3.Hash)
-                    return e3;
-                var e4 = l.Entry4;
-                if (hash == e4.Hash)
-                    return e4;
-
-                var right = hash > e4.Hash && ph > e4.Hash && pph > e4.Hash;
-                var left = !right && hash < e0.Hash && ph < e0.Hash && pph < e0.Hash;
-
-                Entry e = entry; // store the entry original value cause we may change it for the result
-                ImHashMap.InsertInOrder(pph, ref pp, ref e0, ref e1, ref e2, ref e3, ref e4);
-                ImHashMap.InsertInOrder(ph, ref p, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp);
-                ImHashMap.InsertInOrder(hash, ref e, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp, ref p);
-
-                return left
-                    ? new Branch2(new Leaf2(e0, e1), e2, l)
-                    : new Branch2(right ? l : new Leaf5(e0, e1, e2, e3, e4), pp, new Leaf2(p, e));
-            }
-
-            internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry)
-            {
-                var p = Plus; var pp = L.Plus;
-                var l = L.L; var e0 = l.Entry0; var e1 = l.Entry1; var e2 = l.Entry2; var e3 = l.Entry3; var e4 = l.Entry4;
-
-                var hash = entry.Hash;
-                var right = hash > e4.Hash && p.Hash > e4.Hash && pp.Hash > e4.Hash;
-                var left = !right && hash < e0.Hash && p.Hash < e0.Hash && pp.Hash < e0.Hash;
-
-                ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1, ref e2, ref e3, ref e4);
-                ImHashMap.InsertInOrder(p.Hash, ref p, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp);
-                ImHashMap.InsertInOrder(hash, ref entry, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp, ref p);
-                return left
-                    ? new Branch2(new Leaf2(e0, e1), e2, l)
-                    : new Branch2(right ? l : new Leaf5(e0, e1, e2, e3, e4), pp, new Leaf2(p, entry));
-            }
-
-            internal ImHashMap<K, V> AddEntry(int hash, ref Entry entry, ref ImHashMap<K, V> splitRight)
-            {
-                var l = L.L;
-                Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, pp = L.Plus, p = Plus;
-                int ph = p.Hash, pph = pp.Hash;
-
-                var right = hash > e4.Hash && ph > e4.Hash && pph > e4.Hash;
-                var left = !right && hash < e0.Hash && ph < e0.Hash && pph < e0.Hash;
-
-                var e = entry; // store the entry original value cause we may change it for the result
-                ImHashMap.InsertInOrder(pph, ref pp, ref e0, ref e1, ref e2, ref e3, ref e4);
-                ImHashMap.InsertInOrder(ph, ref p, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp);
-                ImHashMap.InsertInOrder(hash, ref e, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp, ref p);
-
-                if (left)
-                {
-                    entry = e2;
-                    splitRight = l;
-                    return new Leaf2(e0, e1);
+                    // if the left node is not full yet then merge
+                    if (Left is Leaf5PlusPlus == false)
+                        return Left.AddOrGetEntry(mid.Hash, mid);
+                    removedEntry = Left.GetMaxHashEntryOrDefault(); // todo: @perf combine `GetMaxHashEntryOrDefault` with `RemoveEntry`
+                    return new Branch2(Left.RemoveEntry(removedEntry), removedEntry, mid); //! the height does not change
                 }
 
-                entry = pp;
-                splitRight = new Leaf2(p, e);
-                return right ? l : new Leaf5(e0, e1, e2, e3, e4);
-            }
-
-            internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry)
-            {
-                var p = Plus;
-                if (p == oldEntry)
-                    return new Leaf5PlusPlus(newEntry, L);
-
-                var pp = L.Plus;
-                if (pp == oldEntry)
-                    return new Leaf5PlusPlus(p, new Leaf5Plus(newEntry, L.L));
-
-                var l = L.L;
-                Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4;
-                return
-                    oldEntry == e0 ? new Leaf5PlusPlus(p, new Leaf5Plus(pp, new Leaf5(newEntry, e1, e2, e3, e4))) :
-                    oldEntry == e1 ? new Leaf5PlusPlus(p, new Leaf5Plus(pp, new Leaf5(e0, newEntry, e2, e3, e4))) :
-                    oldEntry == e2 ? new Leaf5PlusPlus(p, new Leaf5Plus(pp, new Leaf5(e0, e1, newEntry, e3, e4))) :
-                    oldEntry == e3 ? new Leaf5PlusPlus(p, new Leaf5Plus(pp, new Leaf5(e0, e1, e2, newEntry, e4))) :
-                                     new Leaf5PlusPlus(p, new Leaf5Plus(pp, new Leaf5(e0, e1, e2, e3, newEntry)));
-            }
-
-            internal ImHashMap<K, V> RemoveMinHashEntryAndAddNewEntry(Entry minEntry, Entry newEntry)
-            {
-                var p = Plus;
-                if (p == minEntry)
-                    return new Leaf5PlusPlus(newEntry, L);
-
-                var pp = L.Plus;
-                if (pp == minEntry)
-                    return new Leaf5PlusPlus(p, new Leaf5Plus(newEntry, L.L));
-
-                var l = L.L;
-                Entry e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4;
-                var hash = newEntry.Hash;
-                l = hash < e1.Hash ? new Leaf5(newEntry, e1, e2, e3, e4)
-                : hash < e2.Hash ? new Leaf5(e1, newEntry, e2, e3, e4)
-                : hash < e3.Hash ? new Leaf5(e1, e2, newEntry, e3, e4)
-                : hash < e4.Hash ? new Leaf5(e1, e2, e3, newEntry, e4)
-                : new Leaf5(e1, e2, e3, e4, newEntry);
-
-                return new Leaf5PlusPlus(p, new Leaf5Plus(pp, l));
-            }
-
-            internal ImHashMap<K, V> RemoveMaxHashEntryAndAddNewEntry(Entry maxEntry, Entry newEntry)
-            {
-                var p = Plus;
-                if (p == maxEntry)
-                    return new Leaf5PlusPlus(newEntry, L);
-
-                var pp = L.Plus;
-                if (pp == maxEntry)
-                    return new Leaf5PlusPlus(p, new Leaf5Plus(newEntry, L.L));
-
-                var l = L.L;
-                Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3;
-                var hash = newEntry.Hash;
-                l = hash < e0.Hash ? new Leaf5(newEntry, e0, e1, e2, e3)
-                : hash < e1.Hash ? new Leaf5(e0, newEntry, e1, e2, e3)
-                : hash < e2.Hash ? new Leaf5(e0, e1, newEntry, e2, e3)
-                : hash < e3.Hash ? new Leaf5(e0, e1, e2, newEntry, e3)
-                : new Leaf5(e0, e1, e2, e3, newEntry);
-
-                return new Leaf5PlusPlus(p, new Leaf5Plus(pp, l));
-            }
-
-            internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry)
-            {
-                var p = Plus;
-                if (p == removedEntry)
-                    return L;
-
-                var pp = L.Plus;
-                if (pp == removedEntry)
-                    return new Leaf5Plus(p, L.L);
-
-                var l = L.L;
-                Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4;
-                int pph = pp.Hash, ph = p.Hash;
-
-                ImHashMap.InsertInOrder(pph, ref pp, ref e0, ref e1, ref e2, ref e3, ref e4);
-                ImHashMap.InsertInOrder(ph, ref p, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp);
-
-                return removedEntry == e0 ? new Leaf5Plus(p, new Leaf5(e1, e2, e3, e4, pp))
-                    : removedEntry == e1 ? new Leaf5Plus(p, new Leaf5(e0, e2, e3, e4, pp))
-                    : removedEntry == e2 ? new Leaf5Plus(p, new Leaf5(e0, e1, e3, e4, pp))
-                    : removedEntry == e3 ? new Leaf5Plus(p, new Leaf5(e0, e1, e2, e4, pp))
-                    : removedEntry == e4 ? new Leaf5Plus(p, new Leaf5(e0, e1, e2, e3, pp))
-                    : removedEntry == pp ? new Leaf5Plus(p, new Leaf5(e0, e1, e2, e3, e4))
-                    : new Leaf5Plus(pp, new Leaf5(e0, e1, e2, e3, e4));
-            }
-        }
-
-        /// <summary>The 2 branches with the node in between</summary>
-        internal abstract class Branch2Base : ImHashMap<K, V>
-        {
-            public abstract Entry MidEntry { get; }
-            public abstract ImHashMap<K, V> Left { get; }
-            public abstract ImHashMap<K, V> Right { get; }
-
-#if !DEBUG
-            public override string ToString() => "{B2:{E:" + MidEntry + ",L:" + Left + ",R:" + Right + "}}";
-#endif
-            internal override StringBuilder ToMermaidNodeId(StringBuilder s) =>
-                s.Append("B2_").Append(MidEntry.Hash);
-            internal override StringBuilder ToMermaidString(StringBuilder s)
-            {
-                Left.ToMermaidString(s).AppendLine();
-                Right.ToMermaidString(s).AppendLine();
-
-                ToMermaidNodeId(s).Append('[');
-                MidEntry.ToMermaidNodeItem(s).Append("]-->");
-                Left.ToMermaidNodeId(s).AppendLine();
-
-                ToMermaidNodeId(s).Append("-->");
-                Right.ToMermaidNodeId(s);
-
-                return s;
-            }
-
-            internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry)
-            {
-                // The downward phase for deleting an element from a 2-3 tree is the same as the downward phase
-                // for inserting an element except for the case when the element to be deleted is equal to the value in
-                // a 2-node or a 3-node. In this case, if the value is not part of a terminal node, the value is replaced
-                // by its in-order predecessor or in-order successor, just as in binary search tree deletion. So in any
-                // case, deletion leaves a hole in a terminal node.
-                // The goal of the rest of the deletion algorithm is to remove the hole without violating the other
-                // invariants of the 2-3 tree.
-
-                var mid = MidEntry;
-                if (removedEntry.Hash > mid.Hash)
+                var newRight = Right.RemoveEntry(removedEntry);
+                //rebalance needed: the branch was merged from Br2 to Br3 or to the leaf and the height decreased 
+                if (Right is Branch2Base && newRight is Branch2Base == false)
                 {
-                    // if we done to the Entry then we don't even need to call the Remove
-                    if (Right is Entry)
-                    {
-                        // if the left node is not full yet then merge
-                        if (Left is Leaf5PlusPlus == false)
-                            return Left.AddOrGetEntry(mid.Hash, mid);
-                        removedEntry = Left.GetMaxHashEntryOrDefault(); // todo: @perf combine `GetMaxHashEntryOrDefault` with `RemoveEntry`
-                        return new Branch2(Left.RemoveEntry(removedEntry), removedEntry, mid); //! the height does not change
-                    }
-
-                    var newRight = Right.RemoveEntry(removedEntry);
-                    //rebalance needed: the branch was merged from Br2 to Br3 or to the leaf and the height decreased 
-                    if (Right is Branch2Base && newRight is Branch2Base == false)
-                    {
-                        var left = Left;
-                        // the the hole has a 2-node as a parent and a 3-node as a sibling.
-                        if (left is Branch3Base lb3) //! the height does not change
-                            return new Branch2(new Branch2(lb3.Left, lb3.Entry0, lb3.Middle), lb3.Entry1, new Branch2(lb3.Right, mid, newRight));
-
-                        if (left is Branch2Plus lb21)
-                            return new Branch3(lb21.ToSplitBranch2(out var lMid, out var lRight), lMid, lRight, mid, newRight);
-
-                        // the the hole has a 2-node as a parent and a 2-node as a sibling.
-                        var lb2 = (Branch2Base)left;
-                        return new Branch3(lb2.Left, lb2.MidEntry, lb2.Right, mid, newRight);
-                    }
-
-                    return new Branch2(Left, mid, newRight);
-                }
-
-                // case 1, downward: swap the predecessor entry (max left entry) with the mid entry, then proceed to remove the predecessor from the Left branch
-                if (removedEntry == mid)
-                    removedEntry = mid = Left.GetMaxHashEntryOrDefault();
-
-                // case 1, upward
-                var newLeft = Left.RemoveEntry(removedEntry);
-                if (newLeft == Empty)
-                {
-                    if (Right is Leaf5PlusPlus == false)
-                        return Right.AddOrGetEntry(mid.Hash, mid);
-                    removedEntry = Right.GetMinHashEntryOrDefault();
-                    return new Branch2(mid, removedEntry, Right.RemoveEntry(removedEntry)); //! the height does not change
-                }
-
-                //*rebalance needed: the branch was merged from Br2 to Br3 or to the leaf and the height decreased 
-                if (Left is Branch2Base && newLeft is Branch2Base == false)
-                {
-                    var right = Right;
+                    var left = Left;
                     // the the hole has a 2-node as a parent and a 3-node as a sibling.
-                    if (right is Branch3Base rb3) //! the height does not change
-                        return new Branch2(new Branch2(newLeft, mid, rb3.Left), rb3.Entry0, new Branch2(rb3.Middle, rb3.Entry1, rb3.Right));
+                    if (left is Branch3Base lb3) //! the height does not change
+                        return new Branch2(new Branch2(lb3.Left, lb3.Entry0, lb3.Middle), lb3.Entry1, new Branch2(lb3.Right, mid, newRight));
 
-                    if (right is Branch2Plus rb21)
-                        return new Branch3(newLeft, mid, rb21.ToSplitBranch2(out var rMid, out var rRight), rMid, rRight);
+                    if (left is Branch2Plus lb21)
+                        return new Branch3(lb21.ToSplitBranch2(out var lMid, out var lRight), lMid, lRight, mid, newRight);
 
                     // the the hole has a 2-node as a parent and a 2-node as a sibling.
-                    var rb2 = (Branch2Base)right;
-                    return new Branch3(newLeft, mid, rb2.Left, rb2.MidEntry, rb2.Right);
+                    var lb2 = (Branch2Base)left;
+                    return new Branch3(lb2.Left, lb2.MidEntry, lb2.Right, mid, newRight);
                 }
 
-                return new Branch2(newLeft, mid, Right);
+                return new Branch2(Left, mid, newRight);
             }
+
+            // case 1, downward: swap the predecessor entry (max left entry) with the mid entry, then proceed to remove the predecessor from the Left branch
+            if (removedEntry == mid)
+                removedEntry = mid = Left.GetMaxHashEntryOrDefault();
+
+            // case 1, upward
+            var newLeft = Left.RemoveEntry(removedEntry);
+            if (newLeft == Empty)
+            {
+                if (Right is Leaf5PlusPlus == false)
+                    return Right.AddOrGetEntry(mid.Hash, mid);
+                removedEntry = Right.GetMinHashEntryOrDefault();
+                return new Branch2(mid, removedEntry, Right.RemoveEntry(removedEntry)); //! the height does not change
+            }
+
+            //*rebalance needed: the branch was merged from Br2 to Br3 or to the leaf and the height decreased 
+            if (Left is Branch2Base && newLeft is Branch2Base == false)
+            {
+                var right = Right;
+                // the the hole has a 2-node as a parent and a 3-node as a sibling.
+                if (right is Branch3Base rb3) //! the height does not change
+                    return new Branch2(new Branch2(newLeft, mid, rb3.Left), rb3.Entry0, new Branch2(rb3.Middle, rb3.Entry1, rb3.Right));
+
+                if (right is Branch2Plus rb21)
+                    return new Branch3(newLeft, mid, rb21.ToSplitBranch2(out var rMid, out var rRight), rMid, rRight);
+
+                // the the hole has a 2-node as a parent and a 2-node as a sibling.
+                var rb2 = (Branch2Base)right;
+                return new Branch3(newLeft, mid, rb2.Left, rb2.MidEntry, rb2.Right);
+            }
+
+            return new Branch2(newLeft, mid, Right);
+        }
+    }
+
+    internal sealed class Branch2 : Branch2Base
+    {
+        internal readonly Entry E;
+        internal readonly ImHashMap<K, V> L, R;
+        public override Entry MidEntry => E;
+        public override ImHashMap<K, V> Left => L;
+        public override ImHashMap<K, V> Right => R;
+        public Branch2(ImHashMap<K, V> left, Entry entry, ImHashMap<K, V> right)
+        {
+            Debug.Assert(left != Empty && right != Empty, $"left:{left} != Empty && right:{right} != Empty");
+            L = left;
+            E = entry;
+            R = right;
         }
 
-        internal sealed class Branch2 : Branch2Base
+        public override int Count() => E.Count() + L.Count() + R.Count();
+
+        internal override Entry GetMinHashEntryOrDefault() => L.GetMinHashEntryOrDefault();
+        internal override Entry GetMaxHashEntryOrDefault() => R.GetMaxHashEntryOrDefault();
+
+        internal override Entry GetEntryOrNull(int hash) =>
+            hash > E.Hash ? R.GetEntryOrNull(hash) : hash < E.Hash ? L.GetEntryOrNull(hash) : E;
+
+        internal override Entry GetSurePresentEntry(int hash) =>
+            hash > E.Hash ? R.GetSurePresentEntry(hash) : hash < E.Hash ? L.GetSurePresentEntry(hash) : E;
+
+        internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry) =>
+            oldEntry.Hash > E.Hash ? new Branch2(L, E, R.ReplaceEntry(oldEntry, newEntry))
+                : oldEntry.Hash < E.Hash ? new Branch2(L.ReplaceEntry(oldEntry, newEntry), E, R)
+                : new Branch2(L, newEntry, R);
+
+        internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
         {
-            internal readonly Entry E;
-            internal readonly ImHashMap<K, V> L, R;
-            public override Entry MidEntry => E;
-            public override ImHashMap<K, V> Left => L;
-            public override ImHashMap<K, V> Right => R;
-            public Branch2(ImHashMap<K, V> left, Entry entry, ImHashMap<K, V> right)
+            ImHashMap<K, V> entryOrNewBranch = null;
+            if (hash > E.Hash)
             {
-                Debug.Assert(left != Empty && right != Empty, $"left:{left} != Empty && right:{right} != Empty");
-                L = left;
-                E = entry;
-                R = right;
+                if (R is Leaf5PlusPlus rl5pp && L is Leaf5PlusPlus == false)
+                    return rl5pp.GetEntryOrNull(hash) ?? (ImHashMap<K, V>)new Branch2Plus(entry, this);
+                entryOrNewBranch = R.AddOrGetEntry(hash, entry);
+                return R.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
+                    ? new Branch3(L, E, b2.L, b2.E, b2.R)
+                    : entryOrNewBranch is Entry ? entryOrNewBranch : new Branch2Right(this, entryOrNewBranch);
             }
-
-            public override int Count() => E.Count() + L.Count() + R.Count();
-
-            internal override Entry GetMinHashEntryOrDefault() => L.GetMinHashEntryOrDefault();
-            internal override Entry GetMaxHashEntryOrDefault() => R.GetMaxHashEntryOrDefault();
-
-            internal override Entry GetEntryOrNull(int hash) =>
-                hash > E.Hash ? R.GetEntryOrNull(hash) : hash < E.Hash ? L.GetEntryOrNull(hash) : E;
-
-            internal override Entry GetSurePresentEntry(int hash) =>
-                hash > E.Hash ? R.GetSurePresentEntry(hash) : hash < E.Hash ? L.GetSurePresentEntry(hash) : E;
-
-            internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry) =>
-                oldEntry.Hash > E.Hash ? new Branch2(L, E, R.ReplaceEntry(oldEntry, newEntry))
-                    : oldEntry.Hash < E.Hash ? new Branch2(L.ReplaceEntry(oldEntry, newEntry), E, R)
-                    : new Branch2(L, newEntry, R);
-
-            internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
+            if (hash < E.Hash)
             {
-                ImHashMap<K, V> entryOrNewBranch = null;
-                if (hash > E.Hash)
-                {
-                    if (R is Leaf5PlusPlus rl5pp && L is Leaf5PlusPlus == false)
-                        return rl5pp.GetEntryOrNull(hash) ?? (ImHashMap<K, V>)new Branch2Plus(entry, this);
-                    entryOrNewBranch = R.AddOrGetEntry(hash, entry);
-                    return R.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
-                        ? new Branch3(L, E, b2.L, b2.E, b2.R)
-                        : entryOrNewBranch is Entry ? entryOrNewBranch : new Branch2Right(this, entryOrNewBranch);
-                }
-                if (hash < E.Hash)
-                {
-                    if (L is Leaf5PlusPlus ll5pp && R is Leaf5PlusPlus == false)
-                        return ll5pp.GetEntryOrNull(hash) ?? (ImHashMap<K, V>)new Branch2Plus(entry, this);
-                    entryOrNewBranch = L.AddOrGetEntry(hash, entry);
-                    return L.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
-                        ? new Branch3(b2.L, b2.E, b2.R, E, R)
-                        : entryOrNewBranch is Entry ? entryOrNewBranch : new Branch2Left(this, entryOrNewBranch);
-                }
-                return E;
+                if (L is Leaf5PlusPlus ll5pp && R is Leaf5PlusPlus == false)
+                    return ll5pp.GetEntryOrNull(hash) ?? (ImHashMap<K, V>)new Branch2Plus(entry, this);
+                entryOrNewBranch = L.AddOrGetEntry(hash, entry);
+                return L.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
+                    ? new Branch3(b2.L, b2.E, b2.R, E, R)
+                    : entryOrNewBranch is Entry ? entryOrNewBranch : new Branch2Left(this, entryOrNewBranch);
             }
-
-            internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry)
-            {
-                ImHashMap<K, V> entryOrNewBranch = null;
-                if (entry.Hash > E.Hash)
-                {
-                    // optimizing the split by postponing it by introducing the branch 2 plus 1
-                    if (R is Leaf5PlusPlus && L is Leaf5PlusPlus == false)
-                        return new Branch2Plus(entry, this);
-                    entryOrNewBranch = R.AddSureNotPresentEntry(entry);
-                    return R.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
-                        ? new Branch3(L, E, b2.L, b2.E, b2.R) : new Branch2Right(this, entryOrNewBranch);
-                }
-                {
-                    if (L is Leaf5PlusPlus && R is Leaf5PlusPlus == false)
-                        return new Branch2Plus(entry, this);
-                    entryOrNewBranch = L.AddSureNotPresentEntry(entry);
-                    return L.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
-                        ? new Branch3(b2.L, b2.E, b2.R, E, R) : new Branch2Left(this, entryOrNewBranch);
-                }
-            }
+            return E;
         }
 
-        internal sealed class Branch2Left : Branch2Base
+        internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry)
         {
-            internal readonly Branch2 B;
-            internal readonly ImHashMap<K, V> L;
-            public override Entry MidEntry => B.E;
-            public override ImHashMap<K, V> Left => L;
-            public override ImHashMap<K, V> Right => B.R;
-            public Branch2Left(Branch2 b, ImHashMap<K, V> l) { B = b; L = l; }
-
-            public override int Count() => B.E.Count() + L.Count() + B.R.Count();
-
-            internal override Entry GetMinHashEntryOrDefault() => L.GetMinHashEntryOrDefault();
-            internal override Entry GetMaxHashEntryOrDefault() => B.R.GetMaxHashEntryOrDefault();
-
-            internal override Entry GetEntryOrNull(int hash) =>
-                hash > B.E.Hash ? B.R.GetEntryOrNull(hash) : hash < B.E.Hash ? L.GetEntryOrNull(hash) : B.E;
-
-            internal override Entry GetSurePresentEntry(int hash) =>
-                hash > B.E.Hash ? B.R.GetSurePresentEntry(hash) : hash < B.E.Hash ? L.GetSurePresentEntry(hash) : B.E;
-
-            internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry) =>
-                oldEntry.Hash > B.E.Hash ? new Branch2(L, B.E, B.R.ReplaceEntry(oldEntry, newEntry))
-                    : oldEntry.Hash < B.E.Hash ? new Branch2(L.ReplaceEntry(oldEntry, newEntry), B.E, B.R)
-                    : new Branch2(L, newEntry, B.R);
-
-            internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
+            ImHashMap<K, V> entryOrNewBranch = null;
+            if (entry.Hash > E.Hash)
             {
-                var me = B.E;
-                ImHashMap<K, V> entryOrNewBranch = null;
-                if (hash > me.Hash)
-                {
-                    var right = B.R;
-                    if (right is Leaf5PlusPlus rl511 && L is Leaf5PlusPlus == false)
-                        return rl511.GetEntryOrNull(hash) ?? (ImHashMap<K, V>)new Branch2Plus(entry, this);
-                    entryOrNewBranch = right.AddOrGetEntry(hash, entry);
-                    return right.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
-                        ? new Branch3(L, me, b2.L, b2.E, b2.R)
-                        : entryOrNewBranch is Entry ? entryOrNewBranch : new Branch2(L, me, entryOrNewBranch);
-                }
-                if (hash < me.Hash)
-                {
-                    if (L is Leaf5PlusPlus ll511 && B.R is Leaf5PlusPlus == false)
-                        return ll511.GetEntryOrNull(hash) ?? (ImHashMap<K, V>)new Branch2Plus(entry, this);
-                    entryOrNewBranch = L.AddOrGetEntry(hash, entry);
-                    return L.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
-                        ? new Branch3(b2.L, b2.E, b2.R, me, B.R)
-                        : entryOrNewBranch is Entry ? entryOrNewBranch : new Branch2Left(B, entryOrNewBranch);
-                }
-                return me;
+                // optimizing the split by postponing it by introducing the branch 2 plus 1
+                if (R is Leaf5PlusPlus && L is Leaf5PlusPlus == false)
+                    return new Branch2Plus(entry, this);
+                entryOrNewBranch = R.AddSureNotPresentEntry(entry);
+                return R.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
+                    ? new Branch3(L, E, b2.L, b2.E, b2.R) : new Branch2Right(this, entryOrNewBranch);
             }
-
-            internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry)
             {
-                var me = B.E;
-                ImHashMap<K, V> entryOrNewBranch = null;
-                if (entry.Hash > me.Hash)
-                {
-                    var right = B.R;
-                    if (right is Leaf5PlusPlus && L is Leaf5PlusPlus == false)
-                        return new Branch2Plus(entry, this);
-                    entryOrNewBranch = right.AddSureNotPresentEntry(entry);
-                    return right.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
-                        ? new Branch3(L, me, b2.L, b2.E, b2.R) : new Branch2(L, me, entryOrNewBranch);
-                }
-                {
-                    if (L is Leaf5PlusPlus ll511 && B.R is Leaf5PlusPlus == false)
-                        return new Branch2Plus(entry, this);
-                    entryOrNewBranch = L.AddSureNotPresentEntry(entry);
-                    return L.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
-                        ? new Branch3(b2.L, b2.E, b2.R, me, B.R) : new Branch2Left(B, entryOrNewBranch);
-                }
+                if (L is Leaf5PlusPlus && R is Leaf5PlusPlus == false)
+                    return new Branch2Plus(entry, this);
+                entryOrNewBranch = L.AddSureNotPresentEntry(entry);
+                return L.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
+                    ? new Branch3(b2.L, b2.E, b2.R, E, R) : new Branch2Left(this, entryOrNewBranch);
             }
         }
+    }
 
-        internal sealed class Branch2Right : Branch2Base
+    internal sealed class Branch2Left : Branch2Base
+    {
+        internal readonly Branch2 B;
+        internal readonly ImHashMap<K, V> L;
+        public override Entry MidEntry => B.E;
+        public override ImHashMap<K, V> Left => L;
+        public override ImHashMap<K, V> Right => B.R;
+        public Branch2Left(Branch2 b, ImHashMap<K, V> l) { B = b; L = l; }
+
+        public override int Count() => B.E.Count() + L.Count() + B.R.Count();
+
+        internal override Entry GetMinHashEntryOrDefault() => L.GetMinHashEntryOrDefault();
+        internal override Entry GetMaxHashEntryOrDefault() => B.R.GetMaxHashEntryOrDefault();
+
+        internal override Entry GetEntryOrNull(int hash) =>
+            hash > B.E.Hash ? B.R.GetEntryOrNull(hash) : hash < B.E.Hash ? L.GetEntryOrNull(hash) : B.E;
+
+        internal override Entry GetSurePresentEntry(int hash) =>
+            hash > B.E.Hash ? B.R.GetSurePresentEntry(hash) : hash < B.E.Hash ? L.GetSurePresentEntry(hash) : B.E;
+
+        internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry) =>
+            oldEntry.Hash > B.E.Hash ? new Branch2(L, B.E, B.R.ReplaceEntry(oldEntry, newEntry))
+                : oldEntry.Hash < B.E.Hash ? new Branch2(L.ReplaceEntry(oldEntry, newEntry), B.E, B.R)
+                : new Branch2(L, newEntry, B.R);
+
+        internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
         {
-            internal readonly Branch2 B;
-            internal readonly ImHashMap<K, V> R;
-            public override Entry MidEntry => B.E;
-            public override ImHashMap<K, V> Left => B.L;
-            public override ImHashMap<K, V> Right => R;
-            public Branch2Right(Branch2 b, ImHashMap<K, V> r) { B = b; R = r; }
-
-            public override int Count() => B.E.Count() + B.L.Count() + R.Count();
-
-            internal override Entry GetMinHashEntryOrDefault() => B.L.GetMinHashEntryOrDefault();
-            internal override Entry GetMaxHashEntryOrDefault() => R.GetMaxHashEntryOrDefault();
-
-            internal override Entry GetEntryOrNull(int hash) =>
-                hash > B.E.Hash ? R.GetEntryOrNull(hash) : hash < B.E.Hash ? B.L.GetEntryOrNull(hash) : B.E;
-
-            internal override Entry GetSurePresentEntry(int hash) =>
-                hash > B.E.Hash ? R.GetSurePresentEntry(hash) : hash < B.E.Hash ? B.L.GetSurePresentEntry(hash) : B.E;
-
-            internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry) =>
-                oldEntry.Hash > B.E.Hash ? new Branch2(B.L, B.E, R.ReplaceEntry(oldEntry, newEntry))
-                    : oldEntry.Hash < B.E.Hash ? new Branch2(B.L.ReplaceEntry(oldEntry, newEntry), B.E, R)
-                    : new Branch2(B.L, newEntry, R);
-
-            internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
+            var me = B.E;
+            ImHashMap<K, V> entryOrNewBranch = null;
+            if (hash > me.Hash)
             {
-                var me = B.E;
-                ImHashMap<K, V> entryOrNewBranch = null;
-                if (hash > me.Hash)
-                {
-                    if (R is Leaf5PlusPlus rl511 && B.L is Leaf5PlusPlus == false)
-                        return rl511.GetEntryOrNull(hash) ?? (ImHashMap<K, V>)new Branch2Plus(entry, this);
-                    entryOrNewBranch = R.AddOrGetEntry(hash, entry);
-                    return R.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
-                        ? new Branch3(B.L, me, b2.L, b2.E, b2.R)
-                        : entryOrNewBranch is Entry ? entryOrNewBranch : new Branch2Right(B, entryOrNewBranch);
-                }
-                if (hash < me.Hash)
-                {
-                    var left = B.L;
-                    if (left is Leaf5PlusPlus ll511 && R is Leaf5PlusPlus == false)
-                        return ll511.GetEntryOrNull(hash) ?? (ImHashMap<K, V>)new Branch2Plus(entry, this);
-                    entryOrNewBranch = left.AddOrGetEntry(hash, entry);
-                    return left.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
-                        ? new Branch3(b2.L, b2.E, b2.R, me, R)
-                        : entryOrNewBranch is Entry ? entryOrNewBranch : new Branch2(entryOrNewBranch, me, R);
-                }
-                return me;
+                var right = B.R;
+                if (right is Leaf5PlusPlus rl511 && L is Leaf5PlusPlus == false)
+                    return rl511.GetEntryOrNull(hash) ?? (ImHashMap<K, V>)new Branch2Plus(entry, this);
+                entryOrNewBranch = right.AddOrGetEntry(hash, entry);
+                return right.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
+                    ? new Branch3(L, me, b2.L, b2.E, b2.R)
+                    : entryOrNewBranch is Entry ? entryOrNewBranch : new Branch2(L, me, entryOrNewBranch);
             }
-
-            internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry)
+            if (hash < me.Hash)
             {
-                var me = B.E;
-                ImHashMap<K, V> entryOrNewBranch = null;
-                if (entry.Hash > me.Hash)
-                {
-                    if (R is Leaf5PlusPlus && B.L is Leaf5PlusPlus == false)
-                        return new Branch2Plus(entry, this);
-                    entryOrNewBranch = R.AddSureNotPresentEntry(entry);
-                    return R.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
-                        ? new Branch3(B.L, me, b2.L, b2.E, b2.R) : new Branch2Right(B, entryOrNewBranch);
-                }
-                {
-                    var left = B.L;
-                    if (left is Leaf5PlusPlus && R is Leaf5PlusPlus == false)
-                        return new Branch2Plus(entry, this);
-                    entryOrNewBranch = left.AddSureNotPresentEntry(entry);
-                    return left.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
-                        ? new Branch3(b2.L, b2.E, b2.R, me, R) : new Branch2(entryOrNewBranch, me, R);
-                }
+                if (L is Leaf5PlusPlus ll511 && B.R is Leaf5PlusPlus == false)
+                    return ll511.GetEntryOrNull(hash) ?? (ImHashMap<K, V>)new Branch2Plus(entry, this);
+                entryOrNewBranch = L.AddOrGetEntry(hash, entry);
+                return L.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
+                    ? new Branch3(b2.L, b2.E, b2.R, me, B.R)
+                    : entryOrNewBranch is Entry ? entryOrNewBranch : new Branch2Left(B, entryOrNewBranch);
             }
+            return me;
         }
 
-        /// <summary>The 2 branches with the node in between</summary>
-        internal sealed class Branch2Plus : ImHashMap<K, V>
+        internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry)
         {
-            public readonly Entry Plus;
-            public readonly Branch2Base B;
-            public Branch2Plus(Entry plus, Branch2Base b2) { Plus = plus; B = b2; }
+            var me = B.E;
+            ImHashMap<K, V> entryOrNewBranch = null;
+            if (entry.Hash > me.Hash)
+            {
+                var right = B.R;
+                if (right is Leaf5PlusPlus && L is Leaf5PlusPlus == false)
+                    return new Branch2Plus(entry, this);
+                entryOrNewBranch = right.AddSureNotPresentEntry(entry);
+                return right.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
+                    ? new Branch3(L, me, b2.L, b2.E, b2.R) : new Branch2(L, me, entryOrNewBranch);
+            }
+            {
+                if (L is Leaf5PlusPlus ll511 && B.R is Leaf5PlusPlus == false)
+                    return new Branch2Plus(entry, this);
+                entryOrNewBranch = L.AddSureNotPresentEntry(entry);
+                return L.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
+                    ? new Branch3(b2.L, b2.E, b2.R, me, B.R) : new Branch2Left(B, entryOrNewBranch);
+            }
+        }
+    }
 
-            public override int Count() => Plus.Count() + B.Count();
+    internal sealed class Branch2Right : Branch2Base
+    {
+        internal readonly Branch2 B;
+        internal readonly ImHashMap<K, V> R;
+        public override Entry MidEntry => B.E;
+        public override ImHashMap<K, V> Left => B.L;
+        public override ImHashMap<K, V> Right => R;
+        public Branch2Right(Branch2 b, ImHashMap<K, V> r) { B = b; R = r; }
+
+        public override int Count() => B.E.Count() + B.L.Count() + R.Count();
+
+        internal override Entry GetMinHashEntryOrDefault() => B.L.GetMinHashEntryOrDefault();
+        internal override Entry GetMaxHashEntryOrDefault() => R.GetMaxHashEntryOrDefault();
+
+        internal override Entry GetEntryOrNull(int hash) =>
+            hash > B.E.Hash ? R.GetEntryOrNull(hash) : hash < B.E.Hash ? B.L.GetEntryOrNull(hash) : B.E;
+
+        internal override Entry GetSurePresentEntry(int hash) =>
+            hash > B.E.Hash ? R.GetSurePresentEntry(hash) : hash < B.E.Hash ? B.L.GetSurePresentEntry(hash) : B.E;
+
+        internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry) =>
+            oldEntry.Hash > B.E.Hash ? new Branch2(B.L, B.E, R.ReplaceEntry(oldEntry, newEntry))
+                : oldEntry.Hash < B.E.Hash ? new Branch2(B.L.ReplaceEntry(oldEntry, newEntry), B.E, R)
+                : new Branch2(B.L, newEntry, R);
+
+        internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
+        {
+            var me = B.E;
+            ImHashMap<K, V> entryOrNewBranch = null;
+            if (hash > me.Hash)
+            {
+                if (R is Leaf5PlusPlus rl511 && B.L is Leaf5PlusPlus == false)
+                    return rl511.GetEntryOrNull(hash) ?? (ImHashMap<K, V>)new Branch2Plus(entry, this);
+                entryOrNewBranch = R.AddOrGetEntry(hash, entry);
+                return R.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
+                    ? new Branch3(B.L, me, b2.L, b2.E, b2.R)
+                    : entryOrNewBranch is Entry ? entryOrNewBranch : new Branch2Right(B, entryOrNewBranch);
+            }
+            if (hash < me.Hash)
+            {
+                var left = B.L;
+                if (left is Leaf5PlusPlus ll511 && R is Leaf5PlusPlus == false)
+                    return ll511.GetEntryOrNull(hash) ?? (ImHashMap<K, V>)new Branch2Plus(entry, this);
+                entryOrNewBranch = left.AddOrGetEntry(hash, entry);
+                return left.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
+                    ? new Branch3(b2.L, b2.E, b2.R, me, R)
+                    : entryOrNewBranch is Entry ? entryOrNewBranch : new Branch2(entryOrNewBranch, me, R);
+            }
+            return me;
+        }
+
+        internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry)
+        {
+            var me = B.E;
+            ImHashMap<K, V> entryOrNewBranch = null;
+            if (entry.Hash > me.Hash)
+            {
+                if (R is Leaf5PlusPlus && B.L is Leaf5PlusPlus == false)
+                    return new Branch2Plus(entry, this);
+                entryOrNewBranch = R.AddSureNotPresentEntry(entry);
+                return R.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
+                    ? new Branch3(B.L, me, b2.L, b2.E, b2.R) : new Branch2Right(B, entryOrNewBranch);
+            }
+            {
+                var left = B.L;
+                if (left is Leaf5PlusPlus && R is Leaf5PlusPlus == false)
+                    return new Branch2Plus(entry, this);
+                entryOrNewBranch = left.AddSureNotPresentEntry(entry);
+                return left.MayTurnToBranch2 && entryOrNewBranch is Branch2 b2
+                    ? new Branch3(b2.L, b2.E, b2.R, me, R) : new Branch2(entryOrNewBranch, me, R);
+            }
+        }
+    }
+
+    /// <summary>The 2 branches with the node in between</summary>
+    internal sealed class Branch2Plus : ImHashMap<K, V>
+    {
+        public readonly Entry Plus;
+        public readonly Branch2Base B;
+        public Branch2Plus(Entry plus, Branch2Base b2) { Plus = plus; B = b2; }
+
+        public override int Count() => Plus.Count() + B.Count();
 
 #if !DEBUG
-            public override string ToString() => "{B21:{Plus:" + Plus + ",B:" + B + "}}";
+        public override string ToString() => "{B21:{Plus:" + Plus + ",B:" + B + "}}";
 #endif
 
-            internal override StringBuilder ToMermaidNodeId(StringBuilder s) =>
-                s.Append("B2P_").Append(Plus.Hash);
-            internal override StringBuilder ToMermaidString(StringBuilder s)
-            {
-                B.ToMermaidString(s).AppendLine();
+        internal override StringBuilder ToMermaidNodeId(StringBuilder s) =>
+            s.Append("B2P_").Append(Plus.Hash);
+        internal override StringBuilder ToMermaidString(StringBuilder s)
+        {
+            B.ToMermaidString(s).AppendLine();
 
-                ToMermaidNodeId(s).Append('>');
-                Plus.ToMermaidNodeItem(s).Append("]-->");
-                return B.ToMermaidNodeId(s);
+            ToMermaidNodeId(s).Append('>');
+            Plus.ToMermaidNodeItem(s).Append("]-->");
+            return B.ToMermaidNodeId(s);
+        }
+
+        internal override Entry GetMinHashEntryOrDefault()
+        {
+            var m = B.Left.GetMinHashEntryOrDefault();
+            return m.Hash < Plus.Hash ? m : Plus;
+        }
+
+        internal sealed override Entry GetMaxHashEntryOrDefault()
+        {
+            var m = B.Right.GetMaxHashEntryOrDefault();
+            return m.Hash > Plus.Hash ? m : Plus;
+        }
+
+        internal override Entry GetEntryOrNull(int hash)
+        {
+            if (Plus.Hash == hash)
+                return Plus;
+            var mh = B.MidEntry.Hash;
+            return hash > mh ? B.Right.GetEntryOrNull(hash) : hash < mh ? B.Left.GetEntryOrNull(hash) : B.MidEntry;
+        }
+
+        internal override Entry GetSurePresentEntry(int hash)
+        {
+            if (Plus.Hash == hash)
+                return Plus;
+            var mh = B.MidEntry.Hash;
+            return hash > mh ? B.Right.GetSurePresentEntry(hash) : hash < mh ? B.Left.GetSurePresentEntry(hash) : B.MidEntry;
+        }
+
+        internal ImHashMap<K, V> ToSplitBranch2(out Entry newMid, out ImHashMap<K, V> newRight)
+        {
+            var b = B;
+            var m = b.MidEntry;
+            var l511 = b.Left as Leaf5PlusPlus;
+            if (l511 != null)
+            {
+                newRight = b.Right.AddOrGetEntry(m.Hash, m); // @perf replace with the AddEntry method
+                newMid = l511.GetMaxHashEntryOrDefault();
+                if (newMid.Hash > Plus.Hash)
+                    return l511.RemoveMaxHashEntryAndAddNewEntry(newMid, Plus);
+                newMid = Plus;
+                return l511;
             }
 
-            internal override Entry GetMinHashEntryOrDefault()
-            {
-                var m = B.Left.GetMinHashEntryOrDefault();
-                return m.Hash < Plus.Hash ? m : Plus;
-            }
+            newRight = l511 = (Leaf5PlusPlus)b.Right;
+            newMid = l511.GetMinHashEntryOrDefault();
+            if (newMid.Hash < Plus.Hash)
+                newRight = l511.RemoveMinHashEntryAndAddNewEntry(newMid, Plus);
+            else
+                newMid = Plus;
+            return b.Left.AddOrGetEntry(m.Hash, m); // @perf replace with the AddEntry method
+        }
 
-            internal sealed override Entry GetMaxHashEntryOrDefault()
+        internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
+        {
+            var ph = Plus.Hash;
+            if (ph == hash) // fast match and return
+                return Plus;
+            var b = B;
+            var m = b.MidEntry;
+            ImHashMap<K, V> entryOrNewBranch = null;
+            if (hash > m.Hash)
             {
-                var m = B.Right.GetMaxHashEntryOrDefault();
-                return m.Hash > Plus.Hash ? m : Plus;
-            }
-
-            internal override Entry GetEntryOrNull(int hash)
-            {
-                if (Plus.Hash == hash)
-                    return Plus;
-                var mh = B.MidEntry.Hash;
-                return hash > mh ? B.Right.GetEntryOrNull(hash) : hash < mh ? B.Left.GetEntryOrNull(hash) : B.MidEntry;
-            }
-
-            internal override Entry GetSurePresentEntry(int hash)
-            {
-                if (Plus.Hash == hash)
-                    return Plus;
-                var mh = B.MidEntry.Hash;
-                return hash > mh ? B.Right.GetSurePresentEntry(hash) : hash < mh ? B.Left.GetSurePresentEntry(hash) : B.MidEntry;
-            }
-
-            internal ImHashMap<K, V> ToSplitBranch2(out Entry newMid, out ImHashMap<K, V> newRight)
-            {
-                var b = B;
-                var m = b.MidEntry;
-                var l511 = b.Left as Leaf5PlusPlus;
-                if (l511 != null)
+                var right = b.Right;
+                entryOrNewBranch = right.AddOrGetEntry(hash, entry);
+                if (entryOrNewBranch is Entry)
+                    return entryOrNewBranch;
+                if (right is Leaf5PlusPlus rl)
                 {
-                    newRight = b.Right.AddOrGetEntry(m.Hash, m); // @perf replace with the AddEntry method
-                    newMid = l511.GetMaxHashEntryOrDefault();
-                    if (newMid.Hash > Plus.Hash)
-                        return l511.RemoveMaxHashEntryAndAddNewEntry(newMid, Plus);
-                    newMid = Plus;
-                    return l511;
+                    // The new entry is for sure Branch2 because it was L5PP before and now it has a new entry added
+                    var rb2 = (Branch2)entryOrNewBranch;
+                    Debug.Assert(ph > m.Hash, "Because right was on the verge of balance and the fact that the other branch is not on the verge was the reason of Branch2Plus1 creation");
+                    return ph > rb2.MidEntry.Hash
+                        ? new Branch3(b.Left, m, rb2.L, rb2.E, rb2.R is Leaf2 l2 ? new Leaf2Plus(Plus, l2) : new Leaf5Plus(Plus, (Leaf5)rb2.R))
+                        : new Branch3(b.Left, m, rb2.L is Leaf5 l5 ? new Leaf5Plus(Plus, l5) : new Leaf2Plus(Plus, (Leaf2)rb2.L), rb2.E, rb2.R);
+                }
+                // todo: @perf it increases the memory for some reason
+                // if (entryOrNewBranch is Leaf5PlusPlus == false)
+                //     return new Branch2Plus(Plus,
+                //         b is Branch2Right b2r ? new Branch2Right(b2r.B, entryOrNewBranch) :
+                //         b is Branch2 b2 ? new Branch2Right(b2, entryOrNewBranch) :
+                //         new Branch2(((Branch2Left)b).L, m, entryOrNewBranch));
+
+                var ll5pp = (Leaf5PlusPlus)b.Left;
+                // todo: @perf can we keep the B2 for longer?
+                // left was Leaf5PlusPlus, and Plus was supposed to be added there, so the entryOrNewBranch is still a Leaf
+                // if (entryOrNewBranch is Leaf5PlusPlus == false && entryOrNewBranch is Leaf2PlusPlus == false)
+                // {
+                //     var maxLeft = ll5pp.GetMaxHashEntryOrDefault();
+                //     if (Plus.Hash > maxLeft.Hash)
+                //         return new Branch2(ll5pp, Plus, entryOrNewBranch.AddSureNotPresentEntry(m));
+                //     if (maxLeft == ll5pp.Plus)
+                //         return new Branch2(ll5pp.L.AddSureNotPresentEntry(Plus), maxLeft, entryOrNewBranch.AddSureNotPresentEntry(m));
+                // }
+
+                // right is not on the verge, then the Plus would be added to the left
+                entry = Plus;
+                ImHashMap<K, V> splitRight = null;
+                var newLeft = ll5pp.AddEntry(ph, ref entry, ref splitRight);
+                return new Branch3(newLeft, entry, splitRight, m, entryOrNewBranch);
+            }
+            if (hash < m.Hash)
+            {
+                var left = b.Left;
+                entryOrNewBranch = left.AddOrGetEntry(hash, entry);
+                if (entryOrNewBranch is Entry)
+                    return entryOrNewBranch;
+                if (left is Leaf5PlusPlus ll)
+                {
+                    var lb2 = (Branch2)entryOrNewBranch;
+                    return ph < lb2.MidEntry.Hash
+                        ? new Branch3(lb2.L is Leaf5 l5 ? new Leaf5Plus(Plus, l5) : new Leaf2Plus(Plus, (Leaf2)lb2.L), lb2.E, lb2.R, m, b.Right)
+                        : new Branch3(lb2.L, lb2.E, lb2.R is Leaf2 l2 ? new Leaf2Plus(Plus, l2) : new Leaf5Plus(Plus, (Leaf5)lb2.R), m, b.Right);
                 }
 
-                newRight = l511 = (Leaf5PlusPlus)b.Right;
-                newMid = l511.GetMinHashEntryOrDefault();
-                if (newMid.Hash < Plus.Hash)
-                    newRight = l511.RemoveMinHashEntryAndAddNewEntry(newMid, Plus);
-                else
-                    newMid = Plus;
-                return b.Left.AddOrGetEntry(m.Hash, m); // @perf replace with the AddEntry method
+                // if (entryOrNewBranch is Leaf5PlusPlus == false)
+                //     return new Branch2Plus(Plus,
+                //         b is Branch2Left b2r ? new Branch2Left(b2r.B, entryOrNewBranch) :
+                //         b is Branch2 b2 ? new Branch2Left(b2, entryOrNewBranch) :
+                //         new Branch2(entryOrNewBranch, m, ((Branch2Right)b).R));
+
+                var rl5pp = (Leaf5PlusPlus)b.Right;
+                // if (entryOrNewBranch is Leaf5PlusPlus == false && entryOrNewBranch is Leaf2PlusPlus == false)
+                // {
+                //     var minRight = rl5pp.GetMinHashEntryOrDefault();
+                //     if (Plus.Hash < minRight.Hash)
+                //         return new Branch2(entryOrNewBranch.AddSureNotPresentEntry(m), Plus, rl5pp);
+                //     if (minRight == rl5pp.Plus)
+                //         return new Branch2(entryOrNewBranch.AddSureNotPresentEntry(m), minRight, rl5pp.L.AddSureNotPresentEntry(Plus));
+                // }
+
+                entry = Plus;
+                ImHashMap<K, V> splitRight = null;
+                var newMiddle = rl5pp.AddEntry(ph, ref entry, ref splitRight);
+                return new Branch3(entryOrNewBranch, m, newMiddle, entry, splitRight);
             }
+            return m;
+        }
 
-            internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
+        internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry)
+        {
+            var b = B;
+            var m = b.MidEntry;
+            ImHashMap<K, V> entryOrNewBranch = null;
+            if (entry.Hash > m.Hash)
             {
-                var ph = Plus.Hash;
-                if (ph == hash) // fast match and return
-                    return Plus;
-                var b = B;
-                var m = b.MidEntry;
-                ImHashMap<K, V> entryOrNewBranch = null;
-                if (hash > m.Hash)
+                var right = b.Right;
+                entryOrNewBranch = right.AddSureNotPresentEntry(entry);
+                if (right is Leaf5PlusPlus rl)
                 {
-                    var right = b.Right;
-                    entryOrNewBranch = right.AddOrGetEntry(hash, entry);
-                    if (entryOrNewBranch is Entry)
-                        return entryOrNewBranch;
-                    if (right is Leaf5PlusPlus rl)
-                    {
-                        // The new entry is for sure Branch2 because it was L5PP before and now it has a new entry added
-                        var rb2 = (Branch2)entryOrNewBranch;
-                        Debug.Assert(ph > m.Hash, "Because right was on the verge of balance and the fact that the other branch is not on the verge was the reason of Branch2Plus1 creation");
-                        return ph > rb2.MidEntry.Hash
-                            ? new Branch3(b.Left, m, rb2.L, rb2.E, rb2.R is Leaf2 l2 ? new Leaf2Plus(Plus, l2) : new Leaf5Plus(Plus, (Leaf5)rb2.R))
-                            : new Branch3(b.Left, m, rb2.L is Leaf5 l5 ? new Leaf5Plus(Plus, l5) : new Leaf2Plus(Plus, (Leaf2)rb2.L), rb2.E, rb2.R);
-                    }
-                    // todo: @perf it increases the memory for some reason
-                    // if (entryOrNewBranch is Leaf5PlusPlus == false)
-                    //     return new Branch2Plus(Plus,
-                    //         b is Branch2Right b2r ? new Branch2Right(b2r.B, entryOrNewBranch) :
-                    //         b is Branch2 b2 ? new Branch2Right(b2, entryOrNewBranch) :
-                    //         new Branch2(((Branch2Left)b).L, m, entryOrNewBranch));
-
-                    var ll5pp = (Leaf5PlusPlus)b.Left;
-                    // todo: @perf can we keep the B2 for longer?
-                    // left was Leaf5PlusPlus, and Plus was supposed to be added there, so the entryOrNewBranch is still a Leaf
-                    // if (entryOrNewBranch is Leaf5PlusPlus == false && entryOrNewBranch is Leaf2PlusPlus == false)
-                    // {
-                    //     var maxLeft = ll5pp.GetMaxHashEntryOrDefault();
-                    //     if (Plus.Hash > maxLeft.Hash)
-                    //         return new Branch2(ll5pp, Plus, entryOrNewBranch.AddSureNotPresentEntry(m));
-                    //     if (maxLeft == ll5pp.Plus)
-                    //         return new Branch2(ll5pp.L.AddSureNotPresentEntry(Plus), maxLeft, entryOrNewBranch.AddSureNotPresentEntry(m));
-                    // }
-
-                    // right is not on the verge, then the Plus would be added to the left
-                    entry = Plus;
-                    ImHashMap<K, V> splitRight = null;
-                    var newLeft = ll5pp.AddEntry(ph, ref entry, ref splitRight);
-                    return new Branch3(newLeft, entry, splitRight, m, entryOrNewBranch);
+                    // we know that the new entry is Branch2, because otherwise it would not be Branch2Plus1 in the first place 
+                    var b2 = (Branch2)entryOrNewBranch;
+                    Debug.Assert(Plus.Hash > m.Hash, "Because right was on the verge of balance and the fact that the other branch is not on the verge was the reason of Branch2Plus1 creation");
+                    return Plus.Hash > b2.MidEntry.Hash
+                        ? new Branch3(b.Left, m, b2.L, b2.E, b2.R is Leaf2 l2 ? new Leaf2Plus(Plus, l2) : new Leaf5Plus(Plus, (Leaf5)b2.R))
+                        : new Branch3(b.Left, m, b2.L is Leaf5 l5 ? new Leaf5Plus(Plus, l5) : new Leaf2Plus(Plus, (Leaf2)b2.L), b2.E, b2.R);
                 }
-                if (hash < m.Hash)
-                {
-                    var left = b.Left;
-                    entryOrNewBranch = left.AddOrGetEntry(hash, entry);
-                    if (entryOrNewBranch is Entry)
-                        return entryOrNewBranch;
-                    if (left is Leaf5PlusPlus ll)
-                    {
-                        var lb2 = (Branch2)entryOrNewBranch;
-                        return ph < lb2.MidEntry.Hash
-                            ? new Branch3(lb2.L is Leaf5 l5 ? new Leaf5Plus(Plus, l5) : new Leaf2Plus(Plus, (Leaf2)lb2.L), lb2.E, lb2.R, m, b.Right)
-                            : new Branch3(lb2.L, lb2.E, lb2.R is Leaf2 l2 ? new Leaf2Plus(Plus, l2) : new Leaf5Plus(Plus, (Leaf5)lb2.R), m, b.Right);
-                    }
-
-                    // if (entryOrNewBranch is Leaf5PlusPlus == false)
-                    //     return new Branch2Plus(Plus,
-                    //         b is Branch2Left b2r ? new Branch2Left(b2r.B, entryOrNewBranch) :
-                    //         b is Branch2 b2 ? new Branch2Left(b2, entryOrNewBranch) :
-                    //         new Branch2(entryOrNewBranch, m, ((Branch2Right)b).R));
-
-                    var rl5pp = (Leaf5PlusPlus)b.Right;
-                    // if (entryOrNewBranch is Leaf5PlusPlus == false && entryOrNewBranch is Leaf2PlusPlus == false)
-                    // {
-                    //     var minRight = rl5pp.GetMinHashEntryOrDefault();
-                    //     if (Plus.Hash < minRight.Hash)
-                    //         return new Branch2(entryOrNewBranch.AddSureNotPresentEntry(m), Plus, rl5pp);
-                    //     if (minRight == rl5pp.Plus)
-                    //         return new Branch2(entryOrNewBranch.AddSureNotPresentEntry(m), minRight, rl5pp.L.AddSureNotPresentEntry(Plus));
-                    // }
-
-                    entry = Plus;
-                    ImHashMap<K, V> splitRight = null;
-                    var newMiddle = rl5pp.AddEntry(ph, ref entry, ref splitRight);
-                    return new Branch3(entryOrNewBranch, m, newMiddle, entry, splitRight);
-                }
-                return m;
+                // right is not on the verge, then the Plus would be added to the left
+                entry = Plus;
+                ImHashMap<K, V> splitRight = null;
+                var newLeft = ((Leaf5PlusPlus)b.Left).AddEntry(Plus.Hash, ref entry, ref splitRight);
+                return new Branch3(newLeft, entry, splitRight, m, entryOrNewBranch);
             }
-
-            internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry)
             {
-                var b = B;
-                var m = b.MidEntry;
-                ImHashMap<K, V> entryOrNewBranch = null;
-                if (entry.Hash > m.Hash)
+                var left = b.Left;
+                entryOrNewBranch = left.AddSureNotPresentEntry(entry);
+                if (left is Leaf5PlusPlus ll)
                 {
-                    var right = b.Right;
-                    entryOrNewBranch = right.AddSureNotPresentEntry(entry);
-                    if (right is Leaf5PlusPlus rl)
-                    {
-                        // we know that the new entry is Branch2, because otherwise it would not be Branch2Plus1 in the first place 
-                        var b2 = (Branch2)entryOrNewBranch;
-                        Debug.Assert(Plus.Hash > m.Hash, "Because right was on the verge of balance and the fact that the other branch is not on the verge was the reason of Branch2Plus1 creation");
-                        return Plus.Hash > b2.MidEntry.Hash
-                            ? new Branch3(b.Left, m, b2.L, b2.E, b2.R is Leaf2 l2 ? new Leaf2Plus(Plus, l2) : new Leaf5Plus(Plus, (Leaf5)b2.R))
-                            : new Branch3(b.Left, m, b2.L is Leaf5 l5 ? new Leaf5Plus(Plus, l5) : new Leaf2Plus(Plus, (Leaf2)b2.L), b2.E, b2.R);
-                    }
-                    // right is not on the verge, then the Plus would be added to the left
-                    entry = Plus;
-                    ImHashMap<K, V> splitRight = null;
-                    var newLeft = ((Leaf5PlusPlus)b.Left).AddEntry(Plus.Hash, ref entry, ref splitRight);
-                    return new Branch3(newLeft, entry, splitRight, m, entryOrNewBranch);
+                    var b2 = (Branch2)entryOrNewBranch;
+                    return Plus.Hash < b2.MidEntry.Hash
+                        ? new Branch3(b2.L is Leaf5 l5 ? new Leaf5Plus(Plus, l5) : new Leaf2Plus(Plus, (Leaf2)b2.L), b2.E, b2.R, m, b.Right)
+                        : new Branch3(b2.L, b2.E, b2.R is Leaf2 l2 ? new Leaf2Plus(Plus, l2) : new Leaf5Plus(Plus, (Leaf5)b2.R), m, b.Right);
                 }
-                {
-                    var left = b.Left;
-                    entryOrNewBranch = left.AddSureNotPresentEntry(entry);
-                    if (left is Leaf5PlusPlus ll)
-                    {
-                        var b2 = (Branch2)entryOrNewBranch;
-                        return Plus.Hash < b2.MidEntry.Hash
-                            ? new Branch3(b2.L is Leaf5 l5 ? new Leaf5Plus(Plus, l5) : new Leaf2Plus(Plus, (Leaf2)b2.L), b2.E, b2.R, m, b.Right)
-                            : new Branch3(b2.L, b2.E, b2.R is Leaf2 l2 ? new Leaf2Plus(Plus, l2) : new Leaf5Plus(Plus, (Leaf5)b2.R), m, b.Right);
-                    }
-                    entry = Plus;
-                    ImHashMap<K, V> splitRight = null;
-                    var newMiddle = ((Leaf5PlusPlus)b.Right).AddEntry(Plus.Hash, ref entry, ref splitRight);
-                    return new Branch3(entryOrNewBranch, m, newMiddle, entry, splitRight);
-                }
+                entry = Plus;
+                ImHashMap<K, V> splitRight = null;
+                var newMiddle = ((Leaf5PlusPlus)b.Right).AddEntry(Plus.Hash, ref entry, ref splitRight);
+                return new Branch3(entryOrNewBranch, m, newMiddle, entry, splitRight);
             }
+        }
 
-            internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry) =>
-                oldEntry == Plus ? new Branch2Plus(newEntry, B) : new Branch2Plus(Plus, (Branch2Base)B.ReplaceEntry(oldEntry, newEntry));
+        internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry) =>
+            oldEntry == Plus ? new Branch2Plus(newEntry, B) : new Branch2Plus(Plus, (Branch2Base)B.ReplaceEntry(oldEntry, newEntry));
 
-            internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry)
+        internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry)
+        {
+            if (removedEntry == Plus)
+                return B;
+            var b = B;
+            Entry p = Plus, m = b.MidEntry;
+            if (removedEntry == m)
             {
-                if (removedEntry == Plus)
-                    return B;
-                var b = B;
-                Entry p = Plus, m = b.MidEntry;
-                if (removedEntry == m)
+                if (b.Right is Leaf5PlusPlus rl)
                 {
-                    if (b.Right is Leaf5PlusPlus rl)
-                    {
-                        var rightMin = rl.GetMinHashEntryOrDefault();
-                        return rightMin.Hash > p.Hash
-                            ? new Branch2(b.Left, p, rl)
-                            : new Branch2(b.Left, rightMin, rl.RemoveMinHashEntryAndAddNewEntry(rightMin, p));
-                    }
+                    var rightMin = rl.GetMinHashEntryOrDefault();
+                    return rightMin.Hash > p.Hash
+                        ? new Branch2(b.Left, p, rl)
+                        : new Branch2(b.Left, rightMin, rl.RemoveMinHashEntryAndAddNewEntry(rightMin, p));
+                }
+                var ll = (Leaf5PlusPlus)b.Left;
+                var leftMax = ll.GetMaxHashEntryOrDefault();
+                return leftMax.Hash < p.Hash
+                    ? new Branch2(ll, p, b.Right)
+                    : new Branch2(ll.RemoveMaxHashEntryAndAddNewEntry(leftMax, p), leftMax, b.Right);
+            }
+            if (removedEntry.Hash > m.Hash)
+            {
+                if (b.Right is Leaf5PlusPlus rl)
+                    return new Branch2(b.Left, m, rl.RemoveEntry(removedEntry).AddOrGetEntry(p.Hash, p));
+                var newRight = b.Right.RemoveEntry(removedEntry);
+                if (newRight == Empty)
+                {
                     var ll = (Leaf5PlusPlus)b.Left;
                     var leftMax = ll.GetMaxHashEntryOrDefault();
                     return leftMax.Hash < p.Hash
-                        ? new Branch2(ll, p, b.Right)
-                        : new Branch2(ll.RemoveMaxHashEntryAndAddNewEntry(leftMax, p), leftMax, b.Right);
+                        ? new Branch2(ll.RemoveEntry(leftMax), leftMax, p)
+                        : new Branch2(ll.RemoveEntry(leftMax), p, leftMax);
                 }
-                if (removedEntry.Hash > m.Hash)
+                return new Branch2Plus(p, new Branch2(b.Left, m, newRight));
+            }
+            {
+                if (b.Left is Leaf5PlusPlus ll)
+                    return new Branch2(ll.RemoveEntry(removedEntry).AddOrGetEntry(p.Hash, p), m, b.Right);
+                var newLeft = b.Left.RemoveEntry(removedEntry);
+                if (newLeft == Empty)
                 {
-                    if (b.Right is Leaf5PlusPlus rl)
-                        return new Branch2(b.Left, m, rl.RemoveEntry(removedEntry).AddOrGetEntry(p.Hash, p));
-                    var newRight = b.Right.RemoveEntry(removedEntry);
-                    if (newRight == Empty)
-                    {
-                        var ll = (Leaf5PlusPlus)b.Left;
-                        var leftMax = ll.GetMaxHashEntryOrDefault();
-                        return leftMax.Hash < p.Hash
-                            ? new Branch2(ll.RemoveEntry(leftMax), leftMax, p)
-                            : new Branch2(ll.RemoveEntry(leftMax), p, leftMax);
-                    }
-                    return new Branch2Plus(p, new Branch2(b.Left, m, newRight));
+                    var rl = (Leaf5PlusPlus)b.Right;
+                    var rightMin = rl.GetMinHashEntryOrDefault();
+                    return rightMin.Hash > p.Hash
+                        ? new Branch2(p, rightMin, rl.RemoveEntry(rightMin))
+                        : new Branch2(rightMin, p, rl.RemoveEntry(rightMin));
                 }
-                {
-                    if (b.Left is Leaf5PlusPlus ll)
-                        return new Branch2(ll.RemoveEntry(removedEntry).AddOrGetEntry(p.Hash, p), m, b.Right);
-                    var newLeft = b.Left.RemoveEntry(removedEntry);
-                    if (newLeft == Empty)
-                    {
-                        var rl = (Leaf5PlusPlus)b.Right;
-                        var rightMin = rl.GetMinHashEntryOrDefault();
-                        return rightMin.Hash > p.Hash
-                            ? new Branch2(p, rightMin, rl.RemoveEntry(rightMin))
-                            : new Branch2(rightMin, p, rl.RemoveEntry(rightMin));
-                    }
-                    return new Branch2Plus(p, new Branch2(newLeft, m, b.Right));
-                }
+                return new Branch2Plus(p, new Branch2(newLeft, m, b.Right));
             }
         }
+    }
 
-        internal abstract class Branch3Base : ImHashMap<K, V>
-        {
-            public abstract Entry Entry0 { get; }
-            public abstract Entry Entry1 { get; }
-            public abstract ImHashMap<K, V> Left { get; }
-            public abstract ImHashMap<K, V> Middle { get; }
-            public abstract ImHashMap<K, V> Right { get; }
-            internal override bool MayTurnToBranch2 => true;
+    internal abstract class Branch3Base : ImHashMap<K, V>
+    {
+        public abstract Entry Entry0 { get; }
+        public abstract Entry Entry1 { get; }
+        public abstract ImHashMap<K, V> Left { get; }
+        public abstract ImHashMap<K, V> Middle { get; }
+        public abstract ImHashMap<K, V> Right { get; }
+        internal override bool MayTurnToBranch2 => true;
 
 #if !DEBUG
-            public override string ToString() => "{B3:{E0:" + Entry0 + ",E1:" + Entry0 + ",L:" + Left + ",M:" + Middle + ",R:" + Right + "}}";
+        public override string ToString() => "{B3:{E0:" + Entry0 + ",E1:" + Entry0 + ",L:" + Left + ",M:" + Middle + ",R:" + Right + "}}";
 #endif
 
-            internal override StringBuilder ToMermaidNodeId(StringBuilder s) =>
-                s.Append("B3_").Append(Entry0.Hash);
-            internal override StringBuilder ToMermaidString(StringBuilder s)
+        internal override StringBuilder ToMermaidNodeId(StringBuilder s) =>
+            s.Append("B3_").Append(Entry0.Hash);
+        internal override StringBuilder ToMermaidString(StringBuilder s)
+        {
+            Left.ToMermaidString(s).AppendLine();
+            Middle.ToMermaidString(s).AppendLine();
+            Right.ToMermaidString(s).AppendLine();
+
+            ToMermaidNodeId(s).Append('[');
+            Entry0.ToMermaidNodeItem(s).Append('/');
+            Entry1.ToMermaidNodeItem(s).Append("]-->");
+            Left.ToMermaidNodeId(s).AppendLine();
+
+            ToMermaidNodeId(s).Append("-->");
+            Middle.ToMermaidNodeId(s).AppendLine();
+
+            ToMermaidNodeId(s).Append("-->");
+            Right.ToMermaidNodeId(s);
+            return s;
+        }
+
+        // todo: @perf optimize in inheritors
+        internal override Entry GetMinHashEntryOrDefault() => Left.GetMinHashEntryOrDefault();
+        // todo: @perf optimize in inheritors
+        internal override Entry GetMaxHashEntryOrDefault() => Right.GetMaxHashEntryOrDefault();
+
+        // todo: @perf @mem optimize the Replace
+        internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry)
+        {
+            int hash = oldEntry.Hash, h0 = Entry0.Hash, h1 = Entry1.Hash;
+            return hash > h1 ? new Branch3(Left, Entry0, Middle, Entry1, Right.ReplaceEntry(oldEntry, newEntry))
+                : hash < h0 ? new Branch3(Left.ReplaceEntry(oldEntry, newEntry), Entry0, Middle, Entry1, Right)
+                : hash > h0 && hash < h1 ? new Branch3(Left, Entry0, Middle.ReplaceEntry(oldEntry, newEntry), Entry1, Right)
+                : hash == h0 ? new Branch3(Left, newEntry, Middle, Entry1, Right) : new Branch3(Left, Entry0, Middle, newEntry, Right);
+        }
+
+        internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry)
+        {
+            Entry midLeft = Entry0, midRight = Entry1;
+            ImHashMap<K, V> middle = Middle, right = Right;
+
+            // case 1, downward: swap the predecessor entry (max left entry) with the mid entry, then proceed to remove the predecessor from the Left branch
+            if (removedEntry == midLeft)
+                removedEntry = midLeft = Left.GetMaxHashEntryOrDefault();
+
+            if (removedEntry.Hash <= midLeft.Hash)
             {
-                Left.ToMermaidString(s).AppendLine();
-                Middle.ToMermaidString(s).AppendLine();
-                Right.ToMermaidString(s).AppendLine();
-
-                ToMermaidNodeId(s).Append('[');
-                Entry0.ToMermaidNodeItem(s).Append('/');
-                Entry1.ToMermaidNodeItem(s).Append("]-->");
-                Left.ToMermaidNodeId(s).AppendLine();
-
-                ToMermaidNodeId(s).Append("-->");
-                Middle.ToMermaidNodeId(s).AppendLine();
-
-                ToMermaidNodeId(s).Append("-->");
-                Right.ToMermaidNodeId(s);
-                return s;
-            }
-
-            // todo: @perf optimize in inheritors
-            internal override Entry GetMinHashEntryOrDefault() => Left.GetMinHashEntryOrDefault();
-            // todo: @perf optimize in inheritors
-            internal override Entry GetMaxHashEntryOrDefault() => Right.GetMaxHashEntryOrDefault();
-
-            // todo: @perf @mem optimize the Replace
-            internal override ImHashMap<K, V> ReplaceEntry(Entry oldEntry, Entry newEntry)
-            {
-                int hash = oldEntry.Hash, h0 = Entry0.Hash, h1 = Entry1.Hash;
-                return hash > h1 ? new Branch3(Left, Entry0, Middle, Entry1, Right.ReplaceEntry(oldEntry, newEntry))
-                    : hash < h0 ? new Branch3(Left.ReplaceEntry(oldEntry, newEntry), Entry0, Middle, Entry1, Right)
-                    : hash > h0 && hash < h1 ? new Branch3(Left, Entry0, Middle.ReplaceEntry(oldEntry, newEntry), Entry1, Right)
-                    : hash == h0 ? new Branch3(Left, newEntry, Middle, Entry1, Right) : new Branch3(Left, Entry0, Middle, newEntry, Right);
-            }
-
-            internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry)
-            {
-                Entry midLeft = Entry0, midRight = Entry1;
-                ImHashMap<K, V> middle = Middle, right = Right;
-
-                // case 1, downward: swap the predecessor entry (max left entry) with the mid entry, then proceed to remove the predecessor from the Left branch
-                if (removedEntry == midLeft)
-                    removedEntry = midLeft = Left.GetMaxHashEntryOrDefault();
-
-                if (removedEntry.Hash <= midLeft.Hash)
-                {
-                    var newLeft = Left.RemoveEntry(removedEntry);
-                    if (newLeft == Empty)
-                        return middle is Leaf5PlusPlus == false
-                            ? new Branch2(middle.AddOrGetEntry(midLeft.Hash, midLeft), midRight, right) //! the height does not change
-                            : new Branch3(midLeft, removedEntry = middle.GetMinHashEntryOrDefault(), middle.RemoveEntry(removedEntry), midRight, right); //! the height does not change
-
-                    // rebalance is needed because the branch was merged from Br2 to Br3 or to Leaf and the height decrease
-                    if (Left is Branch2Base && newLeft is Branch2Base == false)
-                    {
-                        // the hole has a 3-node as a parent and a 3-node as a sibling.
-                        if (middle is Branch3Base mb3) //! the height does not change
-                            return new Branch3(new Branch2(newLeft, midLeft, mb3.Left), mb3.Entry0, new Branch2(mb3.Middle, mb3.Entry1, mb3.Right), midRight, right);
-
-                        if (middle is Branch2Plus mb21)
-                            return new Branch2(new Branch3(newLeft, midLeft, mb21.ToSplitBranch2(out var mMid, out var mRight), mMid, mRight), midRight, right);
-
-                        // the hole has a 3-node as a parent and a 2-node as a sibling.
-                        var mb2 = (Branch2Base)middle;
-                        return new Branch2(new Branch3(newLeft, midLeft, mb2.Left, mb2.MidEntry, mb2.Right), midRight, right);
-                    }
-
-                    return new Branch3(newLeft, midLeft, middle, midRight, right); // no rebalance needed
-                }
-
-                if (removedEntry == midRight)
-                    removedEntry = midRight = middle.GetMaxHashEntryOrDefault();
-
-                if (removedEntry.Hash <= midRight.Hash)
-                {
-                    var newMiddle = middle.RemoveEntry(removedEntry);
-                    if (newMiddle == Empty)
-                    {
-                        if (right is Leaf5PlusPlus == false)
-                            return new Branch2(Left, midLeft, right.AddOrGetEntry(midRight.Hash, midRight)); // the Br3 become the Br2 but the height did not change - so no rebalance needed
-                        return new Branch3(Left, midLeft, midRight, removedEntry = right.GetMinHashEntryOrDefault(), right.RemoveEntry(removedEntry)); //! the height does not change
-                    }
-
-                    if (middle is Branch2Base && newMiddle is Branch2Base == false)
-                    {
-                        // the hole has a 3-node as a parent and a 3-node as a sibling.
-                        if (right is Branch3Base rb3) //! the height does not change
-                            return new Branch3(Left, midLeft, new Branch2(newMiddle, midRight, rb3.Left), rb3.Entry0, new Branch2(rb3.Middle, rb3.Entry1, rb3.Right));
-
-                        if (right is Branch2Plus rb21)
-                            return new Branch2(Left, midLeft, new Branch3(newMiddle, midRight, rb21.ToSplitBranch2(out var rMid, out var rRight), rMid, rRight));
-
-                        // the hole has a 3-node as a parent and a 2-node as a sibling.
-                        var rb2 = (Branch2Base)right;
-                        return new Branch2(Left, midLeft, new Branch3(newMiddle, midRight, rb2.Left, rb2.MidEntry, rb2.Right));
-                    }
-
-                    return new Branch3(Left, midLeft, newMiddle, midRight, right);
-                }
-
-                var newRight = right.RemoveEntry(removedEntry);
-                if (newRight == Empty)
+                var newLeft = Left.RemoveEntry(removedEntry);
+                if (newLeft == Empty)
                     return middle is Leaf5PlusPlus == false
-                        ? new Branch2(Left, midLeft, middle.AddOrGetEntry(midRight.Hash, midRight))
-                        : new Branch3(Left, midLeft, middle.RemoveEntry(removedEntry = middle.GetMaxHashEntryOrDefault()), removedEntry, midRight);
+                        ? new Branch2(middle.AddOrGetEntry(midLeft.Hash, midLeft), midRight, right) //! the height does not change
+                        : new Branch3(midLeft, removedEntry = middle.GetMinHashEntryOrDefault(), middle.RemoveEntry(removedEntry), midRight, right); //! the height does not change
 
-                // right was a Br2 but now is Leaf or Br3 - means the branch height is decrease
-                if (right is Branch2Base && newRight is Branch2Base == false)
+                // rebalance is needed because the branch was merged from Br2 to Br3 or to Leaf and the height decrease
+                if (Left is Branch2Base && newLeft is Branch2Base == false)
                 {
-                    // the hole has a 3-node as a parent and a 3-node as a sibling.new
+                    // the hole has a 3-node as a parent and a 3-node as a sibling.
                     if (middle is Branch3Base mb3) //! the height does not change
-                        return new Branch3(Left, midLeft, new Branch2(mb3.Left, mb3.Entry0, mb3.Middle), mb3.Entry1, new Branch2(mb3.Right, midRight, newRight));
+                        return new Branch3(new Branch2(newLeft, midLeft, mb3.Left), mb3.Entry0, new Branch2(mb3.Middle, mb3.Entry1, mb3.Right), midRight, right);
 
                     if (middle is Branch2Plus mb21)
-                        return new Branch2(Left, midLeft, new Branch3(mb21.ToSplitBranch2(out var mMid, out var mRight), mMid, mRight, midRight, newRight));
+                        return new Branch2(new Branch3(newLeft, midLeft, mb21.ToSplitBranch2(out var mMid, out var mRight), mMid, mRight), midRight, right);
 
                     // the hole has a 3-node as a parent and a 2-node as a sibling.
                     var mb2 = (Branch2Base)middle;
-                    return new Branch2(Left, midLeft, new Branch3(mb2.Left, mb2.MidEntry, mb2.Right, midRight, newRight));
+                    return new Branch2(new Branch3(newLeft, midLeft, mb2.Left, mb2.MidEntry, mb2.Right), midRight, right);
                 }
 
-                return new Branch3(Left, midLeft, middle, midRight, newRight);
+                return new Branch3(newLeft, midLeft, middle, midRight, right); // no rebalance needed
             }
+
+            if (removedEntry == midRight)
+                removedEntry = midRight = middle.GetMaxHashEntryOrDefault();
+
+            if (removedEntry.Hash <= midRight.Hash)
+            {
+                var newMiddle = middle.RemoveEntry(removedEntry);
+                if (newMiddle == Empty)
+                {
+                    if (right is Leaf5PlusPlus == false)
+                        return new Branch2(Left, midLeft, right.AddOrGetEntry(midRight.Hash, midRight)); // the Br3 become the Br2 but the height did not change - so no rebalance needed
+                    return new Branch3(Left, midLeft, midRight, removedEntry = right.GetMinHashEntryOrDefault(), right.RemoveEntry(removedEntry)); //! the height does not change
+                }
+
+                if (middle is Branch2Base && newMiddle is Branch2Base == false)
+                {
+                    // the hole has a 3-node as a parent and a 3-node as a sibling.
+                    if (right is Branch3Base rb3) //! the height does not change
+                        return new Branch3(Left, midLeft, new Branch2(newMiddle, midRight, rb3.Left), rb3.Entry0, new Branch2(rb3.Middle, rb3.Entry1, rb3.Right));
+
+                    if (right is Branch2Plus rb21)
+                        return new Branch2(Left, midLeft, new Branch3(newMiddle, midRight, rb21.ToSplitBranch2(out var rMid, out var rRight), rMid, rRight));
+
+                    // the hole has a 3-node as a parent and a 2-node as a sibling.
+                    var rb2 = (Branch2Base)right;
+                    return new Branch2(Left, midLeft, new Branch3(newMiddle, midRight, rb2.Left, rb2.MidEntry, rb2.Right));
+                }
+
+                return new Branch3(Left, midLeft, newMiddle, midRight, right);
+            }
+
+            var newRight = right.RemoveEntry(removedEntry);
+            if (newRight == Empty)
+                return middle is Leaf5PlusPlus == false
+                    ? new Branch2(Left, midLeft, middle.AddOrGetEntry(midRight.Hash, midRight))
+                    : new Branch3(Left, midLeft, middle.RemoveEntry(removedEntry = middle.GetMaxHashEntryOrDefault()), removedEntry, midRight);
+
+            // right was a Br2 but now is Leaf or Br3 - means the branch height is decrease
+            if (right is Branch2Base && newRight is Branch2Base == false)
+            {
+                // the hole has a 3-node as a parent and a 3-node as a sibling.new
+                if (middle is Branch3Base mb3) //! the height does not change
+                    return new Branch3(Left, midLeft, new Branch2(mb3.Left, mb3.Entry0, mb3.Middle), mb3.Entry1, new Branch2(mb3.Right, midRight, newRight));
+
+                if (middle is Branch2Plus mb21)
+                    return new Branch2(Left, midLeft, new Branch3(mb21.ToSplitBranch2(out var mMid, out var mRight), mMid, mRight, midRight, newRight));
+
+                // the hole has a 3-node as a parent and a 2-node as a sibling.
+                var mb2 = (Branch2Base)middle;
+                return new Branch2(Left, midLeft, new Branch3(mb2.Left, mb2.MidEntry, mb2.Right, midRight, newRight));
+            }
+
+            return new Branch3(Left, midLeft, middle, midRight, newRight);
+        }
+    }
+
+    /// <summary>The 3 branches with the 2 nodes in between</summary>
+    internal sealed class Branch3 : Branch3Base
+    {
+        internal readonly Entry E0, E1;
+        internal readonly ImHashMap<K, V> L, M, R;
+        public override Entry Entry0 => E0;
+        public override Entry Entry1 => E1;
+        public override ImHashMap<K, V> Left => L;
+        public override ImHashMap<K, V> Middle => M;
+        public override ImHashMap<K, V> Right => R;
+        public Branch3(ImHashMap<K, V> left, Entry e0, ImHashMap<K, V> middle, Entry e1, ImHashMap<K, V> right)
+        {
+            Debug.Assert(e0.Hash < e1.Hash, $"e0.Hash:{e0.Hash} < e1.Hash{e1.Hash}");
+            L = left; E0 = e0; M = middle; E1 = e1; R = right;
         }
 
-        /// <summary>The 3 branches with the 2 nodes in between</summary>
-        internal sealed class Branch3 : Branch3Base
+        public override int Count() => L.Count() + E0.Count() + M.Count() + E1.Count() + R.Count();
+
+        internal override Entry GetEntryOrNull(int hash) =>
+            hash > E1.Hash ? R.GetEntryOrNull(hash) :
+            hash < E0.Hash ? L.GetEntryOrNull(hash) :
+            hash == E0.Hash ? E0 : hash == E1.Hash ? E1 : M.GetEntryOrNull(hash);
+
+        internal override Entry GetSurePresentEntry(int hash) =>
+            hash > E1.Hash ? R.GetSurePresentEntry(hash) :
+            hash < E0.Hash ? L.GetSurePresentEntry(hash) :
+            hash == E0.Hash ? E0 : hash == E1.Hash ? E1 : M.GetSurePresentEntry(hash);
+
+        internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
         {
-            internal readonly Entry E0, E1;
-            internal readonly ImHashMap<K, V> L, M, R;
-            public override Entry Entry0 => E0;
-            public override Entry Entry1 => E1;
-            public override ImHashMap<K, V> Left => L;
-            public override ImHashMap<K, V> Middle => M;
-            public override ImHashMap<K, V> Right => R;
-            public Branch3(ImHashMap<K, V> left, Entry e0, ImHashMap<K, V> middle, Entry e1, ImHashMap<K, V> right)
+            if (hash > E1.Hash)
             {
-                Debug.Assert(e0.Hash < e1.Hash, $"e0.Hash:{e0.Hash} < e1.Hash{e1.Hash}");
-                L = left; E0 = e0; M = middle; E1 = e1; R = right;
+                var newRight = R.AddOrGetEntry(hash, entry);
+                return R.MayTurnToBranch2 && newRight is Branch2
+                    ? new Branch2(new Branch2(L, E0, M), E1, newRight)
+                    : newRight is Entry ? newRight : new Branch3Right(this, newRight);
             }
-
-            public override int Count() => L.Count() + E0.Count() + M.Count() + E1.Count() + R.Count();
-
-            internal override Entry GetEntryOrNull(int hash) =>
-                hash > E1.Hash ? R.GetEntryOrNull(hash) :
-                hash < E0.Hash ? L.GetEntryOrNull(hash) :
-                hash == E0.Hash ? E0 : hash == E1.Hash ? E1 : M.GetEntryOrNull(hash);
-
-            internal override Entry GetSurePresentEntry(int hash) =>
-                hash > E1.Hash ? R.GetSurePresentEntry(hash) :
-                hash < E0.Hash ? L.GetSurePresentEntry(hash) :
-                hash == E0.Hash ? E0 : hash == E1.Hash ? E1 : M.GetSurePresentEntry(hash);
-
-            internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
+            if (hash < E0.Hash)
             {
-                if (hash > E1.Hash)
-                {
-                    var newRight = R.AddOrGetEntry(hash, entry);
-                    return R.MayTurnToBranch2 && newRight is Branch2
-                        ? new Branch2(new Branch2(L, E0, M), E1, newRight)
-                        : newRight is Entry ? newRight : new Branch3Right(this, newRight);
-                }
-                if (hash < E0.Hash)
-                {
-                    var newLeft = L.AddOrGetEntry(hash, entry);
-                    return L.MayTurnToBranch2 && newLeft is Branch2
-                        ? new Branch2(newLeft, E0, new Branch2(M, E1, R))
-                        : newLeft is Entry ? newLeft : new Branch3Left(this, newLeft);
-                }
-                if (hash > E0.Hash && hash < E1.Hash)
-                {
-                    var newMiddle = M.AddOrGetEntry(hash, entry);
-                    // note: we are checking for the Branch2 instead of Branch2Base (which is much faster) but we need to be sure that the split always end with Branch2
-                    return M.MayTurnToBranch2 && newMiddle is Branch2 b2
-                        ? new Branch2(new Branch2(L, E0, b2.L), b2.E, new Branch2(b2.R, E1, R)) // todo: @perf @mem opportunity man
-                        : newMiddle is Entry ? newMiddle : new Branch3Middle(this, newMiddle);
-                }
-                return hash == E0.Hash ? E0 : E1;
+                var newLeft = L.AddOrGetEntry(hash, entry);
+                return L.MayTurnToBranch2 && newLeft is Branch2
+                    ? new Branch2(newLeft, E0, new Branch2(M, E1, R))
+                    : newLeft is Entry ? newLeft : new Branch3Left(this, newLeft);
             }
-
-            internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry)
+            if (hash > E0.Hash && hash < E1.Hash)
             {
-                if (entry.Hash > E1.Hash)
-                {
-                    var newRight = R.AddSureNotPresentEntry(entry);
-                    return R.MayTurnToBranch2 && newRight is Branch2
-                        ? new Branch2(new Branch2(L, E0, M), E1, newRight)
-                        : new Branch3Right(this, newRight);
-                }
-                if (entry.Hash < E0.Hash)
-                {
-                    var newLeft = L.AddSureNotPresentEntry(entry);
-                    return L.MayTurnToBranch2 && newLeft is Branch2
-                        ? new Branch2(newLeft, E0, new Branch2(M, E1, R))
-                        : new Branch3Left(this, newLeft);
-                }
-                {
-                    var newMiddle = M.AddSureNotPresentEntry(entry);
-                    // note: we are checking for the Branch2 instead of Branch2Base (which is much faster) but we need to be sure that the split always end with Branch2
-                    return M.MayTurnToBranch2 && newMiddle is Branch2 b2
-                        ? new Branch2(new Branch2(L, E0, b2.L), b2.E, new Branch2(b2.R, E1, R)) // todo: @perf @mem opportunity man
-                        : new Branch3Middle(this, newMiddle);
-                }
+                var newMiddle = M.AddOrGetEntry(hash, entry);
+                // note: we are checking for the Branch2 instead of Branch2Base (which is much faster) but we need to be sure that the split always end with Branch2
+                return M.MayTurnToBranch2 && newMiddle is Branch2 b2
+                    ? new Branch2(new Branch2(L, E0, b2.L), b2.E, new Branch2(b2.R, E1, R)) // todo: @perf @mem opportunity man
+                    : newMiddle is Entry ? newMiddle : new Branch3Middle(this, newMiddle);
             }
+            return hash == E0.Hash ? E0 : E1;
         }
 
-        internal sealed class Branch3Right : Branch3Base
+        internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry)
         {
-            internal readonly Branch3 B;
-            internal readonly ImHashMap<K, V> R;
-            public override Entry Entry0 => B.E0;
-            public override Entry Entry1 => B.E1;
-            public override ImHashMap<K, V> Left => B.L;
-            public override ImHashMap<K, V> Middle => B.M;
-            public override ImHashMap<K, V> Right => R;
-            public Branch3Right(Branch3 b, ImHashMap<K, V> right) { B = b; R = right; }
-
-            public override int Count() => B.L.Count() + B.E0.Count() + B.M.Count() + B.E1.Count() + R.Count();
-
-            internal override Entry GetEntryOrNull(int hash)
+            if (entry.Hash > E1.Hash)
             {
-                var b = B;
-                var h1 = b.E1.Hash;
-                if (hash > h1)
-                    return R.GetEntryOrNull(hash);
-                var h0 = b.E0.Hash;
-                return hash < h0 ? b.L.GetEntryOrNull(hash) : h0 == hash ? b.E0 : h1 == hash ? b.E1 : b.M.GetEntryOrNull(hash);
+                var newRight = R.AddSureNotPresentEntry(entry);
+                return R.MayTurnToBranch2 && newRight is Branch2
+                    ? new Branch2(new Branch2(L, E0, M), E1, newRight)
+                    : new Branch3Right(this, newRight);
             }
-
-            internal override Entry GetSurePresentEntry(int hash)
+            if (entry.Hash < E0.Hash)
             {
-                var b = B;
-                var h1 = b.E1.Hash;
-                if (hash > h1)
-                    return R.GetSurePresentEntry(hash);
-                var h0 = b.E0.Hash;
-                return hash < h0 ? b.L.GetSurePresentEntry(hash) : h0 == hash ? b.E0 : h1 == hash ? b.E1 : b.M.GetSurePresentEntry(hash);
+                var newLeft = L.AddSureNotPresentEntry(entry);
+                return L.MayTurnToBranch2 && newLeft is Branch2
+                    ? new Branch2(newLeft, E0, new Branch2(M, E1, R))
+                    : new Branch3Left(this, newLeft);
             }
-
-            internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
             {
-                var h1 = B.E1.Hash;
-                if (hash > h1)
-                {
-                    var newRight = R.AddOrGetEntry(hash, entry);
-                    return R.MayTurnToBranch2 && newRight is Branch2
-                        ? new Branch2(new Branch2(B.L, B.E0, B.M), B.E1, newRight)
-                        : newRight is Entry ? newRight : new Branch3Right(B, newRight);
-                }
-                var h0 = B.E0.Hash;
-                if (hash < h0)
-                {
-                    var left = B.L;
-                    var newLeft = left.AddOrGetEntry(hash, entry);
-                    return left.MayTurnToBranch2 && newLeft is Branch2
-                        ? new Branch2(newLeft, B.E0, new Branch2(B.M, B.E1, R))
-                        : newLeft is Entry ? newLeft : new Branch3(newLeft, B.E0, B.M, B.E1, R);
-                }
-                if (hash > h0 && hash < h1)
-                {
-                    var middle = B.M;
-                    var newMiddle = middle.AddOrGetEntry(hash, entry);
-                    return middle.MayTurnToBranch2 && newMiddle is Branch2 b2
-                        ? new Branch2(new Branch2(B.L, B.E0, b2.L), b2.E, new Branch2(b2.R, B.E1, R)) // todo: @perf @mem opportunity man
-                        : newMiddle is Entry ? newMiddle : new Branch3(B.L, B.E0, newMiddle, B.E1, R);
-                }
-                return hash == h0 ? B.E0 : B.E1;
-            }
-
-            internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry)
-            {
-                var h1 = B.E1.Hash;
-                if (entry.Hash > h1)
-                {
-                    var newRight = R.AddSureNotPresentEntry(entry);
-                    return R.MayTurnToBranch2 && newRight is Branch2
-                        ? new Branch2(new Branch2(B.L, B.E0, B.M), B.E1, newRight)
-                        : new Branch3Right(B, newRight);
-                }
-                var h0 = B.E0.Hash;
-                if (entry.Hash < h0)
-                {
-                    var left = B.L;
-                    var newLeft = left.AddSureNotPresentEntry(entry);
-                    return left.MayTurnToBranch2 && newLeft is Branch2
-                        ? new Branch2(newLeft, B.E0, new Branch2(B.M, B.E1, R))
-                        : new Branch3(newLeft, B.E0, B.M, B.E1, R);
-                }
-                {
-                    var middle = B.M;
-                    var newMiddle = middle.AddSureNotPresentEntry(entry);
-                    return middle.MayTurnToBranch2 && newMiddle is Branch2 b2
-                        ? new Branch2(new Branch2(B.L, B.E0, b2.L), b2.E, new Branch2(b2.R, B.E1, R)) // todo: @perf @mem opportunity man
-                        : new Branch3(B.L, B.E0, newMiddle, B.E1, R);
-                }
-            }
-        }
-
-        internal sealed class Branch3Left : Branch3Base
-        {
-            internal readonly Branch3 B;
-            internal readonly ImHashMap<K, V> L;
-            public override Entry Entry0 => B.E0;
-            public override Entry Entry1 => B.E1;
-            public override ImHashMap<K, V> Left => L;
-            public override ImHashMap<K, V> Middle => B.M;
-            public override ImHashMap<K, V> Right => B.R;
-            public Branch3Left(Branch3 b, ImHashMap<K, V> l) { B = b; L = l; }
-
-            public override int Count() => L.Count() + B.E0.Count() + B.M.Count() + B.E1.Count() + B.R.Count();
-
-            internal override Entry GetEntryOrNull(int hash)
-            {
-                var b = B;
-                var h1 = b.E1.Hash;
-                if (hash > h1)
-                    return B.R.GetEntryOrNull(hash);
-                var h0 = b.E0.Hash;
-                return hash < h0 ? L.GetEntryOrNull(hash) : h0 == hash ? b.E0 : h1 == hash ? b.E1 : b.M.GetEntryOrNull(hash);
-            }
-
-            internal override Entry GetSurePresentEntry(int hash)
-            {
-                var b = B;
-                var h1 = b.E1.Hash;
-                if (hash > h1)
-                    return B.R.GetSurePresentEntry(hash);
-                var h0 = b.E0.Hash;
-                return hash < h0 ? L.GetSurePresentEntry(hash) : h0 == hash ? b.E0 : h1 == hash ? b.E1 : b.M.GetSurePresentEntry(hash);
-            }
-
-            internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
-            {
-                var h1 = B.E1.Hash;
-                if (hash > h1)
-                {
-                    var right = B.R;
-                    var newRight = right.AddOrGetEntry(hash, entry);
-                    return right.MayTurnToBranch2 && newRight is Branch2
-                        ? new Branch2(new Branch2(L, B.E0, B.M), B.E1, newRight)
-                        : newRight is Entry ? newRight : new Branch3(L, B.E0, B.M, B.E1, newRight);
-                }
-                var h0 = B.E0.Hash;
-                if (hash < h0)
-                {
-                    var newLeft = L.AddOrGetEntry(hash, entry);
-                    return L.MayTurnToBranch2 && newLeft is Branch2
-                        ? new Branch2(newLeft, B.E0, new Branch2(B.M, B.E1, B.R))
-                        : newLeft is Entry ? newLeft : new Branch3Left(B, newLeft);
-                }
-                if (hash > h0 && hash < h1)
-                {
-                    var middle = B.M;
-                    var newMiddle = middle.AddOrGetEntry(hash, entry);
-                    return middle.MayTurnToBranch2 && newMiddle is Branch2 b2
-                        ? new Branch2(new Branch2(L, B.E0, b2.L), b2.E, new Branch2(b2.R, B.E1, B.R)) // todo: @perf @mem opportunity man
-                        : newMiddle is Entry ? newMiddle : new Branch3(L, B.E0, newMiddle, B.E1, B.R);
-                }
-                return hash == h0 ? B.E0 : B.E1;
-            }
-
-            internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry)
-            {
-                var h1 = B.E1.Hash;
-                if (entry.Hash > h1)
-                {
-                    var right = B.R;
-                    var newRight = right.AddSureNotPresentEntry(entry);
-                    return right.MayTurnToBranch2 && newRight is Branch2
-                        ? new Branch2(new Branch2(L, B.E0, B.M), B.E1, newRight)
-                        : new Branch3(L, B.E0, B.M, B.E1, newRight);
-                }
-                var h0 = B.E0.Hash;
-                if (entry.Hash < h0)
-                {
-                    var newLeft = L.AddSureNotPresentEntry(entry);
-                    return L.MayTurnToBranch2 && newLeft is Branch2
-                        ? new Branch2(newLeft, B.E0, new Branch2(B.M, B.E1, B.R))
-                        : new Branch3Left(B, newLeft);
-                }
-                {
-                    var middle = B.M;
-                    var newMiddle = middle.AddSureNotPresentEntry(entry);
-                    return middle.MayTurnToBranch2 && newMiddle is Branch2 b2
-                        ? new Branch2(new Branch2(L, B.E0, b2.L), b2.E, new Branch2(b2.R, B.E1, B.R)) // todo: @perf @mem opportunity man
-                        : new Branch3(L, B.E0, newMiddle, B.E1, B.R);
-                }
-            }
-        }
-
-        internal sealed class Branch3Middle : Branch3Base
-        {
-            internal readonly Branch3 B;
-            internal readonly ImHashMap<K, V> M;
-            public override Entry Entry0 => B.E0;
-            public override Entry Entry1 => B.E1;
-            public override ImHashMap<K, V> Left => B.L;
-            public override ImHashMap<K, V> Middle => M;
-            public override ImHashMap<K, V> Right => B.R;
-            public Branch3Middle(Branch3 b, ImHashMap<K, V> m) { B = b; M = m; }
-
-            public override int Count() => B.L.Count() + B.E0.Count() + M.Count() + B.E1.Count() + B.R.Count();
-
-            internal override Entry GetEntryOrNull(int hash)
-            {
-                var b = B;
-                var h1 = b.E1.Hash;
-                if (hash > h1)
-                    return B.R.GetEntryOrNull(hash);
-                var h0 = b.E0.Hash;
-                return hash < h0 ? b.L.GetEntryOrNull(hash) : h0 == hash ? b.E0 : h1 == hash ? b.E1 : M.GetEntryOrNull(hash);
-            }
-
-            internal override Entry GetSurePresentEntry(int hash)
-            {
-                var b = B;
-                var h1 = b.E1.Hash;
-                if (hash > h1)
-                    return B.R.GetSurePresentEntry(hash);
-                var h0 = b.E0.Hash;
-                return hash < h0 ? b.L.GetSurePresentEntry(hash) : h0 == hash ? b.E0 : h1 == hash ? b.E1 : M.GetSurePresentEntry(hash);
-            }
-
-            internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
-            {
-                var h1 = B.E1.Hash;
-                if (hash > h1)
-                {
-                    var right = B.R;
-                    var newRight = right.AddOrGetEntry(hash, entry);
-                    return right.MayTurnToBranch2 && newRight is Branch2
-                        ? new Branch2(new Branch2(B.L, B.E0, M), B.E1, newRight)
-                        : newRight is Entry ? newRight : new Branch3(B.L, B.E0, M, B.E1, newRight);
-                }
-                var h0 = B.E0.Hash;
-                if (hash < h0)
-                {
-                    var left = B.L;
-                    var newLeft = left.AddOrGetEntry(hash, entry);
-                    return left.MayTurnToBranch2 && newLeft is Branch2
-                        ? new Branch2(newLeft, B.E0, new Branch2(M, B.E1, B.R))
-                        : newLeft is Entry ? newLeft : new Branch3(newLeft, B.E0, M, B.E1, B.R);
-                }
-                if (hash > h0 && hash < h1)
-                {
-                    var newMiddle = M.AddOrGetEntry(hash, entry);
-                    return M.MayTurnToBranch2 && newMiddle is Branch2 b2
-                        ? new Branch2(new Branch2(B.L, B.E0, b2.L), b2.E, new Branch2(b2.R, B.E1, B.R)) // todo: @perf @mem opportunity man
-                        : newMiddle is Entry ? newMiddle : new Branch3Middle(B, newMiddle);
-                }
-                return hash == h0 ? B.E0 : B.E1;
-            }
-
-            internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry)
-            {
-                var h1 = B.E1.Hash;
-                if (entry.Hash > h1)
-                {
-                    var right = B.R;
-                    var newRight = right.AddSureNotPresentEntry(entry);
-                    return right.MayTurnToBranch2 && newRight is Branch2
-                        ? new Branch2(new Branch2(B.L, B.E0, M), B.E1, newRight)
-                        : new Branch3(B.L, B.E0, M, B.E1, newRight);
-                }
-                var h0 = B.E0.Hash;
-                if (entry.Hash < h0)
-                {
-                    var left = B.L;
-                    var newLeft = left.AddSureNotPresentEntry(entry);
-                    return left.MayTurnToBranch2 && newLeft is Branch2
-                        ? new Branch2(newLeft, B.E0, new Branch2(M, B.E1, B.R))
-                        : new Branch3(newLeft, B.E0, M, B.E1, B.R);
-                }
-                {
-                    var newMiddle = M.AddSureNotPresentEntry(entry);
-                    return M.MayTurnToBranch2 && newMiddle is Branch2 b2
-                        ? new Branch2(new Branch2(B.L, B.E0, b2.L), b2.E, new Branch2(b2.R, B.E1, B.R)) // todo: @perf @mem opportunity man
-                        : new Branch3Middle(B, newMiddle);
-                }
+                var newMiddle = M.AddSureNotPresentEntry(entry);
+                // note: we are checking for the Branch2 instead of Branch2Base (which is much faster) but we need to be sure that the split always end with Branch2
+                return M.MayTurnToBranch2 && newMiddle is Branch2 b2
+                    ? new Branch2(new Branch2(L, E0, b2.L), b2.E, new Branch2(b2.R, E1, R)) // todo: @perf @mem opportunity man
+                    : new Branch3Middle(this, newMiddle);
             }
         }
     }
 
-    /// <summary>Helper stack wrapper for the array</summary>
-    public sealed class MapParentStack
+    internal sealed class Branch3Right : Branch3Base
     {
-        private const int DefaultInitialCapacity = 4;
-        private object[] _items;
+        internal readonly Branch3 B;
+        internal readonly ImHashMap<K, V> R;
+        public override Entry Entry0 => B.E0;
+        public override Entry Entry1 => B.E1;
+        public override ImHashMap<K, V> Left => B.L;
+        public override ImHashMap<K, V> Middle => B.M;
+        public override ImHashMap<K, V> Right => R;
+        public Branch3Right(Branch3 b, ImHashMap<K, V> right) { B = b; R = right; }
 
-        /// <summary>Creates the list of the `DefaultInitialCapacity`</summary>
-        public MapParentStack() => _items = new object[DefaultInitialCapacity];
+        public override int Count() => B.L.Count() + B.E0.Count() + B.M.Count() + B.E1.Count() + R.Count();
 
-        /// <summary>Pushes the item</summary>
-        public void Put(object item, int index)
+        internal override Entry GetEntryOrNull(int hash)
         {
-            if (index >= _items.Length)
-                _items = Expand(_items);
-            _items[index] = item;
+            var b = B;
+            var h1 = b.E1.Hash;
+            if (hash > h1)
+                return R.GetEntryOrNull(hash);
+            var h0 = b.E0.Hash;
+            return hash < h0 ? b.L.GetEntryOrNull(hash) : h0 == hash ? b.E0 : h1 == hash ? b.E1 : b.M.GetEntryOrNull(hash);
         }
 
-        /// <summary>Gets the item by index</summary>
-        public object Get(int index) => _items[index];
-
-        private static object[] Expand(object[] items)
+        internal override Entry GetSurePresentEntry(int hash)
         {
-            var count = items.Length;
-            var newItems = new object[count << 1]; // count * 2
-            Array.Copy(items, 0, newItems, 0, count);
-            return newItems;
+            var b = B;
+            var h1 = b.E1.Hash;
+            if (hash > h1)
+                return R.GetSurePresentEntry(hash);
+            var h0 = b.E0.Hash;
+            return hash < h0 ? b.L.GetSurePresentEntry(hash) : h0 == hash ? b.E0 : h1 == hash ? b.E1 : b.M.GetSurePresentEntry(hash);
+        }
+
+        internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
+        {
+            var h1 = B.E1.Hash;
+            if (hash > h1)
+            {
+                var newRight = R.AddOrGetEntry(hash, entry);
+                return R.MayTurnToBranch2 && newRight is Branch2
+                    ? new Branch2(new Branch2(B.L, B.E0, B.M), B.E1, newRight)
+                    : newRight is Entry ? newRight : new Branch3Right(B, newRight);
+            }
+            var h0 = B.E0.Hash;
+            if (hash < h0)
+            {
+                var left = B.L;
+                var newLeft = left.AddOrGetEntry(hash, entry);
+                return left.MayTurnToBranch2 && newLeft is Branch2
+                    ? new Branch2(newLeft, B.E0, new Branch2(B.M, B.E1, R))
+                    : newLeft is Entry ? newLeft : new Branch3(newLeft, B.E0, B.M, B.E1, R);
+            }
+            if (hash > h0 && hash < h1)
+            {
+                var middle = B.M;
+                var newMiddle = middle.AddOrGetEntry(hash, entry);
+                return middle.MayTurnToBranch2 && newMiddle is Branch2 b2
+                    ? new Branch2(new Branch2(B.L, B.E0, b2.L), b2.E, new Branch2(b2.R, B.E1, R)) // todo: @perf @mem opportunity man
+                    : newMiddle is Entry ? newMiddle : new Branch3(B.L, B.E0, newMiddle, B.E1, R);
+            }
+            return hash == h0 ? B.E0 : B.E1;
+        }
+
+        internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry)
+        {
+            var h1 = B.E1.Hash;
+            if (entry.Hash > h1)
+            {
+                var newRight = R.AddSureNotPresentEntry(entry);
+                return R.MayTurnToBranch2 && newRight is Branch2
+                    ? new Branch2(new Branch2(B.L, B.E0, B.M), B.E1, newRight)
+                    : new Branch3Right(B, newRight);
+            }
+            var h0 = B.E0.Hash;
+            if (entry.Hash < h0)
+            {
+                var left = B.L;
+                var newLeft = left.AddSureNotPresentEntry(entry);
+                return left.MayTurnToBranch2 && newLeft is Branch2
+                    ? new Branch2(newLeft, B.E0, new Branch2(B.M, B.E1, R))
+                    : new Branch3(newLeft, B.E0, B.M, B.E1, R);
+            }
+            {
+                var middle = B.M;
+                var newMiddle = middle.AddSureNotPresentEntry(entry);
+                return middle.MayTurnToBranch2 && newMiddle is Branch2 b2
+                    ? new Branch2(new Branch2(B.L, B.E0, b2.L), b2.E, new Branch2(b2.R, B.E1, R)) // todo: @perf @mem opportunity man
+                    : new Branch3(B.L, B.E0, newMiddle, B.E1, R);
+            }
         }
     }
 
-    /// <summary>Helper stack wrapper for the array</summary>
-    public sealed class MapParentStack<K, V>
+    internal sealed class Branch3Left : Branch3Base
     {
-        /// <summary>Entry in a stack</summary>
-        public struct Entry
+        internal readonly Branch3 B;
+        internal readonly ImHashMap<K, V> L;
+        public override Entry Entry0 => B.E0;
+        public override Entry Entry1 => B.E1;
+        public override ImHashMap<K, V> Left => L;
+        public override ImHashMap<K, V> Middle => B.M;
+        public override ImHashMap<K, V> Right => B.R;
+        public Branch3Left(Branch3 b, ImHashMap<K, V> l) { B = b; L = l; }
+
+        public override int Count() => L.Count() + B.E0.Count() + B.M.Count() + B.E1.Count() + B.R.Count();
+
+        internal override Entry GetEntryOrNull(int hash)
         {
-            /// <summary>The next entry to traverse</summary>
-            public ImHashMap<K, V>.Entry NextEntry;
-            /// <summary>The next branch to traverse</summary>
-            public ImHashMap<K, V> NextBranch;
+            var b = B;
+            var h1 = b.E1.Hash;
+            if (hash > h1)
+                return B.R.GetEntryOrNull(hash);
+            var h0 = b.E0.Hash;
+            return hash < h0 ? L.GetEntryOrNull(hash) : h0 == hash ? b.E0 : h1 == hash ? b.E1 : b.M.GetEntryOrNull(hash);
         }
 
-        private const int DefaultInitialCapacity = 4;
-
-        /// <summary>The items</summary>
-        public Entry[] Items;
-
-        /// <summary>Creates the list of the `DefaultInitialCapacity`</summary>
-        public MapParentStack(int capacity = DefaultInitialCapacity) => Items = new Entry[capacity];
-
-        /// <summary>Pushes the item</summary>
-        public void Put(int index, ImHashMap<K, V>.Entry entry, ImHashMap<K, V> branch)
+        internal override Entry GetSurePresentEntry(int hash)
         {
-            if (index >= Items.Length)
-                Items = Expand(Items);
-            ref var e = ref Items[index];
-            e.NextEntry = entry;
-            e.NextBranch = branch;
+            var b = B;
+            var h1 = b.E1.Hash;
+            if (hash > h1)
+                return B.R.GetSurePresentEntry(hash);
+            var h0 = b.E0.Hash;
+            return hash < h0 ? L.GetSurePresentEntry(hash) : h0 == hash ? b.E0 : h1 == hash ? b.E1 : b.M.GetSurePresentEntry(hash);
         }
 
-        private static Entry[] Expand(Entry[] items)
+        internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
         {
-            var count = items.Length;
-            var newItems = new Entry[count << 1]; // count * 2
-            Array.Copy(items, 0, newItems, 0, count);
-            return newItems;
+            var h1 = B.E1.Hash;
+            if (hash > h1)
+            {
+                var right = B.R;
+                var newRight = right.AddOrGetEntry(hash, entry);
+                return right.MayTurnToBranch2 && newRight is Branch2
+                    ? new Branch2(new Branch2(L, B.E0, B.M), B.E1, newRight)
+                    : newRight is Entry ? newRight : new Branch3(L, B.E0, B.M, B.E1, newRight);
+            }
+            var h0 = B.E0.Hash;
+            if (hash < h0)
+            {
+                var newLeft = L.AddOrGetEntry(hash, entry);
+                return L.MayTurnToBranch2 && newLeft is Branch2
+                    ? new Branch2(newLeft, B.E0, new Branch2(B.M, B.E1, B.R))
+                    : newLeft is Entry ? newLeft : new Branch3Left(B, newLeft);
+            }
+            if (hash > h0 && hash < h1)
+            {
+                var middle = B.M;
+                var newMiddle = middle.AddOrGetEntry(hash, entry);
+                return middle.MayTurnToBranch2 && newMiddle is Branch2 b2
+                    ? new Branch2(new Branch2(L, B.E0, b2.L), b2.E, new Branch2(b2.R, B.E1, B.R)) // todo: @perf @mem opportunity man
+                    : newMiddle is Entry ? newMiddle : new Branch3(L, B.E0, newMiddle, B.E1, B.R);
+            }
+            return hash == h0 ? B.E0 : B.E1;
+        }
+
+        internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry)
+        {
+            var h1 = B.E1.Hash;
+            if (entry.Hash > h1)
+            {
+                var right = B.R;
+                var newRight = right.AddSureNotPresentEntry(entry);
+                return right.MayTurnToBranch2 && newRight is Branch2
+                    ? new Branch2(new Branch2(L, B.E0, B.M), B.E1, newRight)
+                    : new Branch3(L, B.E0, B.M, B.E1, newRight);
+            }
+            var h0 = B.E0.Hash;
+            if (entry.Hash < h0)
+            {
+                var newLeft = L.AddSureNotPresentEntry(entry);
+                return L.MayTurnToBranch2 && newLeft is Branch2
+                    ? new Branch2(newLeft, B.E0, new Branch2(B.M, B.E1, B.R))
+                    : new Branch3Left(B, newLeft);
+            }
+            {
+                var middle = B.M;
+                var newMiddle = middle.AddSureNotPresentEntry(entry);
+                return middle.MayTurnToBranch2 && newMiddle is Branch2 b2
+                    ? new Branch2(new Branch2(L, B.E0, b2.L), b2.E, new Branch2(b2.R, B.E1, B.R)) // todo: @perf @mem opportunity man
+                    : new Branch3(L, B.E0, newMiddle, B.E1, B.R);
+            }
         }
     }
 
-    /// <summary>The map methods</summary>
-    public static class ImHashMap
+    internal sealed class Branch3Middle : Branch3Base
     {
-        /// <summary>Outputs the map as the Mermaid top-down graph</summary>
-        public static string ToMermaidString<K, V>(this ImHashMap<K, V> map) =>
-             map.ToMermaidString(new StringBuilder("graph TD").AppendLine()).ToString();
+        internal readonly Branch3 B;
+        internal readonly ImHashMap<K, V> M;
+        public override Entry Entry0 => B.E0;
+        public override Entry Entry1 => B.E1;
+        public override ImHashMap<K, V> Left => B.L;
+        public override ImHashMap<K, V> Middle => M;
+        public override ImHashMap<K, V> Right => B.R;
+        public Branch3Middle(Branch3 b, ImHashMap<K, V> m) { B = b; M = m; }
 
-        [MethodImpl((MethodImplOptions)256)]
-        internal static void InsertInOrder<K, V>(int ph, ref ImHashMap<K, V>.Entry p,
-            ref ImHashMap<K, V>.Entry e0, ref ImHashMap<K, V>.Entry e1)
+        public override int Count() => B.L.Count() + B.E0.Count() + M.Count() + B.E1.Count() + B.R.Count();
+
+        internal override Entry GetEntryOrNull(int hash)
         {
-            var t = default(ImHashMap<K, V>.Entry);
+            var b = B;
+            var h1 = b.E1.Hash;
+            if (hash > h1)
+                return B.R.GetEntryOrNull(hash);
+            var h0 = b.E0.Hash;
+            return hash < h0 ? b.L.GetEntryOrNull(hash) : h0 == hash ? b.E0 : h1 == hash ? b.E1 : M.GetEntryOrNull(hash);
+        }
+
+        internal override Entry GetSurePresentEntry(int hash)
+        {
+            var b = B;
+            var h1 = b.E1.Hash;
+            if (hash > h1)
+                return B.R.GetSurePresentEntry(hash);
+            var h0 = b.E0.Hash;
+            return hash < h0 ? b.L.GetSurePresentEntry(hash) : h0 == hash ? b.E0 : h1 == hash ? b.E1 : M.GetSurePresentEntry(hash);
+        }
+
+        internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
+        {
+            var h1 = B.E1.Hash;
+            if (hash > h1)
+            {
+                var right = B.R;
+                var newRight = right.AddOrGetEntry(hash, entry);
+                return right.MayTurnToBranch2 && newRight is Branch2
+                    ? new Branch2(new Branch2(B.L, B.E0, M), B.E1, newRight)
+                    : newRight is Entry ? newRight : new Branch3(B.L, B.E0, M, B.E1, newRight);
+            }
+            var h0 = B.E0.Hash;
+            if (hash < h0)
+            {
+                var left = B.L;
+                var newLeft = left.AddOrGetEntry(hash, entry);
+                return left.MayTurnToBranch2 && newLeft is Branch2
+                    ? new Branch2(newLeft, B.E0, new Branch2(M, B.E1, B.R))
+                    : newLeft is Entry ? newLeft : new Branch3(newLeft, B.E0, M, B.E1, B.R);
+            }
+            if (hash > h0 && hash < h1)
+            {
+                var newMiddle = M.AddOrGetEntry(hash, entry);
+                return M.MayTurnToBranch2 && newMiddle is Branch2 b2
+                    ? new Branch2(new Branch2(B.L, B.E0, b2.L), b2.E, new Branch2(b2.R, B.E1, B.R)) // todo: @perf @mem opportunity man
+                    : newMiddle is Entry ? newMiddle : new Branch3Middle(B, newMiddle);
+            }
+            return hash == h0 ? B.E0 : B.E1;
+        }
+
+        internal override ImHashMap<K, V> AddSureNotPresentEntry(Entry entry)
+        {
+            var h1 = B.E1.Hash;
+            if (entry.Hash > h1)
+            {
+                var right = B.R;
+                var newRight = right.AddSureNotPresentEntry(entry);
+                return right.MayTurnToBranch2 && newRight is Branch2
+                    ? new Branch2(new Branch2(B.L, B.E0, M), B.E1, newRight)
+                    : new Branch3(B.L, B.E0, M, B.E1, newRight);
+            }
+            var h0 = B.E0.Hash;
+            if (entry.Hash < h0)
+            {
+                var left = B.L;
+                var newLeft = left.AddSureNotPresentEntry(entry);
+                return left.MayTurnToBranch2 && newLeft is Branch2
+                    ? new Branch2(newLeft, B.E0, new Branch2(M, B.E1, B.R))
+                    : new Branch3(newLeft, B.E0, M, B.E1, B.R);
+            }
+            {
+                var newMiddle = M.AddSureNotPresentEntry(entry);
+                return M.MayTurnToBranch2 && newMiddle is Branch2 b2
+                    ? new Branch2(new Branch2(B.L, B.E0, b2.L), b2.E, new Branch2(b2.R, B.E1, B.R)) // todo: @perf @mem opportunity man
+                    : new Branch3Middle(B, newMiddle);
+            }
+        }
+    }
+}
+
+/// <summary>Helper stack wrapper for the array</summary>
+public sealed class MapParentStack
+{
+    private const int DefaultInitialCapacity = 4;
+    private object[] _items;
+
+    /// <summary>Creates the list of the `DefaultInitialCapacity`</summary>
+    public MapParentStack() => _items = new object[DefaultInitialCapacity];
+
+    /// <summary>Pushes the item</summary>
+    public void Put(object item, int index)
+    {
+        if (index >= _items.Length)
+            _items = Expand(_items);
+        _items[index] = item;
+    }
+
+    /// <summary>Gets the item by index</summary>
+    public object Get(int index) => _items[index];
+
+    private static object[] Expand(object[] items)
+    {
+        var count = items.Length;
+        var newItems = new object[count << 1]; // count * 2
+        Array.Copy(items, 0, newItems, 0, count);
+        return newItems;
+    }
+}
+
+/// <summary>Helper stack wrapper for the array</summary>
+public sealed class MapParentStack<K, V>
+{
+    /// <summary>Entry in a stack</summary>
+    public struct Entry
+    {
+        /// <summary>The next entry to traverse</summary>
+        public ImHashMap<K, V>.Entry NextEntry;
+        /// <summary>The next branch to traverse</summary>
+        public ImHashMap<K, V> NextBranch;
+    }
+
+    private const int DefaultInitialCapacity = 4;
+
+    /// <summary>The items</summary>
+    public Entry[] Items;
+
+    /// <summary>Creates the list of the `DefaultInitialCapacity`</summary>
+    public MapParentStack(int capacity = DefaultInitialCapacity) => Items = new Entry[capacity];
+
+    /// <summary>Pushes the item</summary>
+    public void Put(int index, ImHashMap<K, V>.Entry entry, ImHashMap<K, V> branch)
+    {
+        if (index >= Items.Length)
+            Items = Expand(Items);
+        ref var e = ref Items[index];
+        e.NextEntry = entry;
+        e.NextBranch = branch;
+    }
+
+    private static Entry[] Expand(Entry[] items)
+    {
+        var count = items.Length;
+        var newItems = new Entry[count << 1]; // count * 2
+        Array.Copy(items, 0, newItems, 0, count);
+        return newItems;
+    }
+}
+
+/// <summary>The map methods</summary>
+public static class ImHashMap
+{
+    /// <summary>Outputs the map as the Mermaid top-down graph</summary>
+    public static string ToMermaidString<K, V>(this ImHashMap<K, V> map) =>
+            map.ToMermaidString(new StringBuilder("graph TD").AppendLine()).ToString();
+
+    [MethodImpl((MethodImplOptions)256)]
+    internal static void InsertInOrder<K, V>(int ph, ref ImHashMap<K, V>.Entry p,
+        ref ImHashMap<K, V>.Entry e0, ref ImHashMap<K, V>.Entry e1)
+    {
+        var t = default(ImHashMap<K, V>.Entry);
+        if (ph < e1.Hash)
+        {
+            t = e1; e1 = p; p = t;
+            if (ph < e0.Hash)
+            {
+                t = e0; e0 = e1; e1 = t;
+            }
+        }
+    }
+
+    [MethodImpl((MethodImplOptions)256)]
+    internal static void InsertInOrder<K, V>(int ph, ref ImHashMap<K, V>.Entry p,
+        ref ImHashMap<K, V>.Entry e0, ref ImHashMap<K, V>.Entry e1, ref ImHashMap<K, V>.Entry e2)
+    {
+        var t = default(ImHashMap<K, V>.Entry);
+        if (ph < e2.Hash)
+        {
+            t = e2; e2 = p; p = t;
             if (ph < e1.Hash)
             {
-                t = e1; e1 = p; p = t;
+                t = e1; e1 = e2; e2 = t;
                 if (ph < e0.Hash)
                 {
                     t = e0; e0 = e1; e1 = t;
                 }
             }
         }
+    }
 
-        [MethodImpl((MethodImplOptions)256)]
-        internal static void InsertInOrder<K, V>(int ph, ref ImHashMap<K, V>.Entry p,
-            ref ImHashMap<K, V>.Entry e0, ref ImHashMap<K, V>.Entry e1, ref ImHashMap<K, V>.Entry e2)
+    [MethodImpl((MethodImplOptions)256)]
+    internal static void InsertInOrder<K, V>(int ph, ref ImHashMap<K, V>.Entry p,
+        ref ImHashMap<K, V>.Entry e0, ref ImHashMap<K, V>.Entry e1, ref ImHashMap<K, V>.Entry e2, ref ImHashMap<K, V>.Entry e3)
+    {
+        var t = default(ImHashMap<K, V>.Entry);
+        if (ph < e3.Hash)
         {
-            var t = default(ImHashMap<K, V>.Entry);
+            t = e3; e3 = p; p = t;
             if (ph < e2.Hash)
             {
-                t = e2; e2 = p; p = t;
+                t = e2; e2 = e3; e3 = t;
                 if (ph < e1.Hash)
                 {
                     t = e1; e1 = e2; e2 = t;
@@ -4590,15 +4612,19 @@ namespace DryIoc.ImTools
                 }
             }
         }
+    }
 
-        [MethodImpl((MethodImplOptions)256)]
-        internal static void InsertInOrder<K, V>(int ph, ref ImHashMap<K, V>.Entry p,
-            ref ImHashMap<K, V>.Entry e0, ref ImHashMap<K, V>.Entry e1, ref ImHashMap<K, V>.Entry e2, ref ImHashMap<K, V>.Entry e3)
+    [MethodImpl((MethodImplOptions)256)]
+    internal static void InsertInOrder<K, V>(int ph, ref ImHashMap<K, V>.Entry p,
+        ref ImHashMap<K, V>.Entry e0, ref ImHashMap<K, V>.Entry e1, ref ImHashMap<K, V>.Entry e2, ref ImHashMap<K, V>.Entry e3, ref ImHashMap<K, V>.Entry e4)
+    {
+        var t = default(ImHashMap<K, V>.Entry);
+        if (ph < e4.Hash)
         {
-            var t = default(ImHashMap<K, V>.Entry);
+            t = e4; e4 = p; p = t;
             if (ph < e3.Hash)
             {
-                t = e3; e3 = p; p = t;
+                t = e3; e3 = e4; e4 = t;
                 if (ph < e2.Hash)
                 {
                     t = e2; e2 = e3; e3 = t;
@@ -4613,15 +4639,20 @@ namespace DryIoc.ImTools
                 }
             }
         }
+    }
 
-        [MethodImpl((MethodImplOptions)256)]
-        internal static void InsertInOrder<K, V>(int ph, ref ImHashMap<K, V>.Entry p,
-            ref ImHashMap<K, V>.Entry e0, ref ImHashMap<K, V>.Entry e1, ref ImHashMap<K, V>.Entry e2, ref ImHashMap<K, V>.Entry e3, ref ImHashMap<K, V>.Entry e4)
+    [MethodImpl((MethodImplOptions)256)]
+    internal static void InsertInOrder<K, V>(int ph, ref ImHashMap<K, V>.Entry p,
+        ref ImHashMap<K, V>.Entry e0, ref ImHashMap<K, V>.Entry e1, ref ImHashMap<K, V>.Entry e2, ref ImHashMap<K, V>.Entry e3, ref ImHashMap<K, V>.Entry e4,
+        ref ImHashMap<K, V>.Entry e5)
+    {
+        var t = default(ImHashMap<K, V>.Entry);
+        if (ph < e5.Hash)
         {
-            var t = default(ImHashMap<K, V>.Entry);
+            t = e5; e5 = p; p = t;
             if (ph < e4.Hash)
             {
-                t = e4; e4 = p; p = t;
+                t = e4; e4 = e5; e5 = t;
                 if (ph < e3.Hash)
                 {
                     t = e3; e3 = e4; e4 = t;
@@ -4640,16 +4671,20 @@ namespace DryIoc.ImTools
                 }
             }
         }
+    }
 
-        [MethodImpl((MethodImplOptions)256)]
-        internal static void InsertInOrder<K, V>(int ph, ref ImHashMap<K, V>.Entry p,
-            ref ImHashMap<K, V>.Entry e0, ref ImHashMap<K, V>.Entry e1, ref ImHashMap<K, V>.Entry e2, ref ImHashMap<K, V>.Entry e3, ref ImHashMap<K, V>.Entry e4,
-            ref ImHashMap<K, V>.Entry e5)
+    [MethodImpl((MethodImplOptions)256)]
+    internal static void InsertInOrder<K, V>(int ph, ref ImHashMap<K, V>.Entry p,
+        ref ImHashMap<K, V>.Entry e0, ref ImHashMap<K, V>.Entry e1, ref ImHashMap<K, V>.Entry e2, ref ImHashMap<K, V>.Entry e3, ref ImHashMap<K, V>.Entry e4,
+        ref ImHashMap<K, V>.Entry e5, ref ImHashMap<K, V>.Entry e6)
+    {
+        var t = default(ImHashMap<K, V>.Entry);
+        if (ph < e6.Hash)
         {
-            var t = default(ImHashMap<K, V>.Entry);
+            t = e6; e6 = p; p = t;
             if (ph < e5.Hash)
             {
-                t = e5; e5 = p; p = t;
+                t = e5; e5 = e6; e6 = t;
                 if (ph < e4.Hash)
                 {
                     t = e4; e4 = e5; e5 = t;
@@ -4672,903 +4707,796 @@ namespace DryIoc.ImTools
                 }
             }
         }
+    }
+
+    private static readonly object _enumerationB3Tombstone = new object();
+
+    internal struct MapStack<K, V>
+    {
+        ImHashMap<K, V>.Entry e0, e1, e2, e3, e4, e5, e6, e7;//, e8, e9, e10, e11, e12, e13, e14, e15;
+        ImHashMap<K, V> b0, b1, b2, b3, b4, b5, b6, b7;//, b8, b9, b10, b11, b12, b13, b14, b15;
+        MapParentStack<K, V> _deeper;
+        const byte _deeperStartsAtLevel = 8;
+        public void Put(ushort i, ImHashMap<K, V>.Entry e, ImHashMap<K, V> b)
+        {
+            switch (i)
+            {
+                case 0: e0 = e; b0 = b; break;
+                case 1: e1 = e; b1 = b; break;
+                case 2: e2 = e; b2 = b; break;
+                case 3: e3 = e; b3 = b; break;
+                case 4: e4 = e; b4 = b; break;
+                case 5: e5 = e; b5 = b; break;
+                case 6: e6 = e; b6 = b; break;
+                case 7: e7 = e; b7 = b; break;
+                default:
+                    if (_deeper == null)
+                        _deeper = new MapParentStack<K, V>(8);
+                    _deeper.Put(i - _deeperStartsAtLevel, e, b);
+                    break;
+            }
+        }
+
+        public void Put(ushort i, ImHashMap<K, V>.Entry e, ImHashMap<K, V> b, ImHashMap<K, V>.Entry eNext, ImHashMap<K, V> bNext)
+        {
+            switch (i)
+            {
+                case 0: e0 = e; b0 = b; e1 = eNext; b1 = bNext; break;
+                case 1: e1 = e; b1 = b; e2 = eNext; b2 = bNext; break;
+                case 2: e2 = e; b2 = b; e3 = eNext; b3 = bNext; break;
+                case 3: e3 = e; b3 = b; e4 = eNext; b4 = bNext; break;
+                case 4: e4 = e; b4 = b; e5 = eNext; b5 = bNext; break;
+                case 5: e5 = e; b5 = b; e6 = eNext; b6 = bNext; break;
+                case 6: e6 = e; b6 = b; e7 = eNext; b7 = bNext; break;
+                case 7:
+                    e7 = e; b7 = b;
+                    if (_deeper == null) _deeper = new MapParentStack<K, V>(8);
+                    _deeper.Put(0, eNext, bNext);
+                    break;
+                default:
+                    if (_deeper == null) _deeper = new MapParentStack<K, V>(8);
+                    i -= _deeperStartsAtLevel;
+                    _deeper.Put(i, e, b);
+                    _deeper.Put(i + 1, eNext, bNext);
+                    break;
+            }
+        }
+
+        public void Get(ushort i, ref ImHashMap<K, V>.Entry e, ref ImHashMap<K, V> b)
+        {
+            switch (i)
+            {
+                case 0: e = e0; b = b0; break;
+                case 1: e = e1; b = b1; break;
+                case 2: e = e2; b = b2; break;
+                case 3: e = e3; b = b3; break;
+                case 4: e = e4; b = b4; break;
+                case 5: e = e5; b = b5; break;
+                case 6: e = e6; b = b6; break;
+                case 7: e = e7; b = b7; break;
+                default:
+                    Debug.Assert(_deeper != null, "Expecting the `deeper` parent stack created before accessing it here at level " + i);
+                    ref var p = ref _deeper.Items[i - _deeperStartsAtLevel];
+                    e = p.NextEntry; b = p.NextBranch;
+                    break;
+            }
+        }
+    }
+
+    /// <summary>Non-allocating enumerator</summary>
+    public struct Enumerable<V> : IEnumerable<VEntry<V>>, IEnumerable
+    {
+        private readonly ImHashMap<int, V> _map;
+        /// <summary>Constructor</summary>
+        public Enumerable(ImHashMap<int, V> map) => _map = map;
+
+        /// <summary>Returns non-allocating enumerator</summary>
+        public Enumerator<V> GetEnumerator() => new Enumerator<V> { _map = _map };
+        IEnumerator<VEntry<V>> IEnumerable<VEntry<V>>.GetEnumerator() => new Enumerator<V> { _map = _map };
+        IEnumerator IEnumerable.GetEnumerator() => new Enumerator<V> { _map = _map };
+    }
+
+    /// <summary>Enumerator on stack, without allocation</summary>
+    public struct Enumerator<V> : IEnumerator<VEntry<V>>, IDisposable, IEnumerator
+    {
+        internal ImHashMap<int, V> _map;
+        private short _state;
+        private ushort _index;
+        private MapStack<int, V> _ps;
+
+        internal void ReInit(ImHashMap<int, V> map)
+        {
+            _map = map;
+            _state = default;
+            _index = default;
+            _ps = default;
+        }
+
+        private ImHashMap<int, V> _nextBranch;
+        private ImHashMap<int, V>.Branch2Plus _b2PlusLeftWasEnumerated;
+
+        private ImHashMap<int, V>.Entry _a, _b, _c, _d, _e, _f, _g, _h;
+        internal VEntry<V> _current;
+        /// <inheritdoc />
+        public VEntry<V> Current => _current;
+        object IEnumerator.Current => _current;
 
         [MethodImpl((MethodImplOptions)256)]
-        internal static void InsertInOrder<K, V>(int ph, ref ImHashMap<K, V>.Entry p,
-            ref ImHashMap<K, V>.Entry e0, ref ImHashMap<K, V>.Entry e1, ref ImHashMap<K, V>.Entry e2, ref ImHashMap<K, V>.Entry e3, ref ImHashMap<K, V>.Entry e4,
-            ref ImHashMap<K, V>.Entry e5, ref ImHashMap<K, V>.Entry e6)
+        private bool SetCurrentAndState(ImHashMap<int, V>.Entry e, short nextState)
         {
-            var t = default(ImHashMap<K, V>.Entry);
-            if (ph < e6.Hash)
-            {
-                t = e6; e6 = p; p = t;
-                if (ph < e5.Hash)
-                {
-                    t = e5; e5 = e6; e6 = t;
-                    if (ph < e4.Hash)
-                    {
-                        t = e4; e4 = e5; e5 = t;
-                        if (ph < e3.Hash)
-                        {
-                            t = e3; e3 = e4; e4 = t;
-                            if (ph < e2.Hash)
-                            {
-                                t = e2; e2 = e3; e3 = t;
-                                if (ph < e1.Hash)
-                                {
-                                    t = e1; e1 = e2; e2 = t;
-                                    if (ph < e0.Hash)
-                                    {
-                                        t = e0; e0 = e1; e1 = t;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            _state = nextState;
+            _current = (VEntry<V>)e;
+            return true;
         }
 
-        private static readonly object _enumerationB3Tombstone = new object();
-
-        internal struct MapStack<K, V>
+        /// <inheritdoc />
+        public bool MoveNext()
         {
-            ImHashMap<K, V>.Entry e0, e1, e2, e3, e4, e5, e6, e7;//, e8, e9, e10, e11, e12, e13, e14, e15;
-            ImHashMap<K, V> b0, b1, b2, b3, b4, b5, b6, b7;//, b8, b9, b10, b11, b12, b13, b14, b15;
-            MapParentStack<K, V> _deeper;
-            const byte _deeperStartsAtLevel = 8;
-            public void Put(ushort i, ImHashMap<K, V>.Entry e, ImHashMap<K, V> b)
+            ImHashMap<int, V>.Leaf5PlusPlus b21FullLeaf511;
+            switch (_state)
             {
-                switch (i)
-                {
-                    case 0: e0 = e; b0 = b; break;
-                    case 1: e1 = e; b1 = b; break;
-                    case 2: e2 = e; b2 = b; break;
-                    case 3: e3 = e; b3 = b; break;
-                    case 4: e4 = e; b4 = b; break;
-                    case 5: e5 = e; b5 = b; break;
-                    case 6: e6 = e; b6 = b; break;
-                    case 7: e7 = e; b7 = b; break;
-                    default:
-                        if (_deeper == null)
-                            _deeper = new MapParentStack<K, V>(8);
-                        _deeper.Put(i - _deeperStartsAtLevel, e, b);
-                        break;
-                }
-            }
-
-            public void Put(ushort i, ImHashMap<K, V>.Entry e, ImHashMap<K, V> b, ImHashMap<K, V>.Entry eNext, ImHashMap<K, V> bNext)
-            {
-                switch (i)
-                {
-                    case 0: e0 = e; b0 = b; e1 = eNext; b1 = bNext; break;
-                    case 1: e1 = e; b1 = b; e2 = eNext; b2 = bNext; break;
-                    case 2: e2 = e; b2 = b; e3 = eNext; b3 = bNext; break;
-                    case 3: e3 = e; b3 = b; e4 = eNext; b4 = bNext; break;
-                    case 4: e4 = e; b4 = b; e5 = eNext; b5 = bNext; break;
-                    case 5: e5 = e; b5 = b; e6 = eNext; b6 = bNext; break;
-                    case 6: e6 = e; b6 = b; e7 = eNext; b7 = bNext; break;
-                    case 7:
-                        e7 = e; b7 = b;
-                        if (_deeper == null) _deeper = new MapParentStack<K, V>(8);
-                        _deeper.Put(0, eNext, bNext);
-                        break;
-                    default:
-                        if (_deeper == null) _deeper = new MapParentStack<K, V>(8);
-                        i -= _deeperStartsAtLevel;
-                        _deeper.Put(i, e, b);
-                        _deeper.Put(i + 1, eNext, bNext);
-                        break;
-                }
-            }
-
-            public void Get(ushort i, ref ImHashMap<K, V>.Entry e, ref ImHashMap<K, V> b)
-            {
-                switch (i)
-                {
-                    case 0: e = e0; b = b0; break;
-                    case 1: e = e1; b = b1; break;
-                    case 2: e = e2; b = b2; break;
-                    case 3: e = e3; b = b3; break;
-                    case 4: e = e4; b = b4; break;
-                    case 5: e = e5; b = b5; break;
-                    case 6: e = e6; b = b6; break;
-                    case 7: e = e7; b = b7; break;
-                    default:
-                        Debug.Assert(_deeper != null, "Expecting the `deeper` parent stack created before accessing it here at level " + i);
-                        ref var p = ref _deeper.Items[i - _deeperStartsAtLevel];
-                        e = p.NextEntry; b = p.NextBranch;
-                        break;
-                }
-            }
-        }
-
-        /// <summary>Non-allocating enumerator</summary>
-        public struct Enumerable<V> : IEnumerable<VEntry<V>>, IEnumerable
-        {
-            private readonly ImHashMap<int, V> _map;
-            /// <summary>Constructor</summary>
-            public Enumerable(ImHashMap<int, V> map) => _map = map;
-
-            /// <summary>Returns non-allocating enumerator</summary>
-            public Enumerator<V> GetEnumerator() => new Enumerator<V> { _map = _map };
-            IEnumerator<VEntry<V>> IEnumerable<VEntry<V>>.GetEnumerator() => new Enumerator<V> { _map = _map };
-            IEnumerator IEnumerable.GetEnumerator() => new Enumerator<V> { _map = _map };
-        }
-
-        /// <summary>Enumerator on stack, without allocation</summary>
-        public struct Enumerator<V> : IEnumerator<VEntry<V>>, IDisposable, IEnumerator
-        {
-            internal ImHashMap<int, V> _map;
-            private short _state;
-            private ushort _index;
-            private MapStack<int, V> _ps;
-
-            internal void ReInit(ImHashMap<int, V> map)
-            {
-                _map = map;
-                _state = default;
-                _index = default;
-                _ps = default;
-            }
-
-            private ImHashMap<int, V> _nextBranch;
-            private ImHashMap<int, V>.Branch2Plus _b2PlusLeftWasEnumerated;
-
-            private ImHashMap<int, V>.Entry _a, _b, _c, _d, _e, _f, _g, _h;
-            internal VEntry<V> _current;
-            /// <inheritdoc />
-            public VEntry<V> Current => _current;
-            object IEnumerator.Current => _current;
-
-            [MethodImpl((MethodImplOptions)256)]
-            private bool SetCurrentAndState(ImHashMap<int, V>.Entry e, short nextState)
-            {
-                _state = nextState;
-                _current = (VEntry<V>)e;
-                return true;
-            }
-
-            /// <inheritdoc />
-            public bool MoveNext()
-            {
-                ImHashMap<int, V>.Leaf5PlusPlus b21FullLeaf511;
-                switch (_state)
-                {
-                    case 0:
-                        if (_map == ImHashMap<int, V>.Empty)
-                            return false;
-                        if (_map is VEntry<V> singleEntryMap)
-                            return SetCurrentAndState(singleEntryMap, 1);
-                        _state = -1; // todo: @perf optimize just by setting _state = -1 for all
-                        goto Label0;
-                    case 1:
-                        // end of enumeration
-                        _state = -1;
-                        _current = null;
+                case 0:
+                    if (_map == ImHashMap<int, V>.Empty)
                         return false;
-                    case 2:
-                        b21FullLeaf511 = (ImHashMap<int, V>.Leaf5PlusPlus)_b2PlusLeftWasEnumerated.B.Right;
-                        _g = (VEntry<V>)_b2PlusLeftWasEnumerated.Plus;
-                        _b2PlusLeftWasEnumerated = null;
-                        _map = ImHashMap<int, V>.Empty;
-                        _state = -1;
-                        goto SortLeaf511Label;
-                    case 3: return SetCurrentAndState(_a, 4);
-                    case 4: return SetCurrentAndState(_b, 5);
-                    case 5: return SetCurrentAndState(_c, 6);
-                    case 6: return SetCurrentAndState(_d, 7);
-                    case 7: return SetCurrentAndState(_e, 8);
-                    case 8: return SetCurrentAndState(_f, 9);
-                    case 9: return SetCurrentAndState(_g, 10);
-                    case 10:
-                        if (_h == null)
-                        {
-                            _state = -1;
-                            goto Label2;
-                        }
-                        return SetCurrentAndState(_h, 11);
-                    case 11:
+                    if (_map is VEntry<V> singleEntryMap)
+                        return SetCurrentAndState(singleEntryMap, 1);
+                    _state = -1; // todo: @perf optimize just by setting _state = -1 for all
+                    goto Label0;
+                case 1:
+                    // end of enumeration
+                    _state = -1;
+                    _current = null;
+                    return false;
+                case 2:
+                    b21FullLeaf511 = (ImHashMap<int, V>.Leaf5PlusPlus)_b2PlusLeftWasEnumerated.B.Right;
+                    _g = (VEntry<V>)_b2PlusLeftWasEnumerated.Plus;
+                    _b2PlusLeftWasEnumerated = null;
+                    _map = ImHashMap<int, V>.Empty;
+                    _state = -1;
+                    goto SortLeaf511Label;
+                case 3: return SetCurrentAndState(_a, 4);
+                case 4: return SetCurrentAndState(_b, 5);
+                case 5: return SetCurrentAndState(_c, 6);
+                case 6: return SetCurrentAndState(_d, 7);
+                case 7: return SetCurrentAndState(_e, 8);
+                case 8: return SetCurrentAndState(_f, 9);
+                case 9: return SetCurrentAndState(_g, 10);
+                case 10:
+                    if (_h == null)
+                    {
                         _state = -1;
                         goto Label2;
-                    case 12:
-                        return SetCurrentAndState(_a, 13);
-                    case 13:
-                        _state = -1;
-                        goto Label3;
-                    case 14:
-                        return SetCurrentAndState(_h, 15);
-                    case 15:
-                        return SetCurrentAndState(_g, 16);
-                    case 16:
-                        _state = -1; _h = null; _g = null;
-                        goto Label3;
-                    case 17: return SetCurrentAndState(_g, 18);
-                    case 18: return SetCurrentAndState(_h, 19);
-                    case 19: return SetCurrentAndState(_e, 20);
-                    case 20:
-                        _state = -1; _g = null; _h = null; _e = null;
-                        goto Label3;
-                    case 21: return SetCurrentAndState(_a, 22);
-                    case 22: return SetCurrentAndState(_b, 23);
-                    case 23: return SetCurrentAndState(_c, 24);
-                    case 24: return SetCurrentAndState(_d, 25);
-                    case 25:
-                        _state = -1;
-                        break;
-                    case 26: return SetCurrentAndState(_e, 27);
-                    case 27: return SetCurrentAndState(_h, 28);
-                    case 28: return SetCurrentAndState(_g, 29);
-                    case 29: return SetCurrentAndState(_f, 30);
-                    case 30: return SetCurrentAndState(_d, 31);
-                    case 31:
-                        _state = -1; _e = null; _h = null; _g = null; _f = null; _d = null;
-                        break;
-                    case 32: return SetCurrentAndState(_d, 33);
-                    case 33: return SetCurrentAndState(_f, 34);
-                    case 34: return SetCurrentAndState(_g, 35);
-                    case 35: return SetCurrentAndState(_h, 36);
-                    case 36: return SetCurrentAndState(_c, 37);
-                    case 37: return SetCurrentAndState(_e, 38);
-                    case 38:
-                        _state = -1; _d = null; _f = null; _g = null; _h = null; _e = null; _c = null;
-                        break;
-                    case 39:
-                        _state = -1;
-                        break;
-                    case 40:
-                        _state = -1;
-                        _map = _nextBranch;
-                        _nextBranch = null;
-                        _a = null;
-                        goto Label0;
-                    default:
-                        return false;
-                }
-            Label6:
-                _a = null; _b = null; _c = null; _d = null;
-            Label3:
-                if (_b2PlusLeftWasEnumerated == null)
-                {
-                    if (_index == 0)
-                        return false;
-                    ImHashMap<int, V>.Entry current = null;
-                    var popIndex = (ushort)(_index - 1);
-                    _ps.Get(popIndex, ref current, ref _nextBranch);
-                    // Sets the previous state so that we are modifying any fields like _a, _b, etc. and directly goto back to this label
-                    SetCurrentAndState((VEntry<V>)current, 40);
-                    if (_state == 40)
-                        _index = popIndex; // proceed
-                    return true;
-                }
-            Label0:
-                while (true)
-                {
-                    if (_map is ImHashMap<int, V>.Branch2Base branch2)
-                    {
-                        _ps.Put(_index++, branch2.MidEntry, branch2.Right);
-                        _map = branch2.Left;
                     }
-                    else if (_map is ImHashMap<int, V>.Branch3Base branch3)
-                    {
-                        _ps.Put(_index, branch3.Entry1, branch3.Right, branch3.Entry0, branch3.Middle);
-                        _index += 2;
-                        _map = branch3.Left;
-                    }
-                    else break;
-                }
-
-                if (_b2PlusLeftWasEnumerated == null && !(_map is ImHashMap<int, V>.Branch2Plus))
-                    goto AllLeafsAndEntryLabel;
-
-                _g = null; _h = null;
-                if (_b2PlusLeftWasEnumerated != null)
-                    return SetCurrentAndState((VEntry<V>)_b2PlusLeftWasEnumerated.B.MidEntry, 2);
-
-                var branch2Plus = (ImHashMap<int, V>.Branch2Plus)_map;
-                var b21b = branch2Plus.B;
-                if (b21b.Right is ImHashMap<int, V>.Leaf5PlusPlus)
-                {
-                    _b2PlusLeftWasEnumerated = branch2Plus;
-                    _map = b21b.Left;
-                    goto B2PlusNotFilledLeftLeafLabel;
-                }
-
-                b21FullLeaf511 = (ImHashMap<int, V>.Leaf5PlusPlus)b21b.Left;
-                _h = (VEntry<V>)b21b.MidEntry;
-                _g = (VEntry<V>)branch2Plus.Plus;
-                _map = b21b.Right;
-            SortLeaf511Label:
-                {
-                    var l = b21FullLeaf511.L.L;
-                    var e0 = l.Entry0;
-                    _a = l.Entry1;
-                    _b = l.Entry2;
-                    _c = l.Entry3;
-                    _d = l.Entry4;
-                    _f = b21FullLeaf511.Plus;
-                    _e = b21FullLeaf511.L.Plus;
-                    InsertInOrder(_e.Hash, ref _e, ref e0, ref _a, ref _b, ref _c, ref _d);
-                    InsertInOrder(_f.Hash, ref _f, ref e0, ref _a, ref _b, ref _c, ref _d, ref _e);
-                    InsertInOrder(_g.Hash, ref _g, ref e0, ref _a, ref _b, ref _c, ref _d, ref _e, ref _f);
-                    return SetCurrentAndState(e0, 3);
-                }
-            Label2:
-                _a = null; _b = null; _c = null; _d = null; _e = null; _f = null;
-
-            B2PlusNotFilledLeftLeafLabel:
-                _g = null; _h = null;
-
-            AllLeafsAndEntryLabel:
-                if (_map is ImHashMap<int, V>.Leaf2 l2)
-                {
-                    _a = l2.Entry1;
-                    return SetCurrentAndState(l2.Entry0, 12);
-                }
-                if (_map is ImHashMap<int, V>.Leaf2Plus l21)
-                {
-                    var l = l21.L;
-                    var e0 = l.Entry0;
-                    _h = l.Entry1;
-                    _g = l21.Plus;
-                    InsertInOrder(_g.Hash, ref _g, ref e0, ref _h);
-                    return SetCurrentAndState(e0, 14);
-                }
-                if (_map is ImHashMap<int, V>.Leaf2PlusPlus l211)
-                {
-                    var l1 = l211.L.L;
-                    var e0 = l1.Entry0;
-                    _g = l1.Entry1;
-                    _h = l211.L.Plus;
-                    _e = l211.Plus;
-                    InsertInOrder(_h.Hash, ref _h, ref e0, ref _g);
-                    InsertInOrder(_e.Hash, ref _e, ref e0, ref _g, ref _h);
-                    return SetCurrentAndState(e0, 17);
-                }
-                if (_map is ImHashMap<int, V>.Leaf5 l5)
-                {
-                    _a = l5.Entry1;
-                    _b = l5.Entry2;
-                    _c = l5.Entry3;
-                    _d = l5.Entry4;
-                    return SetCurrentAndState(l5.Entry0, 21);
-                }
-                if (_map is ImHashMap<int, V>.Leaf5Plus l51)
-                {
-                    var leaf5 = l51.L;
-                    var e0 = leaf5.Entry0;
-                    _e = leaf5.Entry1;
-                    _h = leaf5.Entry2;
-                    _g = leaf5.Entry3;
-                    _f = leaf5.Entry4;
-                    _d = l51.Plus;
-                    InsertInOrder(_d.Hash, ref _d, ref e0, ref _e, ref _h, ref _g, ref _f);
-                    return SetCurrentAndState(e0, 26);
-                }
-                if (_map is ImHashMap<int, V>.Leaf5PlusPlus l511)
-                {
-                    var leaf51 = l511.L.L;
-                    var e0 = leaf51.Entry0;
-                    _d = leaf51.Entry1;
-                    _f = leaf51.Entry2;
-                    _g = leaf51.Entry3;
-                    _h = leaf51.Entry4;
-                    _c = l511.L.Plus;
-                    _e = l511.Plus;
-                    InsertInOrder(_c.Hash, ref _c, ref e0, ref _d, ref _f, ref _g, ref _h);
-                    InsertInOrder(_e.Hash, ref _e, ref e0, ref _d, ref _f, ref _g, ref _h, ref _c);
-                    return SetCurrentAndState(e0, 32);
-                }
-                if (_map is ImHashMap<int, V>.Entry e)
-                    return SetCurrentAndState(e, 39);
-                goto Label6;
+                    return SetCurrentAndState(_h, 11);
+                case 11:
+                    _state = -1;
+                    goto Label2;
+                case 12:
+                    return SetCurrentAndState(_a, 13);
+                case 13:
+                    _state = -1;
+                    goto Label3;
+                case 14:
+                    return SetCurrentAndState(_h, 15);
+                case 15:
+                    return SetCurrentAndState(_g, 16);
+                case 16:
+                    _state = -1; _h = null; _g = null;
+                    goto Label3;
+                case 17: return SetCurrentAndState(_g, 18);
+                case 18: return SetCurrentAndState(_h, 19);
+                case 19: return SetCurrentAndState(_e, 20);
+                case 20:
+                    _state = -1; _g = null; _h = null; _e = null;
+                    goto Label3;
+                case 21: return SetCurrentAndState(_a, 22);
+                case 22: return SetCurrentAndState(_b, 23);
+                case 23: return SetCurrentAndState(_c, 24);
+                case 24: return SetCurrentAndState(_d, 25);
+                case 25:
+                    _state = -1;
+                    break;
+                case 26: return SetCurrentAndState(_e, 27);
+                case 27: return SetCurrentAndState(_h, 28);
+                case 28: return SetCurrentAndState(_g, 29);
+                case 29: return SetCurrentAndState(_f, 30);
+                case 30: return SetCurrentAndState(_d, 31);
+                case 31:
+                    _state = -1; _e = null; _h = null; _g = null; _f = null; _d = null;
+                    break;
+                case 32: return SetCurrentAndState(_d, 33);
+                case 33: return SetCurrentAndState(_f, 34);
+                case 34: return SetCurrentAndState(_g, 35);
+                case 35: return SetCurrentAndState(_h, 36);
+                case 36: return SetCurrentAndState(_c, 37);
+                case 37: return SetCurrentAndState(_e, 38);
+                case 38:
+                    _state = -1; _d = null; _f = null; _g = null; _h = null; _e = null; _c = null;
+                    break;
+                case 39:
+                    _state = -1;
+                    break;
+                case 40:
+                    _state = -1;
+                    _map = _nextBranch;
+                    _nextBranch = null;
+                    _a = null;
+                    goto Label0;
+                default:
+                    return false;
             }
-
-            bool IEnumerator.MoveNext() => MoveNext();
-            void IEnumerator.Reset() => throw new NotSupportedException();
-            void IDisposable.Dispose() { }
-        }
-
-        /// <summary>Non-allocating enumerator</summary>
-        public struct Enumerable<K, V> : IEnumerable<KVEntry<K, V>>, IEnumerable
-        {
-            private readonly ImHashMap<K, V> _map;
-            /// <summary>Constructor</summary>
-            public Enumerable(ImHashMap<K, V> map) => _map = map;
-
-            /// <summary>Returns non-allocating enumerator</summary>
-            public Enumerator<K, V> GetEnumerator() => new Enumerator<K, V> { _map = _map };
-            IEnumerator<KVEntry<K, V>> IEnumerable<KVEntry<K, V>>.GetEnumerator() => new Enumerator<K, V> { _map = _map };
-            IEnumerator IEnumerable.GetEnumerator() => new Enumerator<K, V> { _map = _map };
-        }
-
-        /// <summary>Enumerator on stack, without allocation</summary>
-        public struct Enumerator<K, V> : IEnumerator<KVEntry<K, V>>, IDisposable, IEnumerator
-        {
-            internal ImHashMap<K, V> _map;
-            private short _state;
-            private short _conflictIndex;
-            private ushort _index;
-            private MapStack<K, V> _ps;
-
-            internal void ReInit(ImHashMap<K, V> map)
+        Label6:
+            _a = null; _b = null; _c = null; _d = null;
+        Label3:
+            if (_b2PlusLeftWasEnumerated == null)
             {
-                _map = map;
-                _state = default;
-                _index = default;
-                _ps = default;
-            }
-
-            private ImHashMap<K, V> _nextBranch;
-            private ImHashMap<K, V>.Branch2Plus _b21LeftWasEnumerated;
-            private ImHashMap<K, V>.Entry _a, _b, _c, _d, _e, _f, _g, _h, _hc;
-            internal KVEntry<K, V> _current;
-            /// <inheritdoc />
-            public KVEntry<K, V> Current => _current;
-            object IEnumerator.Current => _current;
-
-            [MethodImpl((MethodImplOptions)256)]
-            private bool SetCurrentAndState(ImHashMap<K, V>.Entry e, short nextState, short prevState)
-            {
-                _state = nextState;
-                _current = e as KVEntry<K, V> ?? GetCurrentFrom((ImHashMap<K, V>.HashConflictingEntry)e, prevState);
+                if (_index == 0)
+                    return false;
+                ImHashMap<int, V>.Entry current = null;
+                var popIndex = (ushort)(_index - 1);
+                _ps.Get(popIndex, ref current, ref _nextBranch);
+                // Sets the previous state so that we are modifying any fields like _a, _b, etc. and directly goto back to this label
+                SetCurrentAndState((VEntry<V>)current, 40);
+                if (_state == 40)
+                    _index = popIndex; // proceed
                 return true;
             }
-
-            private KVEntry<K, V> GetCurrentFrom(ImHashMap<K, V>.HashConflictingEntry hc, short prevState)
+        Label0:
+            while (true)
             {
+                if (_map is ImHashMap<int, V>.Branch2Base branch2)
+                {
+                    _ps.Put(_index++, branch2.MidEntry, branch2.Right);
+                    _map = branch2.Left;
+                }
+                else if (_map is ImHashMap<int, V>.Branch3Base branch3)
+                {
+                    _ps.Put(_index, branch3.Entry1, branch3.Right, branch3.Entry0, branch3.Middle);
+                    _index += 2;
+                    _map = branch3.Left;
+                }
+                else break;
+            }
+
+            if (_b2PlusLeftWasEnumerated == null && !(_map is ImHashMap<int, V>.Branch2Plus))
+                goto AllLeafsAndEntryLabel;
+
+            _g = null; _h = null;
+            if (_b2PlusLeftWasEnumerated != null)
+                return SetCurrentAndState((VEntry<V>)_b2PlusLeftWasEnumerated.B.MidEntry, 2);
+
+            var branch2Plus = (ImHashMap<int, V>.Branch2Plus)_map;
+            var b21b = branch2Plus.B;
+            if (b21b.Right is ImHashMap<int, V>.Leaf5PlusPlus)
+            {
+                _b2PlusLeftWasEnumerated = branch2Plus;
+                _map = b21b.Left;
+                goto B2PlusNotFilledLeftLeafLabel;
+            }
+
+            b21FullLeaf511 = (ImHashMap<int, V>.Leaf5PlusPlus)b21b.Left;
+            _h = (VEntry<V>)b21b.MidEntry;
+            _g = (VEntry<V>)branch2Plus.Plus;
+            _map = b21b.Right;
+        SortLeaf511Label:
+            {
+                var l = b21FullLeaf511.L.L;
+                var e0 = l.Entry0;
+                _a = l.Entry1;
+                _b = l.Entry2;
+                _c = l.Entry3;
+                _d = l.Entry4;
+                _f = b21FullLeaf511.Plus;
+                _e = b21FullLeaf511.L.Plus;
+                InsertInOrder(_e.Hash, ref _e, ref e0, ref _a, ref _b, ref _c, ref _d);
+                InsertInOrder(_f.Hash, ref _f, ref e0, ref _a, ref _b, ref _c, ref _d, ref _e);
+                InsertInOrder(_g.Hash, ref _g, ref e0, ref _a, ref _b, ref _c, ref _d, ref _e, ref _f);
+                return SetCurrentAndState(e0, 3);
+            }
+        Label2:
+            _a = null; _b = null; _c = null; _d = null; _e = null; _f = null;
+
+        B2PlusNotFilledLeftLeafLabel:
+            _g = null; _h = null;
+
+        AllLeafsAndEntryLabel:
+            if (_map is ImHashMap<int, V>.Leaf2 l2)
+            {
+                _a = l2.Entry1;
+                return SetCurrentAndState(l2.Entry0, 12);
+            }
+            if (_map is ImHashMap<int, V>.Leaf2Plus l21)
+            {
+                var l = l21.L;
+                var e0 = l.Entry0;
+                _h = l.Entry1;
+                _g = l21.Plus;
+                InsertInOrder(_g.Hash, ref _g, ref e0, ref _h);
+                return SetCurrentAndState(e0, 14);
+            }
+            if (_map is ImHashMap<int, V>.Leaf2PlusPlus l211)
+            {
+                var l1 = l211.L.L;
+                var e0 = l1.Entry0;
+                _g = l1.Entry1;
+                _h = l211.L.Plus;
+                _e = l211.Plus;
+                InsertInOrder(_h.Hash, ref _h, ref e0, ref _g);
+                InsertInOrder(_e.Hash, ref _e, ref e0, ref _g, ref _h);
+                return SetCurrentAndState(e0, 17);
+            }
+            if (_map is ImHashMap<int, V>.Leaf5 l5)
+            {
+                _a = l5.Entry1;
+                _b = l5.Entry2;
+                _c = l5.Entry3;
+                _d = l5.Entry4;
+                return SetCurrentAndState(l5.Entry0, 21);
+            }
+            if (_map is ImHashMap<int, V>.Leaf5Plus l51)
+            {
+                var leaf5 = l51.L;
+                var e0 = leaf5.Entry0;
+                _e = leaf5.Entry1;
+                _h = leaf5.Entry2;
+                _g = leaf5.Entry3;
+                _f = leaf5.Entry4;
+                _d = l51.Plus;
+                InsertInOrder(_d.Hash, ref _d, ref e0, ref _e, ref _h, ref _g, ref _f);
+                return SetCurrentAndState(e0, 26);
+            }
+            if (_map is ImHashMap<int, V>.Leaf5PlusPlus l511)
+            {
+                var leaf51 = l511.L.L;
+                var e0 = leaf51.Entry0;
+                _d = leaf51.Entry1;
+                _f = leaf51.Entry2;
+                _g = leaf51.Entry3;
+                _h = leaf51.Entry4;
+                _c = l511.L.Plus;
+                _e = l511.Plus;
+                InsertInOrder(_c.Hash, ref _c, ref e0, ref _d, ref _f, ref _g, ref _h);
+                InsertInOrder(_e.Hash, ref _e, ref e0, ref _d, ref _f, ref _g, ref _h, ref _c);
+                return SetCurrentAndState(e0, 32);
+            }
+            if (_map is ImHashMap<int, V>.Entry e)
+                return SetCurrentAndState(e, 39);
+            goto Label6;
+        }
+
+        bool IEnumerator.MoveNext() => MoveNext();
+        void IEnumerator.Reset() => throw new NotSupportedException();
+        void IDisposable.Dispose() { }
+    }
+
+    /// <summary>Non-allocating enumerator</summary>
+    public struct Enumerable<K, V> : IEnumerable<KVEntry<K, V>>, IEnumerable
+    {
+        private readonly ImHashMap<K, V> _map;
+        /// <summary>Constructor</summary>
+        public Enumerable(ImHashMap<K, V> map) => _map = map;
+
+        /// <summary>Returns non-allocating enumerator</summary>
+        public Enumerator<K, V> GetEnumerator() => new Enumerator<K, V> { _map = _map };
+        IEnumerator<KVEntry<K, V>> IEnumerable<KVEntry<K, V>>.GetEnumerator() => new Enumerator<K, V> { _map = _map };
+        IEnumerator IEnumerable.GetEnumerator() => new Enumerator<K, V> { _map = _map };
+    }
+
+    /// <summary>Enumerator on stack, without allocation</summary>
+    public struct Enumerator<K, V> : IEnumerator<KVEntry<K, V>>, IDisposable, IEnumerator
+    {
+        internal ImHashMap<K, V> _map;
+        private short _state;
+        private short _conflictIndex;
+        private ushort _index;
+        private MapStack<K, V> _ps;
+
+        internal void ReInit(ImHashMap<K, V> map)
+        {
+            _map = map;
+            _state = default;
+            _index = default;
+            _ps = default;
+        }
+
+        private ImHashMap<K, V> _nextBranch;
+        private ImHashMap<K, V>.Branch2Plus _b21LeftWasEnumerated;
+        private ImHashMap<K, V>.Entry _a, _b, _c, _d, _e, _f, _g, _h, _hc;
+        internal KVEntry<K, V> _current;
+        /// <inheritdoc />
+        public KVEntry<K, V> Current => _current;
+        object IEnumerator.Current => _current;
+
+        [MethodImpl((MethodImplOptions)256)]
+        private bool SetCurrentAndState(ImHashMap<K, V>.Entry e, short nextState, short prevState)
+        {
+            _state = nextState;
+            _current = e as KVEntry<K, V> ?? GetCurrentFrom((ImHashMap<K, V>.HashConflictingEntry)e, prevState);
+            return true;
+        }
+
+        private KVEntry<K, V> GetCurrentFrom(ImHashMap<K, V>.HashConflictingEntry hc, short prevState)
+        {
+            var cs = hc.Conflicts;
+            var i = _conflictIndex;
+            // undo the next state until we are done with conflicts
+            if (++_conflictIndex < cs.Length)
+                _state = prevState;
+            else // reset the index of conflicts todo: @perf use special value to avoid the type check later
+                _conflictIndex = 0;
+            return (KVEntry<K, V>)cs[i];
+        }
+
+        private bool SetCurrentAndState(short nextState, short prevState)
+        {
+            _state = nextState;
+            if (_hc is KVEntry<K, V> kv)
+            {
+                _current = kv;
+                _hc = null;
+            }
+            else
+            {
+                var hc = (ImHashMap<K, V>.HashConflictingEntry)_hc;
                 var cs = hc.Conflicts;
                 var i = _conflictIndex;
                 // undo the next state until we are done with conflicts
                 if (++_conflictIndex < cs.Length)
                     _state = prevState;
                 else // reset the index of conflicts todo: @perf use special value to avoid the type check later
+                {
                     _conflictIndex = 0;
-                return (KVEntry<K, V>)cs[i];
+                    _hc = null;
+                }
+                _current = (KVEntry<K, V>)cs[i];
+            }
+            return true;
+        }
+
+        /// <inheritdoc />
+        public bool MoveNext()
+        {
+            ImHashMap<K, V>.Leaf5PlusPlus b21FullLeaf511;
+            switch (_state)
+            {
+                case 0:
+                    if (_map == ImHashMap<K, V>.Empty)
+                        return false;
+                    if (_map is ImHashMap<K, V>.Entry singleEntryMap)
+                        return SetCurrentAndState(singleEntryMap, 1, 0);
+                    _state = -1; // todo: @perf optimize just by setting _state = -1 for all
+                    goto Label0;
+                case 1:
+                    // end of enumeration
+                    _state = -1;
+                    _current = null;
+                    return false;
+                case 2:
+                    b21FullLeaf511 = (ImHashMap<K, V>.Leaf5PlusPlus)_b21LeftWasEnumerated.B.Right;
+                    _g = _b21LeftWasEnumerated.Plus;
+                    _b21LeftWasEnumerated = null;
+                    _map = ImHashMap<K, V>.Empty;
+                    _state = -1;
+                    goto SortLeaf511Label;
+                case 3: return SetCurrentAndState(_a, 4, 3);
+                case 4: return SetCurrentAndState(_b, 5, 4);
+                case 5: return SetCurrentAndState(_c, 6, 5);
+                case 6: return SetCurrentAndState(_d, 7, 6);
+                case 7: return SetCurrentAndState(_e, 8, 7);
+                case 8: return SetCurrentAndState(_f, 9, 8);
+                case 9: return SetCurrentAndState(_g, 10, 9);
+                case 10:
+                    if (_h == null)
+                    {
+                        _state = -1;
+                        goto Label2;
+                    }
+                    return SetCurrentAndState(_h, 11, 10);
+                case 11:
+                    _state = -1;
+                    goto Label2;
+                case 12: return SetCurrentAndState(_a, 13, 12);
+                case 13:
+                    _state = -1;
+                    goto Label3;
+                case 14: return SetCurrentAndState(_h, 15, 14);
+                case 15: return SetCurrentAndState(_g, 16, 15);
+                case 16:
+                    _state = -1; _h = null; _g = null;
+                    goto Label3;
+                case 17: return SetCurrentAndState(_g, 18, 17);
+                case 18: return SetCurrentAndState(_h, 19, 18);
+                case 19: return SetCurrentAndState(_e, 20, 19);
+                case 20:
+                    _state = -1; _g = null; _h = null; _e = null;
+                    goto Label3;
+                case 21: return SetCurrentAndState(_a, 22, 21);
+                case 22: return SetCurrentAndState(_b, 23, 22);
+                case 23: return SetCurrentAndState(_c, 24, 23);
+                case 24: return SetCurrentAndState(_d, 25, 24);
+                case 25:
+                    _state = -1;
+                    break;
+                case 26: return SetCurrentAndState(_e, 27, 26);
+                case 27: return SetCurrentAndState(_h, 28, 27);
+                case 28: return SetCurrentAndState(_g, 29, 28);
+                case 29: return SetCurrentAndState(_f, 30, 29);
+                case 30: return SetCurrentAndState(_d, 31, 30);
+                case 31:
+                    _state = -1; _e = null; _h = null; _g = null; _f = null; _d = null;
+                    break;
+                case 32: return SetCurrentAndState(_d, 33, 32);
+                case 33: return SetCurrentAndState(_f, 34, 33);
+                case 34: return SetCurrentAndState(_g, 35, 34);
+                case 35: return SetCurrentAndState(_h, 36, 35);
+                case 36: return SetCurrentAndState(_c, 37, 36);
+                case 37: return SetCurrentAndState(_e, 38, 37);
+                case 38:
+                    _state = -1; _d = null; _f = null; _g = null; _h = null; _e = null; _c = null;
+                    break;
+                case 39:
+                    _state = -1;
+                    break;
+                case 40:
+                    _state = -1;
+                    _map = _nextBranch;
+                    _a = null;
+                    _nextBranch = null;
+                    goto Label0;
+                case 41: goto HashConflictingEntryLabel0;
+                case 42: goto HashConflictingEntryLabel1;
+                case 43: goto HashConflictingEntryLabel2;
+                case 44: goto HashConflictingEntryLabel3;
+                case 45: goto HashConflictingEntryLabel4;
+                case 46: goto HashConflictingEntryLabel5;
+                case 47: goto HashConflictingEntryLabel6;
+                case 48: goto HashConflictingEntryLabel7;
+                case 49: goto HashConflictingEntryLabel8;
+                default:
+                    return false;
+            }
+        Label6:
+            _a = null; _b = null; _c = null; _d = null;
+        Label3:
+            if (_b21LeftWasEnumerated == null)
+            {
+                if (_index == 0)
+                    return false;
+                ImHashMap<K, V>.Entry current = null;
+                var popIndex = (ushort)(_index - 1);
+                _ps.Get(popIndex, ref current, ref _nextBranch);
+                // Sets the previous state so that we are modifying any fields like _a, _b, etc. and directly goto back to this label
+                SetCurrentAndState(current, 40, 13);
+                if (_state == 40)
+                    _index = popIndex; // proceed
+                return true;
+            }
+        Label0:
+            while (true)
+            {
+                if (_map is ImHashMap<K, V>.Branch2Base branch2)
+                {
+                    _ps.Put(_index++, branch2.MidEntry, branch2.Right);
+                    _map = branch2.Left;
+                }
+                else if (_map is ImHashMap<K, V>.Branch3Base branch3)
+                {
+                    _ps.Put(_index, branch3.Entry1, branch3.Right, branch3.Entry0, branch3.Middle);
+                    _index += 2;
+                    _map = branch3.Left;
+                }
+                else break;
             }
 
-            private bool SetCurrentAndState(short nextState, short prevState)
+            if (_b21LeftWasEnumerated == null && !(_map is ImHashMap<K, V>.Branch2Plus))
+                goto AllLeafsAndEntryLabel;
+
+            _g = null; _h = null;
+        HashConflictingEntryLabel0:
+            if (_b21LeftWasEnumerated != null)
+                return SetCurrentAndState(_b21LeftWasEnumerated.B.MidEntry, 2, 41);
+
+            var branch2Plus1 = (ImHashMap<K, V>.Branch2Plus)_map;
+            var b21b = branch2Plus1.B;
+            if (b21b.Right is ImHashMap<K, V>.Leaf5PlusPlus)
             {
-                _state = nextState;
-                if (_hc is KVEntry<K, V> kv)
+                _b21LeftWasEnumerated = branch2Plus1;
+                _map = b21b.Left;
+                goto B21NotFilledLeftLeafLabel;
+            }
+
+            b21FullLeaf511 = (ImHashMap<K, V>.Leaf5PlusPlus)b21b.Left;
+            _h = b21b.MidEntry;
+            _g = branch2Plus1.Plus;
+            _map = b21b.Right;
+
+        SortLeaf511Label:
+            {
+                var l = b21FullLeaf511.L.L;
+                var e0 = l.Entry0;
+                _a = l.Entry1;
+                _b = l.Entry2;
+                _c = l.Entry3;
+                _d = l.Entry4;
+                _f = b21FullLeaf511.Plus;
+                _e = b21FullLeaf511.L.Plus;
+                InsertInOrder(_e.Hash, ref _e, ref e0, ref _a, ref _b, ref _c, ref _d);
+                InsertInOrder(_f.Hash, ref _f, ref e0, ref _a, ref _b, ref _c, ref _d, ref _e);
+                InsertInOrder(_g.Hash, ref _g, ref e0, ref _a, ref _b, ref _c, ref _d, ref _e, ref _f);
+                _hc = e0;
+            }
+        HashConflictingEntryLabel1:
+            return SetCurrentAndState(3, 42);
+
+        Label2:
+            _a = null; _b = null; _c = null; _d = null; _e = null; _f = null;
+
+        B21NotFilledLeftLeafLabel:
+            _g = null; _h = null;
+
+        AllLeafsAndEntryLabel:
+        HashConflictingEntryLabel2:
+            if (_map is ImHashMap<K, V>.Leaf2 l2)
+            {
+                _a = l2.Entry1;
+                return SetCurrentAndState(l2.Entry0, 12, 43);
+            }
+            if (_map is ImHashMap<K, V>.Leaf2Plus l21)
+            {
+                var l = l21.L;
+                ImHashMap<K, V>.Entry e0 = l.Entry0;
+                _h = l.Entry1;
+                _g = l21.Plus;
+                InsertInOrder(_g.Hash, ref _g, ref e0, ref _h);
+                _hc = e0;
+            }
+        HashConflictingEntryLabel3:
+            if (_hc != null)
+                return SetCurrentAndState(14, 44);
+            if (_map is ImHashMap<K, V>.Leaf2PlusPlus l211)
+            {
+                var l1 = l211.L.L;
+                ImHashMap<K, V>.Entry e0 = l1.Entry0;
+                _g = l1.Entry1;
+                _h = l211.L.Plus;
+                _e = l211.Plus;
+                InsertInOrder(_h.Hash, ref _h, ref e0, ref _g);
+                InsertInOrder(_e.Hash, ref _e, ref e0, ref _g, ref _h);
+                _hc = e0;
+            }
+        HashConflictingEntryLabel4:
+            if (_hc != null)
+                return SetCurrentAndState(17, 45);
+            if (_map is ImHashMap<K, V>.Leaf5 l5)
+            {
+                _a = l5.Entry1;
+                _b = l5.Entry2;
+                _c = l5.Entry3;
+                _d = l5.Entry4;
+                _hc = l5.Entry0;
+            }
+        HashConflictingEntryLabel5:
+            if (_hc != null)
+                return SetCurrentAndState(21, 46);
+            if (_map is ImHashMap<K, V>.Leaf5Plus l51)
+            {
+                var leaf5 = l51.L;
+                ImHashMap<K, V>.Entry e0 = leaf5.Entry0;
+                _e = leaf5.Entry1;
+                _h = leaf5.Entry2;
+                _g = leaf5.Entry3;
+                _f = leaf5.Entry4;
+                _d = l51.Plus;
+                InsertInOrder(_d.Hash, ref _d, ref e0, ref _e, ref _h, ref _g, ref _f);
+                _hc = e0;
+            }
+        HashConflictingEntryLabel6:
+            if (_hc != null)
+                return SetCurrentAndState(26, 47);
+            if (_map is ImHashMap<K, V>.Leaf5PlusPlus l511)
+            {
+                var leaf51 = l511.L.L;
+                ImHashMap<K, V>.Entry e0 = leaf51.Entry0;
+                _d = leaf51.Entry1;
+                _f = leaf51.Entry2;
+                _g = leaf51.Entry3;
+                _h = leaf51.Entry4;
+                _c = l511.L.Plus;
+                _e = l511.Plus;
+                InsertInOrder(_c.Hash, ref _c, ref e0, ref _d, ref _f, ref _g, ref _h);
+                InsertInOrder(_e.Hash, ref _e, ref e0, ref _d, ref _f, ref _g, ref _h, ref _c);
+                _hc = e0;
+            }
+        HashConflictingEntryLabel7:
+            if (_hc != null)
+                return SetCurrentAndState(32, 48);
+            HashConflictingEntryLabel8:
+            if (_map is ImHashMap<K, V>.Entry e)
+                return SetCurrentAndState(e, 39, 49);
+            goto Label6;
+        }
+
+        bool IEnumerator.MoveNext() => MoveNext();
+        void IEnumerator.Reset() => throw new NotSupportedException();
+        void IDisposable.Dispose() { }
+    }
+
+    /// <summary>Enumerates all the map entries in the hash order.</summary>
+    public static Enumerable<V> Enumerate<V>(this ImHashMap<int, V> map) => new Enumerable<V>(map);
+
+    /// <summary>Enumerates all the map entries in the hash order.</summary>
+    public static Enumerable<K, V> Enumerate<K, V>(this ImHashMap<K, V> map) => new Enumerable<K, V>(map);
+
+    // todo: @feature I need to have ForEachUntil with the result of `Func<ImMapEntry<V>, int, S, bool> handler` saying when to stop, the implementation will be the same as for FindFirst!
+    /// <summary>Depth-first in-order of hash traversal as described in http://en.wikipedia.org/wiki/Tree_traversal.
+    /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
+    /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
+    public static S ForEach<K, V, S>(this ImHashMap<K, V> map, S state, Action<ImHashMapEntry<K, V>, int, S> handler, MapParentStack parents = null)
+    {
+        if (map == ImHashMap<K, V>.Empty)
+            return state;
+        if (map is ImHashMap<K, V>.Entry singleEntry)
+        {
+            singleEntry.ForEach(state, 0, handler);
+            return state;
+        }
+        ImHashMap<K, V>.Branch2Plus b21LeftWasEnumerated = null;
+        int count = 0, i = 0;
+        while (true)
+        {
+            if (map is ImHashMap<K, V>.Branch2Base b2)
+            {
+                if (parents == null)
+                    parents = new MapParentStack();
+                parents.Put(map, count++);
+                map = b2.Left;
+                continue;
+            }
+            if (map is ImHashMap<K, V>.Branch3Base b3)
+            {
+                if (parents == null)
+                    parents = new MapParentStack();
+                parents.Put(map, count++);
+                map = b3.Left;
+                continue;
+            }
+            if (b21LeftWasEnumerated != null || map is ImHashMap<K, V>.Branch2Plus)
+            {
+                ImHashMap<K, V>.Leaf5PlusPlus l511 = null;
+                ImHashMap<K, V>.Entry pl = null, mid = null;
+                if (b21LeftWasEnumerated != null)
                 {
-                    _current = kv;
-                    _hc = null;
+                    i = b21LeftWasEnumerated.B.MidEntry.ForEach(state, i, handler);
+
+                    l511 = (ImHashMap<K, V>.Leaf5PlusPlus)b21LeftWasEnumerated.B.Right;
+                    pl = b21LeftWasEnumerated.Plus;
+                    b21LeftWasEnumerated = null; // we done with the branch
+                    map = ImHashMap<K, V>.Empty; // forcing to skip leaves below
                 }
                 else
                 {
-                    var hc = (ImHashMap<K, V>.HashConflictingEntry)_hc;
-                    var cs = hc.Conflicts;
-                    var i = _conflictIndex;
-                    // undo the next state until we are done with conflicts
-                    if (++_conflictIndex < cs.Length)
-                        _state = prevState;
-                    else // reset the index of conflicts todo: @perf use special value to avoid the type check later
+                    var b21 = (ImHashMap<K, V>.Branch2Plus)map;
+                    if (b21.B.Right is ImHashMap<K, V>.Leaf5PlusPlus) // so we need to enumerate the left as a normal branch2 with the code below.
                     {
-                        _conflictIndex = 0;
-                        _hc = null;
+                        b21LeftWasEnumerated = b21;
+                        map = b21.B.Left;
                     }
-                    _current = (KVEntry<K, V>)cs[i];
-                }
-                return true;
-            }
-
-            /// <inheritdoc />
-            public bool MoveNext()
-            {
-                ImHashMap<K, V>.Leaf5PlusPlus b21FullLeaf511;
-                switch (_state)
-                {
-                    case 0:
-                        if (_map == ImHashMap<K, V>.Empty)
-                            return false;
-                        if (_map is ImHashMap<K, V>.Entry singleEntryMap)
-                            return SetCurrentAndState(singleEntryMap, 1, 0);
-                        _state = -1; // todo: @perf optimize just by setting _state = -1 for all
-                        goto Label0;
-                    case 1:
-                        // end of enumeration
-                        _state = -1;
-                        _current = null;
-                        return false;
-                    case 2:
-                        b21FullLeaf511 = (ImHashMap<K, V>.Leaf5PlusPlus)_b21LeftWasEnumerated.B.Right;
-                        _g = _b21LeftWasEnumerated.Plus;
-                        _b21LeftWasEnumerated = null;
-                        _map = ImHashMap<K, V>.Empty;
-                        _state = -1;
-                        goto SortLeaf511Label;
-                    case 3: return SetCurrentAndState(_a, 4, 3);
-                    case 4: return SetCurrentAndState(_b, 5, 4);
-                    case 5: return SetCurrentAndState(_c, 6, 5);
-                    case 6: return SetCurrentAndState(_d, 7, 6);
-                    case 7: return SetCurrentAndState(_e, 8, 7);
-                    case 8: return SetCurrentAndState(_f, 9, 8);
-                    case 9: return SetCurrentAndState(_g, 10, 9);
-                    case 10:
-                        if (_h == null)
-                        {
-                            _state = -1;
-                            goto Label2;
-                        }
-                        return SetCurrentAndState(_h, 11, 10);
-                    case 11:
-                        _state = -1;
-                        goto Label2;
-                    case 12: return SetCurrentAndState(_a, 13, 12);
-                    case 13:
-                        _state = -1;
-                        goto Label3;
-                    case 14: return SetCurrentAndState(_h, 15, 14);
-                    case 15: return SetCurrentAndState(_g, 16, 15);
-                    case 16:
-                        _state = -1; _h = null; _g = null;
-                        goto Label3;
-                    case 17: return SetCurrentAndState(_g, 18, 17);
-                    case 18: return SetCurrentAndState(_h, 19, 18);
-                    case 19: return SetCurrentAndState(_e, 20, 19);
-                    case 20:
-                        _state = -1; _g = null; _h = null; _e = null;
-                        goto Label3;
-                    case 21: return SetCurrentAndState(_a, 22, 21);
-                    case 22: return SetCurrentAndState(_b, 23, 22);
-                    case 23: return SetCurrentAndState(_c, 24, 23);
-                    case 24: return SetCurrentAndState(_d, 25, 24);
-                    case 25:
-                        _state = -1;
-                        break;
-                    case 26: return SetCurrentAndState(_e, 27, 26);
-                    case 27: return SetCurrentAndState(_h, 28, 27);
-                    case 28: return SetCurrentAndState(_g, 29, 28);
-                    case 29: return SetCurrentAndState(_f, 30, 29);
-                    case 30: return SetCurrentAndState(_d, 31, 30);
-                    case 31:
-                        _state = -1; _e = null; _h = null; _g = null; _f = null; _d = null;
-                        break;
-                    case 32: return SetCurrentAndState(_d, 33, 32);
-                    case 33: return SetCurrentAndState(_f, 34, 33);
-                    case 34: return SetCurrentAndState(_g, 35, 34);
-                    case 35: return SetCurrentAndState(_h, 36, 35);
-                    case 36: return SetCurrentAndState(_c, 37, 36);
-                    case 37: return SetCurrentAndState(_e, 38, 37);
-                    case 38:
-                        _state = -1; _d = null; _f = null; _g = null; _h = null; _e = null; _c = null;
-                        break;
-                    case 39:
-                        _state = -1;
-                        break;
-                    case 40:
-                        _state = -1;
-                        _map = _nextBranch;
-                        _a = null;
-                        _nextBranch = null;
-                        goto Label0;
-                    case 41: goto HashConflictingEntryLabel0;
-                    case 42: goto HashConflictingEntryLabel1;
-                    case 43: goto HashConflictingEntryLabel2;
-                    case 44: goto HashConflictingEntryLabel3;
-                    case 45: goto HashConflictingEntryLabel4;
-                    case 46: goto HashConflictingEntryLabel5;
-                    case 47: goto HashConflictingEntryLabel6;
-                    case 48: goto HashConflictingEntryLabel7;
-                    case 49: goto HashConflictingEntryLabel8;
-                    default:
-                        return false;
-                }
-            Label6:
-                _a = null; _b = null; _c = null; _d = null;
-            Label3:
-                if (_b21LeftWasEnumerated == null)
-                {
-                    if (_index == 0)
-                        return false;
-                    ImHashMap<K, V>.Entry current = null;
-                    var popIndex = (ushort)(_index - 1);
-                    _ps.Get(popIndex, ref current, ref _nextBranch);
-                    // Sets the previous state so that we are modifying any fields like _a, _b, etc. and directly goto back to this label
-                    SetCurrentAndState(current, 40, 13);
-                    if (_state == 40)
-                        _index = popIndex; // proceed
-                    return true;
-                }
-            Label0:
-                while (true)
-                {
-                    if (_map is ImHashMap<K, V>.Branch2Base branch2)
+                    else // we need to sort out the left side with Plus entry
                     {
-                        _ps.Put(_index++, branch2.MidEntry, branch2.Right);
-                        _map = branch2.Left;
-                    }
-                    else if (_map is ImHashMap<K, V>.Branch3Base branch3)
-                    {
-                        _ps.Put(_index, branch3.Entry1, branch3.Right, branch3.Entry0, branch3.Middle);
-                        _index += 2;
-                        _map = branch3.Left;
-                    }
-                    else break;
-                }
-
-                if (_b21LeftWasEnumerated == null && !(_map is ImHashMap<K, V>.Branch2Plus))
-                    goto AllLeafsAndEntryLabel;
-
-                _g = null; _h = null;
-            HashConflictingEntryLabel0:
-                if (_b21LeftWasEnumerated != null)
-                    return SetCurrentAndState(_b21LeftWasEnumerated.B.MidEntry, 2, 41);
-
-                var branch2Plus1 = (ImHashMap<K, V>.Branch2Plus)_map;
-                var b21b = branch2Plus1.B;
-                if (b21b.Right is ImHashMap<K, V>.Leaf5PlusPlus)
-                {
-                    _b21LeftWasEnumerated = branch2Plus1;
-                    _map = b21b.Left;
-                    goto B21NotFilledLeftLeafLabel;
-                }
-
-                b21FullLeaf511 = (ImHashMap<K, V>.Leaf5PlusPlus)b21b.Left;
-                _h = b21b.MidEntry;
-                _g = branch2Plus1.Plus;
-                _map = b21b.Right;
-
-            SortLeaf511Label:
-                {
-                    var l = b21FullLeaf511.L.L;
-                    var e0 = l.Entry0;
-                    _a = l.Entry1;
-                    _b = l.Entry2;
-                    _c = l.Entry3;
-                    _d = l.Entry4;
-                    _f = b21FullLeaf511.Plus;
-                    _e = b21FullLeaf511.L.Plus;
-                    InsertInOrder(_e.Hash, ref _e, ref e0, ref _a, ref _b, ref _c, ref _d);
-                    InsertInOrder(_f.Hash, ref _f, ref e0, ref _a, ref _b, ref _c, ref _d, ref _e);
-                    InsertInOrder(_g.Hash, ref _g, ref e0, ref _a, ref _b, ref _c, ref _d, ref _e, ref _f);
-                    _hc = e0;
-                }
-            HashConflictingEntryLabel1:
-                return SetCurrentAndState(3, 42);
-
-            Label2:
-                _a = null; _b = null; _c = null; _d = null; _e = null; _f = null;
-
-            B21NotFilledLeftLeafLabel:
-                _g = null; _h = null;
-
-            AllLeafsAndEntryLabel:
-            HashConflictingEntryLabel2:
-                if (_map is ImHashMap<K, V>.Leaf2 l2)
-                {
-                    _a = l2.Entry1;
-                    return SetCurrentAndState(l2.Entry0, 12, 43);
-                }
-                if (_map is ImHashMap<K, V>.Leaf2Plus l21)
-                {
-                    var l = l21.L;
-                    ImHashMap<K, V>.Entry e0 = l.Entry0;
-                    _h = l.Entry1;
-                    _g = l21.Plus;
-                    InsertInOrder(_g.Hash, ref _g, ref e0, ref _h);
-                    _hc = e0;
-                }
-            HashConflictingEntryLabel3:
-                if (_hc != null)
-                    return SetCurrentAndState(14, 44);
-                if (_map is ImHashMap<K, V>.Leaf2PlusPlus l211)
-                {
-                    var l1 = l211.L.L;
-                    ImHashMap<K, V>.Entry e0 = l1.Entry0;
-                    _g = l1.Entry1;
-                    _h = l211.L.Plus;
-                    _e = l211.Plus;
-                    InsertInOrder(_h.Hash, ref _h, ref e0, ref _g);
-                    InsertInOrder(_e.Hash, ref _e, ref e0, ref _g, ref _h);
-                    _hc = e0;
-                }
-            HashConflictingEntryLabel4:
-                if (_hc != null)
-                    return SetCurrentAndState(17, 45);
-                if (_map is ImHashMap<K, V>.Leaf5 l5)
-                {
-                    _a = l5.Entry1;
-                    _b = l5.Entry2;
-                    _c = l5.Entry3;
-                    _d = l5.Entry4;
-                    _hc = l5.Entry0;
-                }
-            HashConflictingEntryLabel5:
-                if (_hc != null)
-                    return SetCurrentAndState(21, 46);
-                if (_map is ImHashMap<K, V>.Leaf5Plus l51)
-                {
-                    var leaf5 = l51.L;
-                    ImHashMap<K, V>.Entry e0 = leaf5.Entry0;
-                    _e = leaf5.Entry1;
-                    _h = leaf5.Entry2;
-                    _g = leaf5.Entry3;
-                    _f = leaf5.Entry4;
-                    _d = l51.Plus;
-                    InsertInOrder(_d.Hash, ref _d, ref e0, ref _e, ref _h, ref _g, ref _f);
-                    _hc = e0;
-                }
-            HashConflictingEntryLabel6:
-                if (_hc != null)
-                    return SetCurrentAndState(26, 47);
-                if (_map is ImHashMap<K, V>.Leaf5PlusPlus l511)
-                {
-                    var leaf51 = l511.L.L;
-                    ImHashMap<K, V>.Entry e0 = leaf51.Entry0;
-                    _d = leaf51.Entry1;
-                    _f = leaf51.Entry2;
-                    _g = leaf51.Entry3;
-                    _h = leaf51.Entry4;
-                    _c = l511.L.Plus;
-                    _e = l511.Plus;
-                    InsertInOrder(_c.Hash, ref _c, ref e0, ref _d, ref _f, ref _g, ref _h);
-                    InsertInOrder(_e.Hash, ref _e, ref e0, ref _d, ref _f, ref _g, ref _h, ref _c);
-                    _hc = e0;
-                }
-            HashConflictingEntryLabel7:
-                if (_hc != null)
-                    return SetCurrentAndState(32, 48);
-                HashConflictingEntryLabel8:
-                if (_map is ImHashMap<K, V>.Entry e)
-                    return SetCurrentAndState(e, 39, 49);
-                goto Label6;
-            }
-
-            bool IEnumerator.MoveNext() => MoveNext();
-            void IEnumerator.Reset() => throw new NotSupportedException();
-            void IDisposable.Dispose() { }
-        }
-
-        /// <summary>Enumerates all the map entries in the hash order.</summary>
-        public static Enumerable<V> Enumerate<V>(this ImHashMap<int, V> map) => new Enumerable<V>(map);
-
-        /// <summary>Enumerates all the map entries in the hash order.</summary>
-        public static Enumerable<K, V> Enumerate<K, V>(this ImHashMap<K, V> map) => new Enumerable<K, V>(map);
-
-        // todo: @feature I need to have ForEachUntil with the result of `Func<ImMapEntry<V>, int, S, bool> handler` saying when to stop, the implementation will be the same as for FindFirst!
-        /// <summary>Depth-first in-order of hash traversal as described in http://en.wikipedia.org/wiki/Tree_traversal.
-        /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
-        /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
-        public static S ForEach<K, V, S>(this ImHashMap<K, V> map, S state, Action<ImHashMapEntry<K, V>, int, S> handler, MapParentStack parents = null)
-        {
-            if (map == ImHashMap<K, V>.Empty)
-                return state;
-            if (map is ImHashMap<K, V>.Entry singleEntry)
-            {
-                singleEntry.ForEach(state, 0, handler);
-                return state;
-            }
-            ImHashMap<K, V>.Branch2Plus b21LeftWasEnumerated = null;
-            int count = 0, i = 0;
-            while (true)
-            {
-                if (map is ImHashMap<K, V>.Branch2Base b2)
-                {
-                    if (parents == null)
-                        parents = new MapParentStack();
-                    parents.Put(map, count++);
-                    map = b2.Left;
-                    continue;
-                }
-                if (map is ImHashMap<K, V>.Branch3Base b3)
-                {
-                    if (parents == null)
-                        parents = new MapParentStack();
-                    parents.Put(map, count++);
-                    map = b3.Left;
-                    continue;
-                }
-                if (b21LeftWasEnumerated != null || map is ImHashMap<K, V>.Branch2Plus)
-                {
-                    ImHashMap<K, V>.Leaf5PlusPlus l511 = null;
-                    ImHashMap<K, V>.Entry pl = null, mid = null;
-                    if (b21LeftWasEnumerated != null)
-                    {
-                        i = b21LeftWasEnumerated.B.MidEntry.ForEach(state, i, handler);
-
-                        l511 = (ImHashMap<K, V>.Leaf5PlusPlus)b21LeftWasEnumerated.B.Right;
-                        pl = b21LeftWasEnumerated.Plus;
-                        b21LeftWasEnumerated = null; // we done with the branch
-                        map = ImHashMap<K, V>.Empty; // forcing to skip leaves below
-                    }
-                    else
-                    {
-                        var b21 = (ImHashMap<K, V>.Branch2Plus)map;
-                        if (b21.B.Right is ImHashMap<K, V>.Leaf5PlusPlus) // so we need to enumerate the left as a normal branch2 with the code below.
-                        {
-                            b21LeftWasEnumerated = b21;
-                            map = b21.B.Left;
-                        }
-                        else // we need to sort out the left side with Plus entry
-                        {
-                            l511 = (ImHashMap<K, V>.Leaf5PlusPlus)b21.B.Left;
-                            mid = b21.B.MidEntry;
-                            pl = b21.Plus;
-                            map = b21.B.Right; // it is a leaf so, no need to continue, just proceed with the leafs below
-                        }
-                    }
-                    if (l511 != null)
-                    {
-                        var l = l511.L.L;
-                        ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, p = l511.Plus, pp = l511.L.Plus;
-
-                        ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1, ref e2, ref e3, ref e4);
-                        ImHashMap.InsertInOrder(p.Hash, ref p, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp);
-                        ImHashMap.InsertInOrder(pl.Hash, ref pl, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp, ref p);
-
-                        i = e0.ForEach(state, i, handler);
-                        i = e1.ForEach(state, i, handler);
-                        i = e2.ForEach(state, i, handler);
-                        i = e3.ForEach(state, i, handler);
-                        i = e4.ForEach(state, i, handler);
-                        i = pp.ForEach(state, i, handler);
-                        i = p.ForEach(state, i, handler);
-                        i = pl.ForEach(state, i, handler);
-
-                        if (mid != null)
-                            i = mid.ForEach(state, i, handler);
+                        l511 = (ImHashMap<K, V>.Leaf5PlusPlus)b21.B.Left;
+                        mid = b21.B.MidEntry;
+                        pl = b21.Plus;
+                        map = b21.B.Right; // it is a leaf so, no need to continue, just proceed with the leafs below
                     }
                 }
-                if (map is ImHashMap<K, V>.Leaf2 l2)
-                {
-                    i = l2.Entry0.ForEach(state, i, handler);
-                    i = l2.Entry1.ForEach(state, i, handler);
-                }
-                else if (map is ImHashMap<K, V>.Leaf2Plus l21)
-                {
-                    var l = l21.L;
-                    ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, pp = l21.Plus;
-
-                    ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1);
-
-                    i = e0.ForEach(state, i, handler);
-                    i = e1.ForEach(state, i, handler);
-                    i = pp.ForEach(state, i, handler);
-                }
-                else if (map is ImHashMap<K, V>.Leaf2PlusPlus l211)
-                {
-                    var l = l211.L.L;
-                    ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, pp = l211.L.Plus, p = l211.Plus;
-
-                    ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1);
-                    ImHashMap.InsertInOrder(p.Hash, ref p, ref e0, ref e1, ref pp);
-
-                    i = e0.ForEach(state, i, handler);
-                    i = e1.ForEach(state, i, handler);
-                    i = pp.ForEach(state, i, handler);
-                    i = p.ForEach(state, i, handler);
-                }
-                else if (map is ImHashMap<K, V>.Leaf5 l5)
-                {
-                    i = l5.Entry0.ForEach(state, i, handler);
-                    i = l5.Entry1.ForEach(state, i, handler);
-                    i = l5.Entry2.ForEach(state, i, handler);
-                    i = l5.Entry3.ForEach(state, i, handler);
-                    i = l5.Entry4.ForEach(state, i, handler);
-                }
-                else if (map is ImHashMap<K, V>.Leaf5Plus l51)
-                {
-                    var l = l51.L;
-                    ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, pp = l51.Plus;
-
-                    ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1, ref e2, ref e3, ref e4);
-
-                    i = e0.ForEach(state, i, handler);
-                    i = e1.ForEach(state, i, handler);
-                    i = e2.ForEach(state, i, handler);
-                    i = e3.ForEach(state, i, handler);
-                    i = e4.ForEach(state, i, handler);
-                    i = pp.ForEach(state, i, handler);
-                }
-                else if (map is ImHashMap<K, V>.Leaf5PlusPlus l511)
+                if (l511 != null)
                 {
                     var l = l511.L.L;
                     ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, p = l511.Plus, pp = l511.L.Plus;
 
                     ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1, ref e2, ref e3, ref e4);
                     ImHashMap.InsertInOrder(p.Hash, ref p, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp);
+                    ImHashMap.InsertInOrder(pl.Hash, ref pl, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp, ref p);
 
                     i = e0.ForEach(state, i, handler);
                     i = e1.ForEach(state, i, handler);
@@ -5577,185 +5505,184 @@ namespace DryIoc.ImTools
                     i = e4.ForEach(state, i, handler);
                     i = pp.ForEach(state, i, handler);
                     i = p.ForEach(state, i, handler);
-                }
-                else if (map is ImHashMap<K, V>.Entry l1)
-                    i = l1.ForEach(state, i, handler);
+                    i = pl.ForEach(state, i, handler);
 
-                if (b21LeftWasEnumerated != null)
-                    continue;
-
-                if (count == 0)
-                    break; // we yield the leaf and there is nothing in stack - we are DONE!
-
-                var b = parents.Get(--count); // otherwise get the parent
-                if (b is ImHashMap<K, V>.Branch2Base pb2)
-                {
-                    i = pb2.MidEntry.ForEach(state, i, handler);
-                    map = pb2.Right;
-                }
-                else if (b != _enumerationB3Tombstone)
-                {
-                    var pb3 = (ImHashMap<K, V>.Branch3Base)b;
-                    i = pb3.Entry0.ForEach(state, i, handler);
-                    map = pb3.Middle;
-                    parents.Put(_enumerationB3Tombstone, ++count);
-                    ++count;
-                }
-                else
-                {
-                    var pb3 = (ImHashMap<K, V>.Branch3Base)parents.Get(--count);
-                    i = pb3.Entry1.ForEach(state, i, handler);
-                    map = pb3.Right;
+                    if (mid != null)
+                        i = mid.ForEach(state, i, handler);
                 }
             }
+            if (map is ImHashMap<K, V>.Leaf2 l2)
+            {
+                i = l2.Entry0.ForEach(state, i, handler);
+                i = l2.Entry1.ForEach(state, i, handler);
+            }
+            else if (map is ImHashMap<K, V>.Leaf2Plus l21)
+            {
+                var l = l21.L;
+                ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, pp = l21.Plus;
+
+                ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1);
+
+                i = e0.ForEach(state, i, handler);
+                i = e1.ForEach(state, i, handler);
+                i = pp.ForEach(state, i, handler);
+            }
+            else if (map is ImHashMap<K, V>.Leaf2PlusPlus l211)
+            {
+                var l = l211.L.L;
+                ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, pp = l211.L.Plus, p = l211.Plus;
+
+                ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1);
+                ImHashMap.InsertInOrder(p.Hash, ref p, ref e0, ref e1, ref pp);
+
+                i = e0.ForEach(state, i, handler);
+                i = e1.ForEach(state, i, handler);
+                i = pp.ForEach(state, i, handler);
+                i = p.ForEach(state, i, handler);
+            }
+            else if (map is ImHashMap<K, V>.Leaf5 l5)
+            {
+                i = l5.Entry0.ForEach(state, i, handler);
+                i = l5.Entry1.ForEach(state, i, handler);
+                i = l5.Entry2.ForEach(state, i, handler);
+                i = l5.Entry3.ForEach(state, i, handler);
+                i = l5.Entry4.ForEach(state, i, handler);
+            }
+            else if (map is ImHashMap<K, V>.Leaf5Plus l51)
+            {
+                var l = l51.L;
+                ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, pp = l51.Plus;
+
+                ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1, ref e2, ref e3, ref e4);
+
+                i = e0.ForEach(state, i, handler);
+                i = e1.ForEach(state, i, handler);
+                i = e2.ForEach(state, i, handler);
+                i = e3.ForEach(state, i, handler);
+                i = e4.ForEach(state, i, handler);
+                i = pp.ForEach(state, i, handler);
+            }
+            else if (map is ImHashMap<K, V>.Leaf5PlusPlus l511)
+            {
+                var l = l511.L.L;
+                ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, p = l511.Plus, pp = l511.L.Plus;
+
+                ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1, ref e2, ref e3, ref e4);
+                ImHashMap.InsertInOrder(p.Hash, ref p, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp);
+
+                i = e0.ForEach(state, i, handler);
+                i = e1.ForEach(state, i, handler);
+                i = e2.ForEach(state, i, handler);
+                i = e3.ForEach(state, i, handler);
+                i = e4.ForEach(state, i, handler);
+                i = pp.ForEach(state, i, handler);
+                i = p.ForEach(state, i, handler);
+            }
+            else if (map is ImHashMap<K, V>.Entry l1)
+                i = l1.ForEach(state, i, handler);
+
+            if (b21LeftWasEnumerated != null)
+                continue;
+
+            if (count == 0)
+                break; // we yield the leaf and there is nothing in stack - we are DONE!
+
+            var b = parents.Get(--count); // otherwise get the parent
+            if (b is ImHashMap<K, V>.Branch2Base pb2)
+            {
+                i = pb2.MidEntry.ForEach(state, i, handler);
+                map = pb2.Right;
+            }
+            else if (b != _enumerationB3Tombstone)
+            {
+                var pb3 = (ImHashMap<K, V>.Branch3Base)b;
+                i = pb3.Entry0.ForEach(state, i, handler);
+                map = pb3.Middle;
+                parents.Put(_enumerationB3Tombstone, ++count);
+                ++count;
+            }
+            else
+            {
+                var pb3 = (ImHashMap<K, V>.Branch3Base)parents.Get(--count);
+                i = pb3.Entry1.ForEach(state, i, handler);
+                map = pb3.Right;
+            }
+        }
+        return state;
+    }
+
+    /// <summary>Depth-first in-order of hash traversal as described in http://en.wikipedia.org/wiki/Tree_traversal.
+    /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
+    /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
+    public static S ForEach<V, S>(this ImHashMap<int, V> map, S state, Action<VEntry<V>, int, S> handler, MapParentStack parents = null)
+    {
+        if (map == ImHashMap<int, V>.Empty)
+            return state;
+        if (map is VEntry<V> singleEntry)
+        {
+            handler(singleEntry, 0, state);
             return state;
         }
 
-        /// <summary>Depth-first in-order of hash traversal as described in http://en.wikipedia.org/wiki/Tree_traversal.
-        /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
-        /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
-        public static S ForEach<V, S>(this ImHashMap<int, V> map, S state, Action<VEntry<V>, int, S> handler, MapParentStack parents = null)
+        ImHashMap<int, V>.Branch2Plus b21LeftWasEnumerated = null;
+        int count = 0, i = 0;
+        while (true)
         {
-            if (map == ImHashMap<int, V>.Empty)
-                return state;
-            if (map is VEntry<V> singleEntry)
+            if (map is ImHashMap<int, V>.Branch2Base b2)
             {
-                handler(singleEntry, 0, state);
-                return state;
+                if (parents == null)
+                    parents = new MapParentStack();
+                parents.Put(map, count++);
+                map = b2.Left;
+                continue;
             }
 
-            ImHashMap<int, V>.Branch2Plus b21LeftWasEnumerated = null;
-            int count = 0, i = 0;
-            while (true)
+            if (map is ImHashMap<int, V>.Branch3Base b3)
             {
-                if (map is ImHashMap<int, V>.Branch2Base b2)
+                if (parents == null)
+                    parents = new MapParentStack();
+                parents.Put(map, count++);
+                map = b3.Left;
+                continue;
+            }
+
+            if (b21LeftWasEnumerated != null || map is ImHashMap<int, V>.Branch2Plus)
+            {
+                ImHashMap<int, V>.Leaf5PlusPlus l511 = null;
+                ImHashMap<int, V>.Entry pl = null, mid = null;
+                if (b21LeftWasEnumerated != null)
                 {
-                    if (parents == null)
-                        parents = new MapParentStack();
-                    parents.Put(map, count++);
-                    map = b2.Left;
-                    continue;
+                    handler((VEntry<V>)b21LeftWasEnumerated.B.MidEntry, i++, state);
+
+                    l511 = (ImHashMap<int, V>.Leaf5PlusPlus)b21LeftWasEnumerated.B.Right;
+                    pl = b21LeftWasEnumerated.Plus;
+                    b21LeftWasEnumerated = null; // we done with the branch
+                    map = ImHashMap<int, V>.Empty; // forcing to skip leaves below
                 }
-
-                if (map is ImHashMap<int, V>.Branch3Base b3)
+                else
                 {
-                    if (parents == null)
-                        parents = new MapParentStack();
-                    parents.Put(map, count++);
-                    map = b3.Left;
-                    continue;
-                }
-
-                if (b21LeftWasEnumerated != null || map is ImHashMap<int, V>.Branch2Plus)
-                {
-                    ImHashMap<int, V>.Leaf5PlusPlus l511 = null;
-                    ImHashMap<int, V>.Entry pl = null, mid = null;
-                    if (b21LeftWasEnumerated != null)
+                    var b21 = (ImHashMap<int, V>.Branch2Plus)map;
+                    if (b21.B.Right is ImHashMap<int, V>.Leaf5PlusPlus) // so we need to enumerate the left as a normal branch2 with the code below.
                     {
-                        handler((VEntry<V>)b21LeftWasEnumerated.B.MidEntry, i++, state);
-
-                        l511 = (ImHashMap<int, V>.Leaf5PlusPlus)b21LeftWasEnumerated.B.Right;
-                        pl = b21LeftWasEnumerated.Plus;
-                        b21LeftWasEnumerated = null; // we done with the branch
-                        map = ImHashMap<int, V>.Empty; // forcing to skip leaves below
+                        b21LeftWasEnumerated = b21;
+                        map = b21.B.Left;
                     }
-                    else
+                    else // we need to sort out the left side with Plus entry
                     {
-                        var b21 = (ImHashMap<int, V>.Branch2Plus)map;
-                        if (b21.B.Right is ImHashMap<int, V>.Leaf5PlusPlus) // so we need to enumerate the left as a normal branch2 with the code below.
-                        {
-                            b21LeftWasEnumerated = b21;
-                            map = b21.B.Left;
-                        }
-                        else // we need to sort out the left side with Plus entry
-                        {
-                            l511 = (ImHashMap<int, V>.Leaf5PlusPlus)b21.B.Left;
-                            mid = b21.B.MidEntry;
-                            pl = b21.Plus;
-                            map = b21.B.Right; // it is a leaf so, no need to continue, just proceed with the leafs below
-                        }
-                    }
-                    if (l511 != null)
-                    {
-                        var l = l511.L.L;
-                        ImHashMap<int, V>.Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, p = l511.Plus, pp = l511.L.Plus;
-
-                        ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1, ref e2, ref e3, ref e4);
-                        ImHashMap.InsertInOrder(p.Hash, ref p, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp);
-                        ImHashMap.InsertInOrder(pl.Hash, ref pl, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp, ref p);
-
-                        handler((VEntry<V>)e0, i++, state);
-                        handler((VEntry<V>)e1, i++, state);
-                        handler((VEntry<V>)e2, i++, state);
-                        handler((VEntry<V>)e3, i++, state);
-                        handler((VEntry<V>)e4, i++, state);
-                        handler((VEntry<V>)pp, i++, state);
-                        handler((VEntry<V>)p, i++, state);
-                        handler((VEntry<V>)pl, i++, state);
-
-                        if (mid != null)
-                            handler((VEntry<V>)mid, i++, state);
+                        l511 = (ImHashMap<int, V>.Leaf5PlusPlus)b21.B.Left;
+                        mid = b21.B.MidEntry;
+                        pl = b21.Plus;
+                        map = b21.B.Right; // it is a leaf so, no need to continue, just proceed with the leafs below
                     }
                 }
-
-                if (map is ImHashMap<int, V>.Leaf2 l2)
-                {
-                    handler((VEntry<V>)l2.Entry0, i++, state);
-                    handler((VEntry<V>)l2.Entry1, i++, state);
-                }
-                else if (map is ImHashMap<int, V>.Leaf2Plus l21)
-                {
-                    var l = l21.L;
-                    ImHashMap<int, V>.Entry e0 = l.Entry0, e1 = l.Entry1, pp = l21.Plus;
-
-                    ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1);
-
-                    handler((VEntry<V>)e0, i++, state);
-                    handler((VEntry<V>)e1, i++, state);
-                    handler((VEntry<V>)pp, i++, state);
-                }
-                else if (map is ImHashMap<int, V>.Leaf2PlusPlus l211)
-                {
-                    var l = l211.L.L;
-                    ImHashMap<int, V>.Entry e0 = l.Entry0, e1 = l.Entry1, pp = l211.L.Plus, p = l211.Plus;
-
-                    ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1);
-                    ImHashMap.InsertInOrder(p.Hash, ref p, ref e0, ref e1, ref pp);
-
-                    handler((VEntry<V>)e0, i++, state);
-                    handler((VEntry<V>)e1, i++, state);
-                    handler((VEntry<V>)pp, i++, state);
-                    handler((VEntry<V>)p, i++, state);
-                }
-                else if (map is ImHashMap<int, V>.Leaf5 l5)
-                {
-                    handler((VEntry<V>)l5.Entry0, i++, state);
-                    handler((VEntry<V>)l5.Entry1, i++, state);
-                    handler((VEntry<V>)l5.Entry2, i++, state);
-                    handler((VEntry<V>)l5.Entry3, i++, state);
-                    handler((VEntry<V>)l5.Entry4, i++, state);
-                }
-                else if (map is ImHashMap<int, V>.Leaf5Plus l51)
-                {
-                    var l = l51.L;
-                    ImHashMap<int, V>.Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, pp = l51.Plus;
-
-                    ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1, ref e2, ref e3, ref e4);
-
-                    handler((VEntry<V>)e0, i++, state);
-                    handler((VEntry<V>)e1, i++, state);
-                    handler((VEntry<V>)e2, i++, state);
-                    handler((VEntry<V>)e3, i++, state);
-                    handler((VEntry<V>)e4, i++, state);
-                    handler((VEntry<V>)pp, i++, state);
-                }
-                else if (map is ImHashMap<int, V>.Leaf5PlusPlus l511)
+                if (l511 != null)
                 {
                     var l = l511.L.L;
                     ImHashMap<int, V>.Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, p = l511.Plus, pp = l511.L.Plus;
 
                     ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1, ref e2, ref e3, ref e4);
                     ImHashMap.InsertInOrder(p.Hash, ref p, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp);
+                    ImHashMap.InsertInOrder(pl.Hash, ref pl, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp, ref p);
 
                     handler((VEntry<V>)e0, i++, state);
                     handler((VEntry<V>)e1, i++, state);
@@ -5764,1064 +5691,1136 @@ namespace DryIoc.ImTools
                     handler((VEntry<V>)e4, i++, state);
                     handler((VEntry<V>)pp, i++, state);
                     handler((VEntry<V>)p, i++, state);
-                }
-                else if (map is ImHashMap<int, V>.Entry l1)
-                    handler((VEntry<V>)l1, i++, state);
+                    handler((VEntry<V>)pl, i++, state);
 
-                if (b21LeftWasEnumerated != null)
-                    continue;
-
-                if (count == 0)
-                    break; // we yield the leaf and there is nothing in stack - we are DONE!
-
-                var b = parents.Get(--count); // otherwise get the parent
-                if (b is ImHashMap<int, V>.Branch2Base pb2)
-                {
-                    handler((VEntry<V>)pb2.MidEntry, i++, state);
-                    map = pb2.Right;
-                }
-                else if (b != _enumerationB3Tombstone)
-                {
-                    var pb3 = (ImHashMap<int, V>.Branch3Base)b;
-                    handler((VEntry<V>)pb3.Entry0, i++, state);
-                    map = pb3.Middle;
-                    parents.Put(_enumerationB3Tombstone, ++count);
-                    ++count;
-                }
-                else
-                {
-                    var pb3 = (ImHashMap<int, V>.Branch3Base)parents.Get(--count);
-                    handler((VEntry<V>)pb3.Entry1, i++, state);
-                    map = pb3.Right;
+                    if (mid != null)
+                        handler((VEntry<V>)mid, i++, state);
                 }
             }
-            return state;
-        }
 
-        /// <summary>Do something for each entry.
-        /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
-        /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
-        public static void ForEach<V>(this ImHashMap<int, V> map, Action<VEntry<V>, int> handler, MapParentStack parents = null) =>
-            map.ForEach(handler, (e, i, r) => r(e, i), parents);
-
-        /// <summary>Do something for each entry.
-        /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
-        /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
-        public static void ForEach<K, V>(this ImHashMap<K, V> map, Action<ImHashMapEntry<K, V>, int> handler, MapParentStack parents = null) =>
-            map.ForEach(handler, (e, i, r) => r(e, i), parents);
-
-        /// <summary>Collect something for each entry.
-        /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
-        /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
-        public static S Fold<V, S>(this ImHashMap<int, V> map, S state, Func<VEntry<V>, int, S, S> handler, MapParentStack parents = null) =>
-            map.ForEach(St.Rent(state, handler), (e, i, s) => s.a = s.b(e, i, s.a), parents).ResetButGetA();
-
-        /// <summary>Collect something for each entry.
-        /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
-        /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
-        public static S Fold<K, V, S>(this ImHashMap<K, V> map, S state, Func<ImHashMapEntry<K, V>, int, S, S> handler, MapParentStack parents = null) =>
-            map.ForEach(St.Rent(state, handler), (e, i, s) => s.a = s.b(e, i, s.a), parents).ResetButGetA();
-
-        /// <summary>Converts the map to an array with the minimum allocations</summary>
-        public static S[] ToArray<V, S>(this ImHashMap<int, V> map, Func<VEntry<V>, S> selector) =>
-            map == ImHashMap<int, V>.Empty ? ArrayTools.Empty<S>() :
-                map.ForEach(St.Rent(new S[map.Count()], selector), static (e, i, s) => s.a[i] = s.b(e)).ResetButGetA();
-        // todo: @perf accept the check for the selector result
-        /// <summary>Converts the map to an array with the minimum allocations</summary>
-        public static S[] ToArray<K, V, S>(this ImHashMap<K, V> map, Func<ImHashMapEntry<K, V>, S> selector) =>
-            map == ImHashMap<K, V>.Empty
-                ? ArrayTools.Empty<S>()
-                : map.ForEach(St.Rent(new S[map.Count()], selector), static (e, i, s) => s.a[i] = s.b(e)).ResetButGetA();
-
-        /// <summary>Converts the map to an array with the minimum allocations</summary>
-        public static VEntry<V>[] ToArray<V>(this ImHashMap<int, V> map) =>
-            map == ImHashMap<int, V>.Empty
-                ? ArrayTools.Empty<VEntry<V>>()
-                : map.ForEach(new VEntry<V>[map.Count()], (e, i, a) => a[i] = e);
-
-        /// <summary>Converts the map to an array with the minimum allocations</summary>
-        public static ImHashMapEntry<K, V>[] ToArray<K, V>(this ImHashMap<K, V> map) =>
-            map == ImHashMap<K, V>.Empty
-                ? ArrayTools.Empty<ImHashMapEntry<K, V>>()
-                : map.ForEach(new ImHashMapEntry<K, V>[map.Count()], (e, i, a) => a[i] = e);
-
-        /// <summary>Converts the map to the dictionary</summary>
-        public static Dictionary<K, V> ToDictionary<K, V>(this ImHashMap<K, V> map) =>
-            map == ImHashMap<K, V>.Empty
-                ? new Dictionary<K, V>(0)
-                : map.ForEach(new Dictionary<K, V>(), (e, _, d) => d.Add(e.Key, e.Value));
-
-        /// <summary>Converts the map to the dictionary</summary>
-        public static Dictionary<int, V> ToDictionary<V>(this ImHashMap<int, V> map) =>
-            map == ImHashMap<int, V>.Empty
-                ? new Dictionary<int, V>(0)
-                : map.ForEach(new Dictionary<int, V>(), (e, _, d) => d.Add(e.Key, e.Value));
-
-        /// <summary>Returns <see langword="true"/> if map contains the hash, otherwise returns <see langword="false"/></summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool Contains<V>(this ImHashMap<int, V> map, int key) => map.GetEntryOrNull(key) != null;
-
-        /// <summary>Returns <see langword="true"/> if map contains the hash and key, otherwise returns <see langword="false"/></summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool Contains<K, V>(this ImHashMap<K, V> map, int hash, K key) => map.GetEntryOrDefault(hash, key) != null;
-
-        /// <summary>Returns <see langword="true"/> if map contains the key, otherwise returns <see langword="false"/></summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool Contains<K, V>(this ImHashMap<K, V> map, K key) => map.GetEntryOrDefault(key.GetHashCode(), key) != null;
-
-        /// <summary>Returns the entry ASSUMING it is present otherwise its behavior is UNDEFINED.
-        /// You can use the method after the Add and Update methods on the same map instance - 
-        /// because the map is immutable and for sure contains added or updated entry.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMapEntry<int, V> GetSurePresent<V>(this ImHashMap<int, V> map, int hash) =>
-            (VEntry<V>)map.GetSurePresentEntry(hash);
-
-        /// <summary>Returns the entry ASSUMING it is present otherwise its behavior is UNDEFINED.
-        /// You can use the method after the Add and Update methods on the same map instance - 
-        /// because the map is immutable and for sure contains added or updated entry.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMapEntry<K, V> GetSurePresent<K, V>(this ImHashMap<K, V> map, int hash, K key) =>
-            map.GetSurePresentEntry(hash).GetOrNullWithTheSameHash(key);
-
-        /// <summary>Returns the entry ASSUMING it is present otherwise its behavior is UNDEFINED.
-        /// You can use the method after the Add and Update methods on the same map instance - 
-        /// because the map is immutable and for sure contains added or updated entry.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMapEntry<K, V> GetSurePresentByReferenceEquals<K, V>(this ImHashMap<K, V> map, int hash, K key) =>
-            map.GetSurePresentEntry(hash).GetOrNullWithTheSameHashByReferenceEquals(key);
-
-        /// <summary>Lookup for the entry by hash, returns the found entry or `null`.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMapEntry<int, V> GetEntryOrDefault<V>(this ImHashMap<int, V> map, int hash) =>
-            (VEntry<V>)map.GetEntryOrNull(hash);
-
-        /// <summary>Lookup for the entry by key and hash, returns the found entry or `null`.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMapEntry<K, V> GetEntryOrDefault<K, V>(this ImHashMap<K, V> map, int hash, K key) =>
-            map.GetEntryOrNull(hash)?.GetOrNullWithTheSameHash(key);
-
-        /// <summary>Lookup for the entry by key and hash, returns the found entry or `null`.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMapEntry<K, V> GetEntryOrDefault<K, V>(this ImHashMap<K, V> map, K key) =>
-            map.GetEntryOrNull(key.GetHashCode())?.GetOrNullWithTheSameHash(key);
-
-        /// <summary>Lookup for the entry by key and hash, comparing the key by reference, returns the found entry or `null`.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMapEntry<K, V> GetEntryOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V> map, int hash, K key) where K : class =>
-            map.GetEntryOrNull(hash)?.GetOrNullWithTheSameHashByReferenceEquals(key);
-
-        /// <summary>Lookup for the entry by key and hash, comparing the key by reference, returns the found entry or `null`.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMapEntry<K, V> GetEntryOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V> map, K key) where K : class =>
-            map.GetEntryOrNull(key.GetHashCode())?.GetOrNullWithTheSameHashByReferenceEquals(key);
-
-        /// <summary>Lookup for the value by hash, returns the default `V` if hash is not found.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefault<V>(this ImHashMap<int, V> map, int hash)
-        {
-            var e = (VEntry<V>)map.GetEntryOrNull(hash);
-            return e != null ? e.Value : default;
-        }
-
-        /// <summary>Lookup for the value by hash, returns the default `V` if hash is not found.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefault<V>(this ImHashMap<int, V> map, int hash, V defaultValue)
-        {
-            var e = (VEntry<V>)map.GetEntryOrNull(hash);
-            return e != null ? e.Value : defaultValue;
-        }
-
-        /// <summary>Lookup for the value by hash, returns the default `V` if hash is not found.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefault<K, V>(this ImHashMap<K, V> map, int hash, K key) =>
-            map.GetEntryOrNull(hash)?.GetOrNullWithTheSameHash(key) is KVEntry<K, V> kv ? kv.Value : default;
-
-        /// <summary>Lookup for the value by hash, returns the default `V` if hash is not found.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefault<K, V>(this ImHashMap<K, V> map, int hash, K key, V defaultValue) =>
-            map.GetEntryOrNull(hash)?.GetOrNullWithTheSameHash(key) is KVEntry<K, V> kv ? kv.Value : defaultValue;
-
-        /// <summary>Lookup for the value by key and its hash, returns the default `V` if hash is not found.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefault<K, V>(this ImHashMap<K, V> map, K key) =>
-            map.GetEntryOrNull(key.GetHashCode())?.GetOrNullWithTheSameHash(key) is KVEntry<K, V> kv ? kv.Value : default;
-
-        /// <summary>Lookup for the value by key and its hash, returns the default `V` if hash is not found.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefault<K, V>(this ImHashMap<K, V> map, K key, V defaultValue) =>
-            map.GetEntryOrNull(key.GetHashCode())?.GetOrNullWithTheSameHash(key) is KVEntry<K, V> kv ? kv.Value : defaultValue;
-
-        /// <summary>Lookup for the value by the key using the hash and checking the key with the `object.ReferenceEquals` for equality,
-        ///  returns found value or the default value if not found</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V> map, int hash, K key) where K : class
-        {
-            var e = map.GetEntryOrNull(hash);
-            return e != null ? e.GetValueOrDefaultWithTheSameHashByReferenceEquals(key) : default;
-        }
-
-        /// <summary>Lookup for the value by the key using the hash and checking the key with the `object.ReferenceEquals` for equality,
-        ///  returns found value or the default value if not found</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V> map, K key) where K : class
-        {
-            var e = map.GetEntryOrNull(key.GetHashCode());
-            return e != null ? e.GetValueOrDefaultWithTheSameHashByReferenceEquals(key) : default;
-        }
-
-        /// <summary>Lookup for the value by its hash, returns the `true` and the found value or the `false` otherwise</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool TryFind<V>(this ImHashMap<int, V> map, int hash, out V value)
-        {
-            var e = (VEntry<V>)map.GetEntryOrNull(hash);
-            if (e != null)
+            if (map is ImHashMap<int, V>.Leaf2 l2)
             {
-                value = e.Value;
-                return true;
+                handler((VEntry<V>)l2.Entry0, i++, state);
+                handler((VEntry<V>)l2.Entry1, i++, state);
             }
-            value = default;
-            return false;
-        }
-
-        /// <summary>Lookup for the value by its key, returns the `true` and the found value or the `false` otherwise</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool TryFind<K, V>(this ImHashMap<K, V> map, int hash, K key, out V value)
-        {
-            var kv = map.GetEntryOrNull(hash)?.GetOrNullWithTheSameHash(key);
-            if (kv != null)
+            else if (map is ImHashMap<int, V>.Leaf2Plus l21)
             {
-                value = kv.Value;
-                return true;
+                var l = l21.L;
+                ImHashMap<int, V>.Entry e0 = l.Entry0, e1 = l.Entry1, pp = l21.Plus;
+
+                ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1);
+
+                handler((VEntry<V>)e0, i++, state);
+                handler((VEntry<V>)e1, i++, state);
+                handler((VEntry<V>)pp, i++, state);
             }
-            value = default;
-            return false;
-        }
-
-        /// <summary>Lookup for the value by the key using its hash and checking the key with the `object.Equals` for equality,
-        /// returns the `true` and the found value or the `false` otherwise</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool TryFind<K, V>(this ImHashMap<K, V> map, K key, out V value) =>
-            map.TryFind(key.GetHashCode(), key, out value);
-
-        /// <summary>Lookup for the value by its key, returns the `true` and the found value or the `false` otherwise</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool TryFindByReferenceEquals<K, V>(this ImHashMap<K, V> map, int hash, K key, out V value) where K : class
-        {
-            var kv = map.GetEntryOrNull(hash)?.GetOrNullWithTheSameHashByReferenceEquals(key);
-            if (kv != null)
+            else if (map is ImHashMap<int, V>.Leaf2PlusPlus l211)
             {
-                value = kv.Value;
-                return true;
+                var l = l211.L.L;
+                ImHashMap<int, V>.Entry e0 = l.Entry0, e1 = l.Entry1, pp = l211.L.Plus, p = l211.Plus;
+
+                ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1);
+                ImHashMap.InsertInOrder(p.Hash, ref p, ref e0, ref e1, ref pp);
+
+                handler((VEntry<V>)e0, i++, state);
+                handler((VEntry<V>)e1, i++, state);
+                handler((VEntry<V>)pp, i++, state);
+                handler((VEntry<V>)p, i++, state);
             }
-            value = default;
-            return false;
-        }
-
-        /// <summary>Lookup for the value by its key, returns the `true` and the found value or the `false` otherwise</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool TryFindByReferenceEquals<K, V>(this ImHashMap<K, V> map, K key, out V value) where K : class =>
-            map.TryFindByReferenceEquals(key.GetHashCode(), key, out value);
-
-        /// <summary>Creates the entry with the `int` key (which will be used as the hash)</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMapEntry<int, V> Entry<V>(int key, V value) => new VEntry<V>(key, value);
-
-        /// <summary>Creates the entry with the `int` key but without assigning its value yet</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMapEntry<int, V> EntryWithDefaultValue<V>(int key) => new VEntry<V>(key);
-
-        /// <summary>Copies the entry but without its value</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMapEntry<int, V> WithDefaultValue<V>(this ImHashMapEntry<int, V> e) => new VEntry<V>(e.Hash);
-
-        /// <summary>Creates the entry with the user provided hash</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMapEntry<K, V> Entry<K, V>(int hash, K key, V value) => new KVEntry<K, V>(hash, key, value);
-
-        /// <summary>Creates the entry with the key, value and hash of `key.GetHashCode()`</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMapEntry<K, V> EntryWithHash<K, V>(K key, V value) => new KVEntry<K, V>(key.GetHashCode(), key, value);
-
-        /// <summary>Creates the entry but without assigning its value yet</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMapEntry<K, V> EntryWithDefaultValue<K, V>(int hash, K key) => new KVEntry<K, V>(hash, key);
-
-        /// <summary>Copies the entry but without its value</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMapEntry<K, V> WithDefaultValue<K, V>(this ImHashMapEntry<K, V> e) => new KVEntry<K, V>(e.Hash, e.Key);
-
-        /// <summary>Sugar to set the value and return the entry</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMapEntry<K, V> SetValue<K, V>(this ImHashMapEntry<K, V> e, V value)
-        {
-            e.Value = value;
-            return e;
-        }
-
-        /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
-        public static ImHashMap<K, V> BuildFromDifferent<K, V>(
-            ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1)
-        {
-            Debug.Assert(!Equals(e0.Key, e1.Key));
-            if (e0.Hash > e1.Hash)
-                Fun.Swap(ref e0, ref e1);
-            return new ImHashMap<K, V>.Leaf2(e0, e1);
-        }
-
-        /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
-        public static ImHashMap<K, V> BuildFromDifferent<K, V>(
-            ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2)
-        {
-            Debug.Assert(!Equals(e2.Key, e0.Key) && !Equals(e2.Key, e1.Key));
-            return new ImHashMap<K, V>.Leaf2Plus(e2, (ImHashMap<K, V>.Leaf2)BuildFromDifferent(e0, e1));
-        }
-
-        /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
-        public static ImHashMap<K, V> BuildFromDifferent<K, V>(
-            ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2, ImHashMapEntry<K, V> e3)
-        {
-            Debug.Assert(!Equals(e3.Key, e0.Key) && !Equals(e3.Key, e1.Key) && !Equals(e3.Key, e2.Key));
-            return new ImHashMap<K, V>.Leaf2PlusPlus(e3, (ImHashMap<K, V>.Leaf2Plus)BuildFromDifferent(e0, e1, e2));
-        }
-
-        /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
-        public static ImHashMap<K, V> BuildUnchecked<K, V>(
-            ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2, ImHashMapEntry<K, V> e3, ImHashMapEntry<K, V> e4)
-        {
-            if (e0.Hash > e1.Hash)
-                Fun.Swap(ref e0, ref e1);
-            ImHashMap<K, V>.Entry kv0 = e0, kv1 = e1, kv2 = e2, kv3 = e3, kv4 = e4;
-            InsertInOrder(kv2.Hash, ref kv2, ref kv0, ref kv1);
-            InsertInOrder(kv3.Hash, ref kv3, ref kv0, ref kv1, ref kv2);
-            InsertInOrder(kv4.Hash, ref kv4, ref kv0, ref kv1, ref kv2, ref kv3);
-            return new ImHashMap<K, V>.Leaf5(kv0, kv1, kv2, kv3, kv4);
-        }
-
-        /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
-        public static ImHashMap<K, V> BuildFromDifferent<K, V>(
-            ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2, ImHashMapEntry<K, V> e3, ImHashMapEntry<K, V> e4,
-            ImHashMapEntry<K, V> e5) =>
-            new ImHashMap<K, V>.Leaf5Plus(e5, (ImHashMap<K, V>.Leaf5)BuildUnchecked(e0, e1, e2, e3, e4));
-
-        /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
-        public static ImHashMap<K, V> BuildFromDifferent<K, V>(
-            ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2, ImHashMapEntry<K, V> e3, ImHashMapEntry<K, V> e4,
-            ImHashMapEntry<K, V> e5, ImHashMapEntry<K, V> e6) =>
-            new ImHashMap<K, V>.Leaf5PlusPlus(e6, (ImHashMap<K, V>.Leaf5Plus)BuildFromDifferent(e0, e1, e2, e3, e4, e5));
-
-        /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
-        public static ImHashMap<K, V> BuildFromDifferent<K, V>(
-            ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2, ImHashMapEntry<K, V> e3, ImHashMapEntry<K, V> e4,
-            ImHashMapEntry<K, V> e5, ImHashMapEntry<K, V> e6, ImHashMapEntry<K, V> e7,
-            ImHashMapEntry<K, V> e8 = null, ImHashMapEntry<K, V> e9 = null)
-        {
-            if (e0.Hash > e1.Hash)
-                Fun.Swap(ref e0, ref e1);
-            ImHashMap<K, V>.Entry kv0 = e0, kv1 = e1, kv2 = e2, kv3 = e3, kv4 = e4, kv5 = e5, kv6 = e6, kv7 = e7;
-            InsertInOrder(kv2.Hash, ref kv2, ref kv0, ref kv1);
-            InsertInOrder(kv3.Hash, ref kv3, ref kv0, ref kv1, ref kv2);
-            InsertInOrder(kv4.Hash, ref kv4, ref kv0, ref kv1, ref kv2, ref kv3);
-            InsertInOrder(kv5.Hash, ref kv5, ref kv0, ref kv1, ref kv2, ref kv3, ref kv4);
-            InsertInOrder(kv6.Hash, ref kv6, ref kv0, ref kv1, ref kv2, ref kv3, ref kv4, ref kv5);
-            InsertInOrder(kv7.Hash, ref kv7, ref kv0, ref kv1, ref kv2, ref kv3, ref kv4, ref kv5, ref kv6);
-
-            ImHashMap<K, V> l = new ImHashMap<K, V>.Leaf2(kv0, kv1);
-            ImHashMap<K, V> r = new ImHashMap<K, V>.Leaf5(kv3, kv4, kv5, kv6, kv7);
-            if (e8 != null || e9 != null)
+            else if (map is ImHashMap<int, V>.Leaf5 l5)
             {
-                if (e8 != null)
-                {
-                    if (e8.Hash > kv2.Hash)
-                        r = r.AddSureNotPresentEntry(e8);
-                    else
-                        l = l.AddSureNotPresentEntry(e8);
-                }
-                if (e9 != null)
-                {
-                    if (e9.Hash > kv2.Hash)
-                        r = r.AddSureNotPresentEntry(e9);
-                    else
-                        l = l.AddSureNotPresentEntry(e9);
-                }
+                handler((VEntry<V>)l5.Entry0, i++, state);
+                handler((VEntry<V>)l5.Entry1, i++, state);
+                handler((VEntry<V>)l5.Entry2, i++, state);
+                handler((VEntry<V>)l5.Entry3, i++, state);
+                handler((VEntry<V>)l5.Entry4, i++, state);
             }
-            return new ImHashMap<K, V>.Branch2(l, kv2, r);
-        }
-
-        /// <summary>Wrapper structure for the hash-key-value</summary>
-        public readonly struct HKV<K, V>
-        {
-            /// <summary>The Key hash</summary>
-            public readonly int Hash;
-            /// <summary>The key</summary>
-            public readonly K Key;
-            /// <summary>The value</summary>
-            public readonly V Value;
-            /// <summary>Constructing thing</summary>
-            public HKV(int hash, K key, V value)
+            else if (map is ImHashMap<int, V>.Leaf5Plus l51)
             {
-                Hash = hash;
-                Key = key;
-                Value = value;
+                var l = l51.L;
+                ImHashMap<int, V>.Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, pp = l51.Plus;
+
+                ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1, ref e2, ref e3, ref e4);
+
+                handler((VEntry<V>)e0, i++, state);
+                handler((VEntry<V>)e1, i++, state);
+                handler((VEntry<V>)e2, i++, state);
+                handler((VEntry<V>)e3, i++, state);
+                handler((VEntry<V>)e4, i++, state);
+                handler((VEntry<V>)pp, i++, state);
+            }
+            else if (map is ImHashMap<int, V>.Leaf5PlusPlus l511)
+            {
+                var l = l511.L.L;
+                ImHashMap<int, V>.Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, p = l511.Plus, pp = l511.L.Plus;
+
+                ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1, ref e2, ref e3, ref e4);
+                ImHashMap.InsertInOrder(p.Hash, ref p, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp);
+
+                handler((VEntry<V>)e0, i++, state);
+                handler((VEntry<V>)e1, i++, state);
+                handler((VEntry<V>)e2, i++, state);
+                handler((VEntry<V>)e3, i++, state);
+                handler((VEntry<V>)e4, i++, state);
+                handler((VEntry<V>)pp, i++, state);
+                handler((VEntry<V>)p, i++, state);
+            }
+            else if (map is ImHashMap<int, V>.Entry l1)
+                handler((VEntry<V>)l1, i++, state);
+
+            if (b21LeftWasEnumerated != null)
+                continue;
+
+            if (count == 0)
+                break; // we yield the leaf and there is nothing in stack - we are DONE!
+
+            var b = parents.Get(--count); // otherwise get the parent
+            if (b is ImHashMap<int, V>.Branch2Base pb2)
+            {
+                handler((VEntry<V>)pb2.MidEntry, i++, state);
+                map = pb2.Right;
+            }
+            else if (b != _enumerationB3Tombstone)
+            {
+                var pb3 = (ImHashMap<int, V>.Branch3Base)b;
+                handler((VEntry<V>)pb3.Entry0, i++, state);
+                map = pb3.Middle;
+                parents.Put(_enumerationB3Tombstone, ++count);
+                ++count;
+            }
+            else
+            {
+                var pb3 = (ImHashMap<int, V>.Branch3Base)parents.Get(--count);
+                handler((VEntry<V>)pb3.Entry1, i++, state);
+                map = pb3.Right;
             }
         }
-
-        /// <summary>Creates the entry with the custom provided hash</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMapEntry<K, V> Entry<K, V>(in HKV<K, V> item) => new KVEntry<K, V>(item.Hash, item.Key, item.Value);
-
-        /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
-        public static ImHashMap<K, V> BuildUnchecked<K, V, E>(E items) where E : IEnumerable<HKV<K, V>>
-        {
-            var en = items.GetEnumerator();
-            if (!en.MoveNext())
-                return ImHashMap<K, V>.Empty;
-            var e0 = Entry(en.Current);
-            if (!en.MoveNext())
-                return e0;
-            var e1 = Entry(en.Current);
-            if (!en.MoveNext())
-                return BuildFromDifferent(e0, e1);
-            var e2 = Entry(en.Current);
-            if (!en.MoveNext())
-                return BuildFromDifferent(e0, e1, e2);
-            var e3 = Entry(en.Current);
-            if (!en.MoveNext())
-                return BuildFromDifferent(e0, e1, e2, e3);
-            var e4 = Entry(en.Current);
-            if (!en.MoveNext())
-                return BuildUnchecked(e0, e1, e2, e3, e4);
-            var e5 = Entry(en.Current);
-            if (!en.MoveNext())
-                return BuildFromDifferent(e0, e1, e2, e3, e4, e5);
-            var e6 = Entry(en.Current);
-            if (!en.MoveNext())
-                return BuildFromDifferent(e0, e1, e2, e3, e4, e5, e6);
-            var e7 = Entry(en.Current);
-            var map = BuildFromDifferent(e0, e1, e2, e3, e4, e5, e6, e7);
-            while (en.MoveNext())
-            {
-                var it = en.Current;
-                map = map.AddSureNotPresent(it.Hash, it.Key, it.Value);
-            }
-            return map;
-        }
-
-        /// <summary>Adds the entry and returns the new map or if the hash is present then return the found entry or the newEntry if the map is empty.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<int, V> AddOrGetEntry<V>(this ImHashMap<int, V> map, ImHashMapEntry<int, V> newEntry) =>
-            map.AddOrGetEntry(newEntry.Hash, newEntry);
-
-        /// <summary>Adds the entry and returns the new map or if the hash is present then return the found entry or the newEntry if the map is empty.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrGetEntry<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry) =>
-            map.AddOrGetEntry(newEntry.Hash, newEntry).GetEntryOrReplacedMapWithTheSameHash(map, newEntry);
-
-        /// <summary>Adds the entry and returns the new map or if the hash is present then return the found entry or the newEntry if the map is empty.
-        /// The entry key is compared by the `ReferenceEquals`</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrGetEntryByReferenceEquals<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry) =>
-            map.AddOrGetEntry(newEntry.Hash, newEntry).GetEntryOrReplacedMapWithTheSameHashByReferenceEquals(map, newEntry);
-
-        /// <summary>Adds or updates (no in-place mutation) the map with the new entry, always returning the NEW map!</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrUpdateEntry<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry) =>
-            // calling GetMapOrReplaceWithEntry overload instead of the previously inlined logic of checking the entry improves the performance for up to 10 items map by 10% (like because of inlining kicking in)!
-            map.AddOrGetEntry(newEntry.Hash, newEntry).GetMapOrReplaceWithEntry(map, newEntry);
-
-        /// <summary>Adds or updates (no in-place mutation) the map with the new entry, always returning the NEW map!</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrUpdateEntryByReferenceEquals<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry) =>
-            map.AddOrGetEntry(newEntry.Hash, newEntry).GetMapOrReplaceWithEntryByReferenceEquals(map, newEntry);
-
-        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed hash and key, always returning the NEW map!</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<int, V> AddOrUpdate<V>(this ImHashMap<int, V> map, int hash, V value) =>
-            map.AddOrUpdateEntry(Entry(hash, value));
-
-        /// <summary>Add sure not present item, so before calling this method you may either check the map via GetEntryOrNull or be sure that the new added hash is unique</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<int, V> AddSureNotPresent<V>(this ImHashMap<int, V> map, int hash, V value) =>
-            map.AddSureNotPresentEntry(Entry(hash, value));
-
-        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed hash and key, always returning the NEW map!</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrUpdate<K, V>(this ImHashMap<K, V> map, int hash, K key, V value) =>
-            map.AddOrUpdateEntry(Entry(hash, key, value));
-
-        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed hash and key, always returning the NEW map!
-        /// Keys are compared by ReferenceEquals</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrUpdateByReferenceEquals<K, V>(this ImHashMap<K, V> map, int hash, K key, V value) =>
-            map.AddOrUpdateEntryByReferenceEquals(Entry(hash, key, value));
-
-        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrUpdate<K, V>(this ImHashMap<K, V> map, K key, V value) =>
-            map.AddOrUpdateEntry(EntryWithHash(key, value));
-
-        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!
-        /// Keys are compared by ReferenceEquals</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrUpdateByReferenceEquals<K, V>(this ImHashMap<K, V> map, K key, V value) =>
-            map.AddOrUpdateEntryByReferenceEquals(EntryWithHash(key, value));
-        // todo: @feature we need and Add method to throw for the existing key, maybe based on GetOrAdd
-        /// <summary>Add sure not present item, so before calling this method you may either check the map via GetEntryOrNull or be sure that the new added key is unique</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddSureNotPresentEntry<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry) =>
-            map.AddSureNotPresentEntry(newEntry);
-
-        /// <summary>Add sure not present item, so before calling this method you may either check the map via GetEntryOrNull or be sure that the new added key is unique</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddSureNotPresent<K, V>(this ImHashMap<K, V> map, int hash, K key, V value) =>
-            map.AddSureNotPresentEntry(Entry(hash, key, value));
-
-        /// <summary>Add sure not present item, so before calling this method you may either check the map via GetEntryOrNull or be sure that the new added key is unique</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddSureNotPresent<K, V>(this ImHashMap<K, V> map, K key, V value) =>
-            map.AddSureNotPresentEntry(EntryWithHash(key, value));
-
-        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed hash and key, always returning the NEW map!</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<int, V> AddOrUpdate<V>(this ImHashMap<int, V> map, int hash, V value, Update<int, V> update)
-        {
-            var newEntry = Entry(hash, value);
-            var mapOrOldEntry = map.AddOrGetEntry(hash, newEntry);
-            return mapOrOldEntry is VEntry<V> oldEntry && oldEntry != newEntry
-                ? map.ReplaceEntry(oldEntry, Entry(hash, update(hash, oldEntry.Value, value)))
-                : mapOrOldEntry;
-        }
-
-        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrUpdate<K, V>(this ImHashMap<K, V> map, int hash, K key, V value, Update<K, V> update)
-        {
-            var newEntry = Entry(hash, key, value);
-            var mapOrOldEntry = map.AddOrGetEntry(hash, newEntry);
-            return mapOrOldEntry is ImHashMap<K, V>.Entry oldEntry && oldEntry != newEntry
-                ? map.ReplaceEntry(oldEntry, oldEntry.AddOrUpdateWithTheSameHash(newEntry, update))
-                : mapOrOldEntry;
-        }
-
-        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrUpdate<K, V, R>(this ImHashMap<K, V> map, int hash, K key, V value, ref R result, Update<K, V, R> update)
-        {
-            var newEntry = Entry(hash, key, value);
-            var mapOrOldEntry = map.AddOrGetEntry(hash, newEntry);
-            return mapOrOldEntry is ImHashMap<K, V>.Entry oldEntry && oldEntry != newEntry
-                ? map.ReplaceEntry(oldEntry, oldEntry.AddOrUpdateWithTheSameHash(newEntry, ref result, update))
-                : mapOrOldEntry;
-        }
-
-        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrUpdateByReferenceEquals<K, V>(this ImHashMap<K, V> map, int hash, K key, V value, Update<K, V> update)
-        {
-            var newEntry = Entry(hash, key, value);
-            var mapOrOldEntry = map.AddOrGetEntry(hash, newEntry);
-            return mapOrOldEntry is ImHashMap<K, V>.Entry oldEntry && oldEntry != newEntry
-                ? map.ReplaceEntry(oldEntry, oldEntry.AddOrUpdateWithTheSameHashByReferenceEquals(newEntry, update))
-                : mapOrOldEntry;
-        }
-
-        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrUpdate<K, V>(this ImHashMap<K, V> map, K key, V value, Update<K, V> update) =>
-            map.AddOrUpdate(key.GetHashCode(), key, value, update);
-
-        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrUpdate<K, V, R>(this ImHashMap<K, V> map, K key, V value, ref R result, Update<K, V, R> update) =>
-            map.AddOrUpdate(key.GetHashCode(), key, value, ref result, update);
-
-        /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the hash is already present</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<int, V> AddOrKeep<V>(this ImHashMap<int, V> map, int hash, V value) =>
-            map.AddOrKeepEntry(Entry(hash, value));
-
-        /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the key is already present</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrKeepEntry<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry) =>
-            map.AddOrGetEntry(newEntry.Hash, newEntry).AddOrKeepWithTheSameHash(map, newEntry);
-
-        /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the key is already present</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrKeepEntryByReferenceEquals<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry) =>
-            map.AddOrGetEntry(newEntry.Hash, newEntry).AddOrKeepWithTheSameHashByReferenceEquals(map, newEntry);
-
-        /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the key is already present</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrKeep<K, V>(this ImHashMap<K, V> map, int hash, K key, V value) =>
-            map.AddOrKeepEntry(Entry(hash, key, value));
-
-        /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the key is already present</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrKeep<K, V>(this ImHashMap<K, V> map, K key, V value) =>
-            map.AddOrKeepEntry(EntryWithHash(key, value));
-
-        /// <summary>Updates the map with the new value if the hash is found otherwise returns the same unchanged map.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<int, V> Update<V>(this ImHashMap<int, V> map, int hash, V value)
-        {
-            var entry = map.GetEntryOrNull(hash);
-            return entry == null ? map : map.ReplaceEntry(entry, Entry(hash, value));
-        }
-
-        /// <summary>Updates the map with the default value if the hash is found otherwise returns the same unchanged map.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<int, V> UpdateToDefault<V>(this ImHashMap<int, V> map, int hash)
-        {
-            var entry = map.GetEntryOrNull(hash);
-            return entry == null ? map : map.ReplaceEntry(entry, EntryWithDefaultValue<V>(hash));
-        }
-
-        /// <summary>Updates the map with the new value if the key is found otherwise returns the same unchanged map.</summary>
-        public static ImHashMap<K, V> Update<K, V>(this ImHashMap<K, V> map, int hash, K key, V value)
-        {
-            var entry = map.GetEntryOrNull(hash);
-            if (entry == null)
-                return map;
-            var updated = entry.UpdatedOrNullWithTheSameHash(Entry(hash, key, value));
-            return updated == null ? map : map.ReplaceEntry(entry, updated);
-        }
-
-        /// <summary>Updates the map with the new value if the key is found otherwise returns the same unchanged map.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> Update<K, V>(this ImHashMap<K, V> map, K key, V value) =>
-            map.Update(key.GetHashCode(), key, value);
-
-        // todo: @feature add ByReferenceEquals
-        /// <summary>Updates the map with the new value if the key is found otherwise returns the same unchanged map.</summary>
-        public static ImHashMap<K, V> UpdateToDefault<K, V>(this ImHashMap<K, V> map, int hash, K key)
-        {
-            var entry = map.GetEntryOrNull(hash);
-            if (entry == null)
-                return map;
-            var updated = entry.UpdatedOrNullWithTheSameHash(EntryWithDefaultValue<K, V>(hash, key));
-            return updated == null ? map : map.ReplaceEntry(entry, updated);
-        }
-
-        /// <summary>Updates the map with the new value if the key is found otherwise returns the same unchanged map.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> UpdateToDefault<K, V>(this ImHashMap<K, V> map, K key) =>
-            map.UpdateToDefault(key.GetHashCode(), key);
-
-        /// <summary>Updates the map with the new value and the `update` function if the key is found otherwise returns the same unchanged map.
-        /// If `update` returns the same map if the updated result is the same</summary>
-        public static ImHashMap<K, V> Update<K, V>(this ImHashMap<K, V> map, int hash, K key, V value, Update<K, V> update)
-        {
-            var entry = map.GetEntryOrNull(hash);
-            if (entry == null)
-                return map;
-            var updated = entry.UpdatedOrNullWithTheSameHash(key, value, update);
-            return updated == null ? map : map.ReplaceEntry(entry, updated);
-        }
-
-        /// <summary>Updates the map with the new value and the `update` function if the key is found otherwise returns the same unchanged map.
-        /// If `update` returns the same map if the updated result is the same</summary>
-        public static ImHashMap<K, V> Update<K, V>(this ImHashMap<K, V> map, K key, V value, Update<K, V> update) =>
-            map.Update(key.GetHashCode(), key, value, update);
-
-        /// <summary>Returns the new map without the specified hash (if found) or returns the same map otherwise</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<int, V> Remove<V>(this ImHashMap<int, V> map, int hash)
-        {
-            var entryToRemove = map.GetEntryOrNull(hash);
-            return entryToRemove == null ? map : map.RemoveEntry(entryToRemove);
-        }
-
-        // todo: @perf minimize virtual calls
-        // todo: @perf or rather what if I move a static method inside the map and override it in VEntry or KVEntry to speedup it for 1 item map, at least
-        /// <summary>Returns the new map without the specified hash and key (if found) or returns the same map otherwise</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> Remove<K, V>(this ImHashMap<K, V> map, int hash, K key)
-        {
-            var entryToRemove = map.GetEntryOrNull(hash);
-            if (entryToRemove != null)
-            {
-                var removed = entryToRemove.RemovedOrNullWithTheSameHash(key);
-                if (removed == entryToRemove)
-                    return map.RemoveEntry(entryToRemove);
-                if (removed != null)
-                    return map.ReplaceEntry(entryToRemove, removed);
-            }
-            return map;
-        }
-
-        /// <summary>Returns the new map without the specified hash and key (if found) or returns the same map otherwise</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> Remove<K, V>(this ImHashMap<K, V> map, K key) =>
-            map == ImHashMap<K, V>.Empty ? map : map.Remove(key.GetHashCode(), key); // it make sense to have the empty map condition here to prevent the probably costly `GetHashCode()` for the empty map.
+        return state;
     }
 
-    /// <summary>
-    /// The fixed array of maps (partitions) where the key first (lower) bits are used to locate the partition to lookup into.
-    /// Note: The partition array is NOT immutable and operates by swapping the updated partition with the new one.
-    /// The number of partitions may be specified by user or you can use the default number 16.
-    /// The default number 16 was selected to be not so big to pay for the few items and not so small to diminish the use of partitions.
-    /// </summary>
-    public static class PartitionedHashMap
+    /// <summary>Do something for each entry.
+    /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
+    /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
+    public static void ForEach<V>(this ImHashMap<int, V> map, Action<VEntry<V>, int> handler, MapParentStack parents = null) =>
+        map.ForEach(handler, (e, i, r) => r(e, i), parents);
+
+    /// <summary>Do something for each entry.
+    /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
+    /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
+    public static void ForEach<K, V>(this ImHashMap<K, V> map, Action<ImHashMapEntry<K, V>, int> handler, MapParentStack parents = null) =>
+        map.ForEach(handler, (e, i, r) => r(e, i), parents);
+
+    /// <summary>Collect something for each entry.
+    /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
+    /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
+    public static S Fold<V, S>(this ImHashMap<int, V> map, S state, Func<VEntry<V>, int, S, S> handler, MapParentStack parents = null) =>
+        map.ForEach(St.Rent(state, handler), (e, i, s) => s.a = s.b(e, i, s.a), parents).ResetButGetA();
+
+    /// <summary>Collect something for each entry.
+    /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
+    /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
+    public static S Fold<K, V, S>(this ImHashMap<K, V> map, S state, Func<ImHashMapEntry<K, V>, int, S, S> handler, MapParentStack parents = null) =>
+        map.ForEach(St.Rent(state, handler), (e, i, s) => s.a = s.b(e, i, s.a), parents).ResetButGetA();
+
+    /// <summary>Converts the map to an array with the minimum allocations</summary>
+    public static S[] ToArray<V, S>(this ImHashMap<int, V> map, Func<VEntry<V>, S> selector) =>
+        map == ImHashMap<int, V>.Empty ? ArrayTools.Empty<S>() :
+            map.ForEach(St.Rent(new S[map.Count()], selector), static (e, i, s) => s.a[i] = s.b(e)).ResetButGetA();
+    // todo: @perf accept the check for the selector result
+    /// <summary>Converts the map to an array with the minimum allocations</summary>
+    public static S[] ToArray<K, V, S>(this ImHashMap<K, V> map, Func<ImHashMapEntry<K, V>, S> selector) =>
+        map == ImHashMap<K, V>.Empty
+            ? ArrayTools.Empty<S>()
+            : map.ForEach(St.Rent(new S[map.Count()], selector), static (e, i, s) => s.a[i] = s.b(e)).ResetButGetA();
+
+    /// <summary>Converts the map to an array with the minimum allocations</summary>
+    public static VEntry<V>[] ToArray<V>(this ImHashMap<int, V> map) =>
+        map == ImHashMap<int, V>.Empty
+            ? ArrayTools.Empty<VEntry<V>>()
+            : map.ForEach(new VEntry<V>[map.Count()], (e, i, a) => a[i] = e);
+
+    /// <summary>Converts the map to an array with the minimum allocations</summary>
+    public static ImHashMapEntry<K, V>[] ToArray<K, V>(this ImHashMap<K, V> map) =>
+        map == ImHashMap<K, V>.Empty
+            ? ArrayTools.Empty<ImHashMapEntry<K, V>>()
+            : map.ForEach(new ImHashMapEntry<K, V>[map.Count()], (e, i, a) => a[i] = e);
+
+    /// <summary>Converts the map to the dictionary</summary>
+    public static Dictionary<K, V> ToDictionary<K, V>(this ImHashMap<K, V> map) =>
+        map == ImHashMap<K, V>.Empty
+            ? new Dictionary<K, V>(0)
+            : map.ForEach(new Dictionary<K, V>(), (e, _, d) => d.Add(e.Key, e.Value));
+
+    /// <summary>Converts the map to the dictionary</summary>
+    public static Dictionary<int, V> ToDictionary<V>(this ImHashMap<int, V> map) =>
+        map == ImHashMap<int, V>.Empty
+            ? new Dictionary<int, V>(0)
+            : map.ForEach(new Dictionary<int, V>(), (e, _, d) => d.Add(e.Key, e.Value));
+
+    /// <summary>Returns <see langword="true"/> if map contains the hash, otherwise returns <see langword="false"/></summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static bool Contains<V>(this ImHashMap<int, V> map, int key) => map.GetEntryOrNull(key) != null;
+
+    /// <summary>Returns <see langword="true"/> if map contains the hash and key, otherwise returns <see langword="false"/></summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static bool Contains<K, V>(this ImHashMap<K, V> map, int hash, K key) => map.GetEntryOrDefault(hash, key) != null;
+
+    /// <summary>Returns <see langword="true"/> if map contains the key, otherwise returns <see langword="false"/></summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static bool Contains<K, V>(this ImHashMap<K, V> map, K key) => map.GetEntryOrDefault(key.GetHashCode(), key) != null;
+
+    /// <summary>Returns the entry ASSUMING it is present otherwise its behavior is UNDEFINED.
+    /// You can use the method after the Add and Update methods on the same map instance - 
+    /// because the map is immutable and for sure contains added or updated entry.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMapEntry<int, V> GetSurePresent<V>(this ImHashMap<int, V> map, int hash) =>
+        (VEntry<V>)map.GetSurePresentEntry(hash);
+
+    /// <summary>Returns the entry ASSUMING it is present otherwise its behavior is UNDEFINED.
+    /// You can use the method after the Add and Update methods on the same map instance - 
+    /// because the map is immutable and for sure contains added or updated entry.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMapEntry<K, V> GetSurePresent<K, V>(this ImHashMap<K, V> map, int hash, K key) =>
+        map.GetSurePresentEntry(hash).GetOrNullWithTheSameHash(key);
+
+    /// <summary>Returns the entry ASSUMING it is present otherwise its behavior is UNDEFINED.
+    /// You can use the method after the Add and Update methods on the same map instance - 
+    /// because the map is immutable and for sure contains added or updated entry.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMapEntry<K, V> GetSurePresentByReferenceEquals<K, V>(this ImHashMap<K, V> map, int hash, K key) =>
+        map.GetSurePresentEntry(hash).GetOrNullWithTheSameHashByReferenceEquals(key);
+
+    /// <summary>Lookup for the entry by hash, returns the found entry or `null`.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMapEntry<int, V> GetEntryOrDefault<V>(this ImHashMap<int, V> map, int hash) =>
+        (VEntry<V>)map.GetEntryOrNull(hash);
+
+    /// <summary>Lookup for the entry by key and hash, returns the found entry or `null`.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMapEntry<K, V> GetEntryOrDefault<K, V>(this ImHashMap<K, V> map, int hash, K key) =>
+        map.GetEntryOrNull(hash)?.GetOrNullWithTheSameHash(key);
+
+    /// <summary>Lookup for the entry by key and hash, returns the found entry or `null`.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMapEntry<K, V> GetEntryOrDefault<K, V>(this ImHashMap<K, V> map, K key) =>
+        map.GetEntryOrNull(key.GetHashCode())?.GetOrNullWithTheSameHash(key);
+
+    /// <summary>Lookup for the entry by key and hash, comparing the key by reference, returns the found entry or `null`.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMapEntry<K, V> GetEntryOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V> map, int hash, K key) where K : class =>
+        map.GetEntryOrNull(hash)?.GetOrNullWithTheSameHashByReferenceEquals(key);
+
+    /// <summary>Lookup for the entry by key and hash, comparing the key by reference, returns the found entry or `null`.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMapEntry<K, V> GetEntryOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V> map, K key) where K : class =>
+        map.GetEntryOrNull(key.GetHashCode())?.GetOrNullWithTheSameHashByReferenceEquals(key);
+
+    /// <summary>Lookup for the value by hash, returns the default `V` if hash is not found.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static V GetValueOrDefault<V>(this ImHashMap<int, V> map, int hash)
     {
-        /// <summary>The default number of partitions</summary>
-        public const int PARTITION_COUNT_POWER_OF_TWO = 16;
+        var e = (VEntry<V>)map.GetEntryOrNull(hash);
+        return e != null ? e.Value : default;
+    }
 
-        /// <summary>The default mask to partition the key</summary>
-        public const int PARTITION_HASH_MASK = PARTITION_COUNT_POWER_OF_TWO - 1;
+    /// <summary>Lookup for the value by hash, returns the default `V` if hash is not found.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static V GetValueOrDefault<V>(this ImHashMap<int, V> map, int hash, V defaultValue)
+    {
+        var e = (VEntry<V>)map.GetEntryOrNull(hash);
+        return e != null ? e.Value : defaultValue;
+    }
 
-        /// <summary>Creates the new collection with the empty partitions</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V>[] CreateEmpty<K, V>(int partitionCountOfPowerOfTwo = PARTITION_COUNT_POWER_OF_TWO)
+    /// <summary>Lookup for the value by hash, returns the default `V` if hash is not found.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static V GetValueOrDefault<K, V>(this ImHashMap<K, V> map, int hash, K key) =>
+        map.GetEntryOrNull(hash)?.GetOrNullWithTheSameHash(key) is KVEntry<K, V> kv ? kv.Value : default;
+
+    /// <summary>Lookup for the value by hash, returns the default `V` if hash is not found.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static V GetValueOrDefault<K, V>(this ImHashMap<K, V> map, int hash, K key, V defaultValue) =>
+        map.GetEntryOrNull(hash)?.GetOrNullWithTheSameHash(key) is KVEntry<K, V> kv ? kv.Value : defaultValue;
+
+    /// <summary>Lookup for the value by key and its hash, returns the default `V` if hash is not found.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static V GetValueOrDefault<K, V>(this ImHashMap<K, V> map, K key) =>
+        map.GetEntryOrNull(key.GetHashCode())?.GetOrNullWithTheSameHash(key) is KVEntry<K, V> kv ? kv.Value : default;
+
+    /// <summary>Lookup for the value by key and its hash, returns the default `V` if hash is not found.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static V GetValueOrDefault<K, V>(this ImHashMap<K, V> map, K key, V defaultValue) =>
+        map.GetEntryOrNull(key.GetHashCode())?.GetOrNullWithTheSameHash(key) is KVEntry<K, V> kv ? kv.Value : defaultValue;
+
+    /// <summary>Lookup for the value by the key using the hash and checking the key with the `object.ReferenceEquals` for equality,
+    ///  returns found value or the default value if not found</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static V GetValueOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V> map, int hash, K key) where K : class
+    {
+        var e = map.GetEntryOrNull(hash);
+        return e != null ? e.GetValueOrDefaultWithTheSameHashByReferenceEquals(key) : default;
+    }
+
+    /// <summary>Lookup for the value by the key using the hash and checking the key with the `object.ReferenceEquals` for equality,
+    ///  returns found value or the default value if not found</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static V GetValueOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V> map, K key) where K : class
+    {
+        var e = map.GetEntryOrNull(key.GetHashCode());
+        return e != null ? e.GetValueOrDefaultWithTheSameHashByReferenceEquals(key) : default;
+    }
+
+    /// <summary>Lookup for the value by its hash, returns the `true` and the found value or the `false` otherwise</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static bool TryFind<V>(this ImHashMap<int, V> map, int hash, out V value)
+    {
+        var e = (VEntry<V>)map.GetEntryOrNull(hash);
+        if (e != null)
         {
-            var parts = new ImHashMap<K, V>[partitionCountOfPowerOfTwo];
-            for (var i = 0; i < parts.Length; ++i)
-                parts[i] = ImHashMap<K, V>.Empty;
-            return parts;
+            value = e.Value;
+            return true;
         }
+        value = default;
+        return false;
+    }
 
-        /// <summary>Creates the new collection with the empty partitions</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<int, V>[] CreateEmpty<V>(int partitionCountOfPowerOfTwo = PARTITION_COUNT_POWER_OF_TWO)
+    /// <summary>Lookup for the value by its key, returns the `true` and the found value or the `false` otherwise</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static bool TryFind<K, V>(this ImHashMap<K, V> map, int hash, K key, out V value)
+    {
+        var kv = map.GetEntryOrNull(hash)?.GetOrNullWithTheSameHash(key);
+        if (kv != null)
         {
-            var parts = new ImHashMap<int, V>[partitionCountOfPowerOfTwo];
-            for (var i = 0; i < parts.Length; ++i)
-                parts[i] = ImHashMap<int, V>.Empty;
-            return parts;
+            value = kv.Value;
+            return true;
         }
+        value = default;
+        return false;
+    }
 
-        /// <summary>Lookup for the value by the key using its hash, returns the default `V` if not found.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefault<V>(this ImHashMap<int, V>[] parts, int hash, int partHashMask = PARTITION_HASH_MASK)
+    /// <summary>Lookup for the value by the key using its hash and checking the key with the `object.Equals` for equality,
+    /// returns the `true` and the found value or the `false` otherwise</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static bool TryFind<K, V>(this ImHashMap<K, V> map, K key, out V value) =>
+        map.TryFind(key.GetHashCode(), key, out value);
+
+    /// <summary>Lookup for the value by its key, returns the `true` and the found value or the `false` otherwise</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static bool TryFindByReferenceEquals<K, V>(this ImHashMap<K, V> map, int hash, K key, out V value) where K : class
+    {
+        var kv = map.GetEntryOrNull(hash)?.GetOrNullWithTheSameHashByReferenceEquals(key);
+        if (kv != null)
         {
-            var p = parts[hash & partHashMask];
-            return p != null && p.GetEntryOrNull(hash) is VEntry<V> kv ? kv.Value : default;
+            value = kv.Value;
+            return true;
         }
+        value = default;
+        return false;
+    }
 
-        /// <summary>Lookup for the value by the key and its hash, returns the default `V` if not found.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefault<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, int partHashMask = PARTITION_HASH_MASK)
+    /// <summary>Lookup for the value by its key, returns the `true` and the found value or the `false` otherwise</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static bool TryFindByReferenceEquals<K, V>(this ImHashMap<K, V> map, K key, out V value) where K : class =>
+        map.TryFindByReferenceEquals(key.GetHashCode(), key, out value);
+
+    /// <summary>Creates the entry with the `int` key (which will be used as the hash)</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMapEntry<int, V> Entry<V>(int key, V value) => new VEntry<V>(key, value);
+
+    /// <summary>Creates the entry with the `int` key but without assigning its value yet</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMapEntry<int, V> EntryWithDefaultValue<V>(int key) => new VEntry<V>(key);
+
+    /// <summary>Copies the entry but without its value</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMapEntry<int, V> WithDefaultValue<V>(this ImHashMapEntry<int, V> e) => new VEntry<V>(e.Hash);
+
+    /// <summary>Creates the entry with the user provided hash</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMapEntry<K, V> Entry<K, V>(int hash, K key, V value) => new KVEntry<K, V>(hash, key, value);
+
+    /// <summary>Creates the entry with the key, value and hash of `key.GetHashCode()`</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMapEntry<K, V> EntryWithHash<K, V>(K key, V value) => new KVEntry<K, V>(key.GetHashCode(), key, value);
+
+    /// <summary>Creates the entry but without assigning its value yet</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMapEntry<K, V> EntryWithDefaultValue<K, V>(int hash, K key) => new KVEntry<K, V>(hash, key);
+
+    /// <summary>Copies the entry but without its value</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMapEntry<K, V> WithDefaultValue<K, V>(this ImHashMapEntry<K, V> e) => new KVEntry<K, V>(e.Hash, e.Key);
+
+    /// <summary>Sugar to set the value and return the entry</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMapEntry<K, V> SetValue<K, V>(this ImHashMapEntry<K, V> e, V value)
+    {
+        e.Value = value;
+        return e;
+    }
+
+    /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
+    public static ImHashMap<K, V> BuildFromDifferent<K, V>(
+        ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1)
+    {
+        Debug.Assert(!Equals(e0.Key, e1.Key));
+        if (e0.Hash > e1.Hash)
+            Fun.Swap(ref e0, ref e1);
+        return new ImHashMap<K, V>.Leaf2(e0, e1);
+    }
+
+    /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
+    public static ImHashMap<K, V> BuildFromDifferent<K, V>(
+        ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2)
+    {
+        Debug.Assert(!Equals(e2.Key, e0.Key) && !Equals(e2.Key, e1.Key));
+        return new ImHashMap<K, V>.Leaf2Plus(e2, (ImHashMap<K, V>.Leaf2)BuildFromDifferent(e0, e1));
+    }
+
+    /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
+    public static ImHashMap<K, V> BuildFromDifferent<K, V>(
+        ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2, ImHashMapEntry<K, V> e3)
+    {
+        Debug.Assert(!Equals(e3.Key, e0.Key) && !Equals(e3.Key, e1.Key) && !Equals(e3.Key, e2.Key));
+        return new ImHashMap<K, V>.Leaf2PlusPlus(e3, (ImHashMap<K, V>.Leaf2Plus)BuildFromDifferent(e0, e1, e2));
+    }
+
+    /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
+    public static ImHashMap<K, V> BuildUnchecked<K, V>(
+        ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2, ImHashMapEntry<K, V> e3, ImHashMapEntry<K, V> e4)
+    {
+        if (e0.Hash > e1.Hash)
+            Fun.Swap(ref e0, ref e1);
+        ImHashMap<K, V>.Entry kv0 = e0, kv1 = e1, kv2 = e2, kv3 = e3, kv4 = e4;
+        InsertInOrder(kv2.Hash, ref kv2, ref kv0, ref kv1);
+        InsertInOrder(kv3.Hash, ref kv3, ref kv0, ref kv1, ref kv2);
+        InsertInOrder(kv4.Hash, ref kv4, ref kv0, ref kv1, ref kv2, ref kv3);
+        return new ImHashMap<K, V>.Leaf5(kv0, kv1, kv2, kv3, kv4);
+    }
+
+    /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
+    public static ImHashMap<K, V> BuildFromDifferent<K, V>(
+        ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2, ImHashMapEntry<K, V> e3, ImHashMapEntry<K, V> e4,
+        ImHashMapEntry<K, V> e5) =>
+        new ImHashMap<K, V>.Leaf5Plus(e5, (ImHashMap<K, V>.Leaf5)BuildUnchecked(e0, e1, e2, e3, e4));
+
+    /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
+    public static ImHashMap<K, V> BuildFromDifferent<K, V>(
+        ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2, ImHashMapEntry<K, V> e3, ImHashMapEntry<K, V> e4,
+        ImHashMapEntry<K, V> e5, ImHashMapEntry<K, V> e6) =>
+        new ImHashMap<K, V>.Leaf5PlusPlus(e6, (ImHashMap<K, V>.Leaf5Plus)BuildFromDifferent(e0, e1, e2, e3, e4, e5));
+
+    /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
+    public static ImHashMap<K, V> BuildFromDifferent<K, V>(
+        ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2, ImHashMapEntry<K, V> e3, ImHashMapEntry<K, V> e4,
+        ImHashMapEntry<K, V> e5, ImHashMapEntry<K, V> e6, ImHashMapEntry<K, V> e7,
+        ImHashMapEntry<K, V> e8 = null, ImHashMapEntry<K, V> e9 = null)
+    {
+        if (e0.Hash > e1.Hash)
+            Fun.Swap(ref e0, ref e1);
+        ImHashMap<K, V>.Entry kv0 = e0, kv1 = e1, kv2 = e2, kv3 = e3, kv4 = e4, kv5 = e5, kv6 = e6, kv7 = e7;
+        InsertInOrder(kv2.Hash, ref kv2, ref kv0, ref kv1);
+        InsertInOrder(kv3.Hash, ref kv3, ref kv0, ref kv1, ref kv2);
+        InsertInOrder(kv4.Hash, ref kv4, ref kv0, ref kv1, ref kv2, ref kv3);
+        InsertInOrder(kv5.Hash, ref kv5, ref kv0, ref kv1, ref kv2, ref kv3, ref kv4);
+        InsertInOrder(kv6.Hash, ref kv6, ref kv0, ref kv1, ref kv2, ref kv3, ref kv4, ref kv5);
+        InsertInOrder(kv7.Hash, ref kv7, ref kv0, ref kv1, ref kv2, ref kv3, ref kv4, ref kv5, ref kv6);
+
+        ImHashMap<K, V> l = new ImHashMap<K, V>.Leaf2(kv0, kv1);
+        ImHashMap<K, V> r = new ImHashMap<K, V>.Leaf5(kv3, kv4, kv5, kv6, kv7);
+        if (e8 != null || e9 != null)
         {
-            var p = parts[hash & partHashMask];
-            return p != null ? p.GetValueOrDefault(hash, key) : default;
-        }
-
-        /// <summary>Lookup for the value by the key and its hash, returns the default `V` if not found.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefault<K, V>(this ImHashMap<K, V>[] parts, K key, int partHashMask = PARTITION_HASH_MASK) =>
-            parts.GetValueOrDefault(key.GetHashCode(), key, partHashMask);
-
-
-        /// <summary>Lookup for the value by the key using the hash and checking the key with the `object.ReferenceEquals` for equality,
-        ///  returns found value or the default value if not found</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, int partHashMask = PARTITION_HASH_MASK) where K : class
-        {
-            var p = parts[hash & partHashMask];
-            return p != null ? p.GetValueOrDefaultByReferenceEquals(hash, key) : default;
-        }
-
-        /// <summary>Lookup for the value by the key using its hash and checking the key with the `object.ReferenceEquals` for equality, 
-        /// returns the default `V` if hash, key are not found.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V>[] parts, K key, int partHashMask = PARTITION_HASH_MASK) where K : class =>
-            parts.GetValueOrDefaultByReferenceEquals(key.GetHashCode(), key, partHashMask);
-
-        /// <summary>Lookup for the value by the key using the hash, returns the `true` and the found value or the `false`</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool TryFind<V>(this ImHashMap<int, V>[] parts, int hash, out V value, int partHashMask = PARTITION_HASH_MASK)
-        {
-            var p = parts[hash & partHashMask];
-            if (p != null)
-                return p.TryFind(hash, out value);
-            value = default;
-            return false;
-        }
-
-        /// <summary>Lookup for the value by the key and the hash, returns the `true` and the found value or the `false`</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool TryFind<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, out V value, int partHashMask = PARTITION_HASH_MASK)
-        {
-            var p = parts[hash & partHashMask];
-            if (p != null)
-                return p.TryFind(hash, key, out value);
-            value = default;
-            return false;
-        }
-
-        /// <summary>Lookup for the value by the key and the hash, returns the `true` and the found value or the `false`</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool TryFind<K, V>(this ImHashMap<K, V>[] parts, K key, out V value, int partHashMask = PARTITION_HASH_MASK) =>
-            parts.TryFind(key.GetHashCode(), key, out value, partHashMask);
-
-        /// <summary>Lookup for the value by the key using the hash code and checking the key with the `object.ReferenceEquals` for equality,
-        /// returns the `true` and the found value or the `false`</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool TryFindByReferenceEquals<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, out V value,
-            int partHashMask = PARTITION_HASH_MASK) where K : class
-        {
-            var p = parts[hash & partHashMask];
-            if (p != null)
-                return p.TryFindByReferenceEquals(hash, key, out value);
-            value = default;
-            return false;
-        }
-
-        /// <summary>Lookup for the value by the key using the hash code and checking the key with the `object.ReferenceEquals` for equality,
-        /// returns the `true` and the found value or the `false`</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool TryFindByReferenceEquals<K, V>(this ImHashMap<K, V>[] parts, K key, out V value,
-            int partHashMask = PARTITION_HASH_MASK) where K : class =>
-            parts.TryFindByReferenceEquals(key.GetHashCode(), key, out value, partHashMask);
-
-        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partition</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static void AddOrUpdate<V>(this ImHashMap<int, V>[] parts, int hash, V value, int partHashMask = PARTITION_HASH_MASK)
-        {
-            ref var part = ref parts[hash & partHashMask];
-            var p = part;
-            if (Interlocked.CompareExchange(ref part, p.AddOrUpdate(hash, value), p) != p)
-                RefAddOrUpdatePart(ref part, hash, value);
-        }
-
-        private static void RefAddOrUpdatePart<V>(ref ImHashMap<int, V> part, int hash, V value) =>
-            Ref.Swap(ref part, hash, value, (x, h, v) => x.AddOrUpdate(h, v));
-
-        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partition</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, V value, int partHashMask = PARTITION_HASH_MASK)
-        {
-            ref var part = ref parts[hash & partHashMask];
-            var p = part;
-            if (Interlocked.CompareExchange(ref part, p.AddOrUpdate(hash, key, value), p) != p)
-                RefAddOrUpdatePart(ref part, hash, key, value);
-        }
-
-        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partition</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] parts, K key, V value, int partHashMask = PARTITION_HASH_MASK) =>
-            parts.AddOrUpdate(key.GetHashCode(), key, value, partHashMask);
-
-        private static void RefAddOrUpdatePart<K, V>(ref ImHashMap<K, V> part, int hash, K key, V value) =>
-            Ref.Swap(ref part, hash, key, value, (x, h, k, v) => x.AddOrUpdate(h, k, v));
-
-        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partition</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static void AddOrUpdate<V>(this ImHashMap<int, V>[] parts, int hash, V value, Update<int, V> update, int partHashMask = PARTITION_HASH_MASK)
-        {
-            ref var part = ref parts[hash & partHashMask];
-            var p = part;
-            if (Interlocked.CompareExchange(ref part, p.AddOrUpdate(hash, value, update), p) != p)
-                Ref.Swap(ref part, hash, value, update, (x, h, k, u) => x.AddOrUpdate(h, k, u));
-        }
-
-        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partition</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, V value, Update<K, V> update, int partHashMask = PARTITION_HASH_MASK)
-        {
-            ref var part = ref parts[hash & partHashMask];
-            var p = part;
-            if (Interlocked.CompareExchange(ref part, p.AddOrUpdate(hash, key, value, update), p) != p)
-                Ref.Swap(ref part, hash, key, value, update, (x, h, k, v, u) => x.AddOrUpdate(h, k, v, u));
-        }
-
-        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partition</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] parts, K key, V value, Update<K, V> update, int partHashMask = PARTITION_HASH_MASK) =>
-            parts.AddOrUpdate(key.GetHashCode(), key, value, update);
-
-        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or the same kept partition</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static void AddOrKeep<V>(this ImHashMap<int, V>[] parts, int hash, V value, int partHashMask = PARTITION_HASH_MASK)
-        {
-            ref var part = ref parts[hash & partHashMask];
-            var p = part;
-            if (Interlocked.CompareExchange(ref part, p.AddOrKeep(hash, value), p) != p)
-                RefAddOrKeepPart(ref part, hash, value);
-        }
-
-        private static void RefAddOrKeepPart<V>(ref ImHashMap<int, V> part, int hash, V value) =>
-            Ref.Swap(ref part, hash, value, (x, h, v) => x.AddOrUpdate(h, v));
-
-        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or the same kept partition</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static void AddOrKeep<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, V value, int partHashMask = PARTITION_HASH_MASK)
-        {
-            ref var part = ref parts[hash & partHashMask];
-            var p = part;
-            if (Interlocked.CompareExchange(ref part, p.AddOrKeep(hash, key, value), p) != p)
-                RefAddOrKeepPart(ref part, hash, key, value);
-        }
-
-        private static void RefAddOrKeepPart<K, V>(ref ImHashMap<K, V> part, int hash, K key, V value) =>
-            Ref.Swap(ref part, hash, key, value, (x, h, k, v) => x.AddOrUpdate(h, k, v));
-
-        /// <summary>Updates the map with the new value if the hash is found otherwise returns the same unchanged map.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static void Update<V>(this ImHashMap<int, V>[] parts, int hash, V value, int partHashMask = PARTITION_HASH_MASK)
-        {
-            ref var part = ref parts[hash & partHashMask];
-            var p = part;
-            if (Interlocked.CompareExchange(ref part, p.Update(hash, value), p) != p)
-                RefUpdatePart(ref part, hash, value);
-        }
-
-        private static void RefUpdatePart<V>(ref ImHashMap<int, V> part, int hash, V value) =>
-            Ref.Swap(ref part, hash, value, (x, h, v) => x.Update(h, v));
-
-        /// <summary>Enumerates the entries in order of their int keys (the hash is the same as the key).</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static Enumerable<V> Enumerate<V>(this ImHashMap<int, V>[] parts) => new Enumerable<V>(parts);
-
-        /// <summary>Non-allocating enumerator</summary>
-        public struct Enumerable<V> : IEnumerable<VEntry<V>>, IEnumerable
-        {
-            private readonly ImHashMap<int, V>[] _maps;
-            /// <summary>Constructor</summary>
-            public Enumerable(ImHashMap<int, V>[] maps) => _maps = maps;
-
-            /// <summary>Returns non-allocating enumerator</summary>
-            public Enumerator<V> GetEnumerator() => new Enumerator<V> { _maps = _maps };
-            IEnumerator<VEntry<V>> IEnumerable<VEntry<V>>.GetEnumerator() => new Enumerator<V> { _maps = _maps };
-            IEnumerator IEnumerable.GetEnumerator() => new Enumerator<V> { _maps = _maps };
-        }
-
-        /// <summary>Enumerator on stack, without allocation</summary>
-        public struct Enumerator<V> : IEnumerator<VEntry<V>>, IDisposable, IEnumerator
-        {
-            internal ImHashMap<int, V>[] _maps;
-            private bool _mapEnumerationInProgress;
-            private int _mapIndex;
-            private ImHashMap.Enumerator<V> _mapEn;
-            private VEntry<V> _current;
-            /// <inheritdoc />
-            public VEntry<V> Current => _current;
-            object IEnumerator.Current => _current;
-
-            /// <inheritdoc />
-            public bool MoveNext()
+            if (e8 != null)
             {
-            StartOver:
-                if (!_mapEnumerationInProgress)
-                {
-                    for (var i = _mapIndex; i < _maps.Length; ++i)
-                    {
-                        var m = _maps[i];
-                        if (m == ImHashMap<int, V>.Empty)
-                            continue;
-                        _mapEn.ReInit(m);
-                        _mapEn.MoveNext();
-                        _current = _mapEn._current;
-                        _mapEnumerationInProgress = true;
-                        _mapIndex = i + 1; // set to next map
-                        return true;
-                    }
-                    return false;
-                }
-                if (!_mapEn.MoveNext())
-                {
-                    _mapEnumerationInProgress = false;
-                    goto StartOver;
-                }
-                _current = _mapEn._current;
-                return true;
+                if (e8.Hash > kv2.Hash)
+                    r = r.AddSureNotPresentEntry(e8);
+                else
+                    l = l.AddSureNotPresentEntry(e8);
             }
-
-            bool IEnumerator.MoveNext() => MoveNext();
-            void IEnumerator.Reset() => throw new NotSupportedException();
-            void IDisposable.Dispose() { }
-        }
-
-        /// <summary>Enumerates the entries in order of their hash.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static Enumerable<K, V> Enumerate<K, V>(this ImHashMap<K, V>[] parts) => new Enumerable<K, V>(parts);
-
-        /// <summary>Non-allocating enumerator</summary>
-        public struct Enumerable<K, V> : IEnumerable<KVEntry<K, V>>, IEnumerable
-        {
-            private readonly ImHashMap<K, V>[] _maps;
-            /// <summary>Constructor</summary>
-            public Enumerable(ImHashMap<K, V>[] maps) => _maps = maps;
-            /// <summary>Returns non-allocating enumerator</summary>
-            public Enumerator<K, V> GetEnumerator() => new Enumerator<K, V> { _maps = _maps };
-            IEnumerator<KVEntry<K, V>> IEnumerable<KVEntry<K, V>>.GetEnumerator() => new Enumerator<K, V> { _maps = _maps };
-            IEnumerator IEnumerable.GetEnumerator() => new Enumerator<K, V> { _maps = _maps };
-        }
-
-        /// <summary>Enumerator on stack, without allocation</summary>
-        public struct Enumerator<K, V> : IEnumerator<KVEntry<K, V>>, IDisposable, IEnumerator
-        {
-            internal ImHashMap<K, V>[] _maps;
-            private bool _mapEnumerationInProgress;
-            private int _mapIndex;
-            private ImHashMap.Enumerator<K, V> _mapEn;
-            private KVEntry<K, V> _current;
-            /// <inheritdoc />
-            public KVEntry<K, V> Current => _current;
-            object IEnumerator.Current => _current;
-
-            /// <inheritdoc />
-            public bool MoveNext()
+            if (e9 != null)
             {
-            StartOver:
-                if (!_mapEnumerationInProgress)
-                {
-                    for (var i = _mapIndex; i < _maps.Length; ++i)
-                    {
-                        var m = _maps[i];
-                        if (m == ImHashMap<K, V>.Empty)
-                            continue;
-                        _mapEn.ReInit(m);
-                        _mapEn.MoveNext();
-                        _current = _mapEn._current;
-                        _mapEnumerationInProgress = true;
-                        _mapIndex = i + 1; // set to next map
-                        return true;
-                    }
-                    return false;
-                }
-                if (!_mapEn.MoveNext())
-                {
-                    _mapEnumerationInProgress = false;
-                    goto StartOver;
-                }
-                _current = _mapEn._current;
-                return true;
+                if (e9.Hash > kv2.Hash)
+                    r = r.AddSureNotPresentEntry(e9);
+                else
+                    l = l.AddSureNotPresentEntry(e9);
             }
-
-            bool IEnumerator.MoveNext() => MoveNext();
-            void IEnumerator.Reset() => throw new NotSupportedException();
-            void IDisposable.Dispose() { }
         }
+        return new ImHashMap<K, V>.Branch2(l, kv2, r);
+    }
 
-        /// <summary>Do something for each entry.
-        /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
-        /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
-        public static S ForEach<V, S>(this ImHashMap<int, V>[] parts, S state, Action<VEntry<V>, int, S> handler, MapParentStack parents = null)
+    /// <summary>Wrapper structure for the hash-key-value</summary>
+    public readonly struct HKV<K, V>
+    {
+        /// <summary>The Key hash</summary>
+        public readonly int Hash;
+        /// <summary>The key</summary>
+        public readonly K Key;
+        /// <summary>The value</summary>
+        public readonly V Value;
+        /// <summary>Constructing thing</summary>
+        public HKV(int hash, K key, V value)
         {
-            if (parents == null)
-                parents = new MapParentStack();
-            foreach (var map in parts)
+            Hash = hash;
+            Key = key;
+            Value = value;
+        }
+    }
+
+    /// <summary>Creates the entry with the custom provided hash</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMapEntry<K, V> Entry<K, V>(in HKV<K, V> item) => new KVEntry<K, V>(item.Hash, item.Key, item.Value);
+
+    /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
+    public static ImHashMap<K, V> BuildUnchecked<K, V, E>(E items) where E : IEnumerable<HKV<K, V>>
+    {
+        var en = items.GetEnumerator();
+        if (!en.MoveNext())
+            return ImHashMap<K, V>.Empty;
+        var e0 = Entry(en.Current);
+        if (!en.MoveNext())
+            return e0;
+        var e1 = Entry(en.Current);
+        if (!en.MoveNext())
+            return BuildFromDifferent(e0, e1);
+        var e2 = Entry(en.Current);
+        if (!en.MoveNext())
+            return BuildFromDifferent(e0, e1, e2);
+        var e3 = Entry(en.Current);
+        if (!en.MoveNext())
+            return BuildFromDifferent(e0, e1, e2, e3);
+        var e4 = Entry(en.Current);
+        if (!en.MoveNext())
+            return BuildUnchecked(e0, e1, e2, e3, e4);
+        var e5 = Entry(en.Current);
+        if (!en.MoveNext())
+            return BuildFromDifferent(e0, e1, e2, e3, e4, e5);
+        var e6 = Entry(en.Current);
+        if (!en.MoveNext())
+            return BuildFromDifferent(e0, e1, e2, e3, e4, e5, e6);
+        var e7 = Entry(en.Current);
+        var map = BuildFromDifferent(e0, e1, e2, e3, e4, e5, e6, e7);
+        while (en.MoveNext())
+        {
+            var it = en.Current;
+            map = map.AddSureNotPresent(it.Hash, it.Key, it.Value);
+        }
+        return map;
+    }
+
+    /// <summary>Adds the entry and returns the new map or if the hash is present then return the found entry or the newEntry if the map is empty.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<int, V> AddOrGetEntry<V>(this ImHashMap<int, V> map, ImHashMapEntry<int, V> newEntry) =>
+        map.AddOrGetEntry(newEntry.Hash, newEntry);
+
+    /// <summary>Adds the entry and returns the new map or if the hash is present then return the found entry or the newEntry if the map is empty.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> AddOrGetEntry<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry) =>
+        map.AddOrGetEntry(newEntry.Hash, newEntry).GetEntryOrReplacedMapWithTheSameHash(map, newEntry);
+
+    /// <summary>Adds the entry and returns the new map or if the hash is present then return the found entry or the newEntry if the map is empty.
+    /// The entry key is compared by the `ReferenceEquals`</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> AddOrGetEntryByReferenceEquals<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry) =>
+        map.AddOrGetEntry(newEntry.Hash, newEntry).GetEntryOrReplacedMapWithTheSameHashByReferenceEquals(map, newEntry);
+
+    /// <summary>Adds or updates (no in-place mutation) the map with the new entry, always returning the NEW map!</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> AddOrUpdateEntry<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry) =>
+        // calling GetMapOrReplaceWithEntry overload instead of the previously inlined logic of checking the entry improves the performance for up to 10 items map by 10% (like because of inlining kicking in)!
+        map.AddOrGetEntry(newEntry.Hash, newEntry).GetMapOrReplaceWithEntry(map, newEntry);
+
+    /// <summary>Adds or updates (no in-place mutation) the map with the new entry, always returning the NEW map!</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> AddOrUpdateEntryByReferenceEquals<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry) =>
+        map.AddOrGetEntry(newEntry.Hash, newEntry).GetMapOrReplaceWithEntryByReferenceEquals(map, newEntry);
+
+    /// <summary>Adds or updates (no in-place mutation) the map with value by the passed hash and key, always returning the NEW map!</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<int, V> AddOrUpdate<V>(this ImHashMap<int, V> map, int hash, V value) =>
+        map.AddOrUpdateEntry(Entry(hash, value));
+
+    /// <summary>Add sure not present item, so before calling this method you may either check the map via GetEntryOrNull or be sure that the new added hash is unique</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<int, V> AddSureNotPresent<V>(this ImHashMap<int, V> map, int hash, V value) =>
+        map.AddSureNotPresentEntry(Entry(hash, value));
+
+    /// <summary>Adds or updates (no in-place mutation) the map with value by the passed hash and key, always returning the NEW map!</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> AddOrUpdate<K, V>(this ImHashMap<K, V> map, int hash, K key, V value) =>
+        map.AddOrUpdateEntry(Entry(hash, key, value));
+
+    /// <summary>Adds or updates (no in-place mutation) the map with value by the passed hash and key, always returning the NEW map!
+    /// Keys are compared by ReferenceEquals</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> AddOrUpdateByReferenceEquals<K, V>(this ImHashMap<K, V> map, int hash, K key, V value) =>
+        map.AddOrUpdateEntryByReferenceEquals(Entry(hash, key, value));
+
+    /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> AddOrUpdate<K, V>(this ImHashMap<K, V> map, K key, V value) =>
+        map.AddOrUpdateEntry(EntryWithHash(key, value));
+
+    /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!
+    /// Keys are compared by ReferenceEquals</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> AddOrUpdateByReferenceEquals<K, V>(this ImHashMap<K, V> map, K key, V value) =>
+        map.AddOrUpdateEntryByReferenceEquals(EntryWithHash(key, value));
+    // todo: @feature we need and Add method to throw for the existing key, maybe based on GetOrAdd
+    /// <summary>Add sure not present item, so before calling this method you may either check the map via GetEntryOrNull or be sure that the new added key is unique</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> AddSureNotPresentEntry<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry) =>
+        map.AddSureNotPresentEntry(newEntry);
+
+    /// <summary>Add sure not present item, so before calling this method you may either check the map via GetEntryOrNull or be sure that the new added key is unique</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> AddSureNotPresent<K, V>(this ImHashMap<K, V> map, int hash, K key, V value) =>
+        map.AddSureNotPresentEntry(Entry(hash, key, value));
+
+    /// <summary>Add sure not present item, so before calling this method you may either check the map via GetEntryOrNull or be sure that the new added key is unique</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> AddSureNotPresent<K, V>(this ImHashMap<K, V> map, K key, V value) =>
+        map.AddSureNotPresentEntry(EntryWithHash(key, value));
+
+    /// <summary>Adds or updates (no in-place mutation) the map with value by the passed hash and key, always returning the NEW map!</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<int, V> AddOrUpdate<V>(this ImHashMap<int, V> map, int hash, V value, Update<int, V> update)
+    {
+        var newEntry = Entry(hash, value);
+        var mapOrOldEntry = map.AddOrGetEntry(hash, newEntry);
+        return mapOrOldEntry is VEntry<V> oldEntry && oldEntry != newEntry
+            ? map.ReplaceEntry(oldEntry, Entry(hash, update(hash, oldEntry.Value, value)))
+            : mapOrOldEntry;
+    }
+
+    /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> AddOrUpdate<K, V>(this ImHashMap<K, V> map, int hash, K key, V value, Update<K, V> update)
+    {
+        var newEntry = Entry(hash, key, value);
+        var mapOrOldEntry = map.AddOrGetEntry(hash, newEntry);
+        return mapOrOldEntry is ImHashMap<K, V>.Entry oldEntry && oldEntry != newEntry
+            ? map.ReplaceEntry(oldEntry, oldEntry.AddOrUpdateWithTheSameHash(newEntry, update))
+            : mapOrOldEntry;
+    }
+
+    /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> AddOrUpdate<K, V, R>(this ImHashMap<K, V> map, int hash, K key, V value, ref R result, Update<K, V, R> update)
+    {
+        var newEntry = Entry(hash, key, value);
+        var mapOrOldEntry = map.AddOrGetEntry(hash, newEntry);
+        return mapOrOldEntry is ImHashMap<K, V>.Entry oldEntry && oldEntry != newEntry
+            ? map.ReplaceEntry(oldEntry, oldEntry.AddOrUpdateWithTheSameHash(newEntry, ref result, update))
+            : mapOrOldEntry;
+    }
+
+    /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> AddOrUpdateByReferenceEquals<K, V>(this ImHashMap<K, V> map, int hash, K key, V value, Update<K, V> update)
+    {
+        var newEntry = Entry(hash, key, value);
+        var mapOrOldEntry = map.AddOrGetEntry(hash, newEntry);
+        return mapOrOldEntry is ImHashMap<K, V>.Entry oldEntry && oldEntry != newEntry
+            ? map.ReplaceEntry(oldEntry, oldEntry.AddOrUpdateWithTheSameHashByReferenceEquals(newEntry, update))
+            : mapOrOldEntry;
+    }
+
+    /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> AddOrUpdate<K, V>(this ImHashMap<K, V> map, K key, V value, Update<K, V> update) =>
+        map.AddOrUpdate(key.GetHashCode(), key, value, update);
+
+    /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> AddOrUpdate<K, V, R>(this ImHashMap<K, V> map, K key, V value, ref R result, Update<K, V, R> update) =>
+        map.AddOrUpdate(key.GetHashCode(), key, value, ref result, update);
+
+    /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the hash is already present</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<int, V> AddOrKeep<V>(this ImHashMap<int, V> map, int hash, V value) =>
+        map.AddOrKeepEntry(Entry(hash, value));
+
+    /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the key is already present</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> AddOrKeepEntry<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry) =>
+        map.AddOrGetEntry(newEntry.Hash, newEntry).AddOrKeepWithTheSameHash(map, newEntry);
+
+    /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the key is already present</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> AddOrKeepEntryByReferenceEquals<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry) =>
+        map.AddOrGetEntry(newEntry.Hash, newEntry).AddOrKeepWithTheSameHashByReferenceEquals(map, newEntry);
+
+    /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the key is already present</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> AddOrKeep<K, V>(this ImHashMap<K, V> map, int hash, K key, V value) =>
+        map.AddOrKeepEntry(Entry(hash, key, value));
+
+    /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the key is already present</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> AddOrKeep<K, V>(this ImHashMap<K, V> map, K key, V value) =>
+        map.AddOrKeepEntry(EntryWithHash(key, value));
+
+    /// <summary>Updates the map with the new value if the hash is found otherwise returns the same unchanged map.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<int, V> Update<V>(this ImHashMap<int, V> map, int hash, V value)
+    {
+        var entry = map.GetEntryOrNull(hash);
+        return entry == null ? map : map.ReplaceEntry(entry, Entry(hash, value));
+    }
+
+    /// <summary>Updates the map with the default value if the hash is found otherwise returns the same unchanged map.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<int, V> UpdateToDefault<V>(this ImHashMap<int, V> map, int hash)
+    {
+        var entry = map.GetEntryOrNull(hash);
+        return entry == null ? map : map.ReplaceEntry(entry, EntryWithDefaultValue<V>(hash));
+    }
+
+    /// <summary>Updates the map with the new value if the key is found otherwise returns the same unchanged map.</summary>
+    public static ImHashMap<K, V> Update<K, V>(this ImHashMap<K, V> map, int hash, K key, V value)
+    {
+        var entry = map.GetEntryOrNull(hash);
+        if (entry == null)
+            return map;
+        var updated = entry.UpdatedOrNullWithTheSameHash(Entry(hash, key, value));
+        return updated == null ? map : map.ReplaceEntry(entry, updated);
+    }
+
+    /// <summary>Updates the map with the new value if the key is found otherwise returns the same unchanged map.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> Update<K, V>(this ImHashMap<K, V> map, K key, V value) =>
+        map.Update(key.GetHashCode(), key, value);
+
+    // todo: @feature add ByReferenceEquals
+    /// <summary>Updates the map with the new value if the key is found otherwise returns the same unchanged map.</summary>
+    public static ImHashMap<K, V> UpdateToDefault<K, V>(this ImHashMap<K, V> map, int hash, K key)
+    {
+        var entry = map.GetEntryOrNull(hash);
+        if (entry == null)
+            return map;
+        var updated = entry.UpdatedOrNullWithTheSameHash(EntryWithDefaultValue<K, V>(hash, key));
+        return updated == null ? map : map.ReplaceEntry(entry, updated);
+    }
+
+    /// <summary>Updates the map with the new value if the key is found otherwise returns the same unchanged map.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> UpdateToDefault<K, V>(this ImHashMap<K, V> map, K key) =>
+        map.UpdateToDefault(key.GetHashCode(), key);
+
+    /// <summary>Updates the map with the new value and the `update` function if the key is found otherwise returns the same unchanged map.
+    /// If `update` returns the same map if the updated result is the same</summary>
+    public static ImHashMap<K, V> Update<K, V>(this ImHashMap<K, V> map, int hash, K key, V value, Update<K, V> update)
+    {
+        var entry = map.GetEntryOrNull(hash);
+        if (entry == null)
+            return map;
+        var updated = entry.UpdatedOrNullWithTheSameHash(key, value, update);
+        return updated == null ? map : map.ReplaceEntry(entry, updated);
+    }
+
+    /// <summary>Updates the map with the new value and the `update` function if the key is found otherwise returns the same unchanged map.
+    /// If `update` returns the same map if the updated result is the same</summary>
+    public static ImHashMap<K, V> Update<K, V>(this ImHashMap<K, V> map, K key, V value, Update<K, V> update) =>
+        map.Update(key.GetHashCode(), key, value, update);
+
+    /// <summary>Returns the new map without the specified hash (if found) or returns the same map otherwise</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<int, V> Remove<V>(this ImHashMap<int, V> map, int hash)
+    {
+        var entryToRemove = map.GetEntryOrNull(hash);
+        return entryToRemove == null ? map : map.RemoveEntry(entryToRemove);
+    }
+
+    // todo: @perf minimize virtual calls
+    // todo: @perf or rather what if I move a static method inside the map and override it in VEntry or KVEntry to speedup it for 1 item map, at least
+    /// <summary>Returns the new map without the specified hash and key (if found) or returns the same map otherwise</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> Remove<K, V>(this ImHashMap<K, V> map, int hash, K key)
+    {
+        var entryToRemove = map.GetEntryOrNull(hash);
+        if (entryToRemove != null)
+        {
+            var removed = entryToRemove.RemovedOrNullWithTheSameHash(key);
+            if (removed == entryToRemove)
+                return map.RemoveEntry(entryToRemove);
+            if (removed != null)
+                return map.ReplaceEntry(entryToRemove, removed);
+        }
+        return map;
+    }
+
+    /// <summary>Returns the new map without the specified hash and key (if found) or returns the same map otherwise</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V> Remove<K, V>(this ImHashMap<K, V> map, K key) =>
+        map == ImHashMap<K, V>.Empty ? map : map.Remove(key.GetHashCode(), key); // it make sense to have the empty map condition here to prevent the probably costly `GetHashCode()` for the empty map.
+}
+
+/// <summary>
+/// The fixed array of maps (partitions) where the key first (lower) bits are used to locate the partition to lookup into.
+/// Note: The partition array is NOT immutable and operates by swapping the updated partition with the new one.
+/// The number of partitions may be specified by user or you can use the default number 16.
+/// The default number 16 was selected to be not so big to pay for the few items and not so small to diminish the use of partitions.
+/// </summary>
+public static class PartitionedHashMap
+{
+    /// <summary>The default number of partitions</summary>
+    public const int PARTITION_COUNT_POWER_OF_TWO = 16;
+
+    /// <summary>The default mask to partition the key</summary>
+    public const int PARTITION_HASH_MASK = PARTITION_COUNT_POWER_OF_TWO - 1;
+
+    /// <summary>Creates the new collection with the empty partitions</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<K, V>[] CreateEmpty<K, V>(int partitionCountOfPowerOfTwo = PARTITION_COUNT_POWER_OF_TWO)
+    {
+        var parts = new ImHashMap<K, V>[partitionCountOfPowerOfTwo];
+        for (var i = 0; i < parts.Length; ++i)
+            parts[i] = ImHashMap<K, V>.Empty;
+        return parts;
+    }
+
+    /// <summary>Creates the new collection with the empty partitions</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMap<int, V>[] CreateEmpty<V>(int partitionCountOfPowerOfTwo = PARTITION_COUNT_POWER_OF_TWO)
+    {
+        var parts = new ImHashMap<int, V>[partitionCountOfPowerOfTwo];
+        for (var i = 0; i < parts.Length; ++i)
+            parts[i] = ImHashMap<int, V>.Empty;
+        return parts;
+    }
+
+    /// <summary>Lookup for the value by the key using its hash, returns the default `V` if not found.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static V GetValueOrDefault<V>(this ImHashMap<int, V>[] parts, int hash, int partHashMask = PARTITION_HASH_MASK)
+    {
+        var p = parts[hash & partHashMask];
+        return p != null && p.GetEntryOrNull(hash) is VEntry<V> kv ? kv.Value : default;
+    }
+
+    /// <summary>Lookup for the value by the key and its hash, returns the default `V` if not found.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static V GetValueOrDefault<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, int partHashMask = PARTITION_HASH_MASK)
+    {
+        var p = parts[hash & partHashMask];
+        return p != null ? p.GetValueOrDefault(hash, key) : default;
+    }
+
+    /// <summary>Lookup for the value by the key and its hash, returns the default `V` if not found.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static V GetValueOrDefault<K, V>(this ImHashMap<K, V>[] parts, K key, int partHashMask = PARTITION_HASH_MASK) =>
+        parts.GetValueOrDefault(key.GetHashCode(), key, partHashMask);
+
+
+    /// <summary>Lookup for the value by the key using the hash and checking the key with the `object.ReferenceEquals` for equality,
+    ///  returns found value or the default value if not found</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static V GetValueOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, int partHashMask = PARTITION_HASH_MASK) where K : class
+    {
+        var p = parts[hash & partHashMask];
+        return p != null ? p.GetValueOrDefaultByReferenceEquals(hash, key) : default;
+    }
+
+    /// <summary>Lookup for the value by the key using its hash and checking the key with the `object.ReferenceEquals` for equality, 
+    /// returns the default `V` if hash, key are not found.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static V GetValueOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V>[] parts, K key, int partHashMask = PARTITION_HASH_MASK) where K : class =>
+        parts.GetValueOrDefaultByReferenceEquals(key.GetHashCode(), key, partHashMask);
+
+    /// <summary>Lookup for the value by the key using the hash, returns the `true` and the found value or the `false`</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static bool TryFind<V>(this ImHashMap<int, V>[] parts, int hash, out V value, int partHashMask = PARTITION_HASH_MASK)
+    {
+        var p = parts[hash & partHashMask];
+        if (p != null)
+            return p.TryFind(hash, out value);
+        value = default;
+        return false;
+    }
+
+    /// <summary>Lookup for the value by the key and the hash, returns the `true` and the found value or the `false`</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static bool TryFind<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, out V value, int partHashMask = PARTITION_HASH_MASK)
+    {
+        var p = parts[hash & partHashMask];
+        if (p != null)
+            return p.TryFind(hash, key, out value);
+        value = default;
+        return false;
+    }
+
+    /// <summary>Lookup for the value by the key and the hash, returns the `true` and the found value or the `false`</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static bool TryFind<K, V>(this ImHashMap<K, V>[] parts, K key, out V value, int partHashMask = PARTITION_HASH_MASK) =>
+        parts.TryFind(key.GetHashCode(), key, out value, partHashMask);
+
+    /// <summary>Lookup for the value by the key using the hash code and checking the key with the `object.ReferenceEquals` for equality,
+    /// returns the `true` and the found value or the `false`</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static bool TryFindByReferenceEquals<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, out V value,
+        int partHashMask = PARTITION_HASH_MASK) where K : class
+    {
+        var p = parts[hash & partHashMask];
+        if (p != null)
+            return p.TryFindByReferenceEquals(hash, key, out value);
+        value = default;
+        return false;
+    }
+
+    /// <summary>Lookup for the value by the key using the hash code and checking the key with the `object.ReferenceEquals` for equality,
+    /// returns the `true` and the found value or the `false`</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static bool TryFindByReferenceEquals<K, V>(this ImHashMap<K, V>[] parts, K key, out V value,
+        int partHashMask = PARTITION_HASH_MASK) where K : class =>
+        parts.TryFindByReferenceEquals(key.GetHashCode(), key, out value, partHashMask);
+
+    /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partition</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static void AddOrUpdate<V>(this ImHashMap<int, V>[] parts, int hash, V value, int partHashMask = PARTITION_HASH_MASK)
+    {
+        ref var part = ref parts[hash & partHashMask];
+        var p = part;
+        if (Interlocked.CompareExchange(ref part, p.AddOrUpdate(hash, value), p) != p)
+            RefAddOrUpdatePart(ref part, hash, value);
+    }
+
+    private static void RefAddOrUpdatePart<V>(ref ImHashMap<int, V> part, int hash, V value) =>
+        Ref.Swap(ref part, hash, value, (x, h, v) => x.AddOrUpdate(h, v));
+
+    /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partition</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, V value, int partHashMask = PARTITION_HASH_MASK)
+    {
+        ref var part = ref parts[hash & partHashMask];
+        var p = part;
+        if (Interlocked.CompareExchange(ref part, p.AddOrUpdate(hash, key, value), p) != p)
+            RefAddOrUpdatePart(ref part, hash, key, value);
+    }
+
+    /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partition</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] parts, K key, V value, int partHashMask = PARTITION_HASH_MASK) =>
+        parts.AddOrUpdate(key.GetHashCode(), key, value, partHashMask);
+
+    private static void RefAddOrUpdatePart<K, V>(ref ImHashMap<K, V> part, int hash, K key, V value) =>
+        Ref.Swap(ref part, hash, key, value, (x, h, k, v) => x.AddOrUpdate(h, k, v));
+
+    /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partition</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static void AddOrUpdate<V>(this ImHashMap<int, V>[] parts, int hash, V value, Update<int, V> update, int partHashMask = PARTITION_HASH_MASK)
+    {
+        ref var part = ref parts[hash & partHashMask];
+        var p = part;
+        if (Interlocked.CompareExchange(ref part, p.AddOrUpdate(hash, value, update), p) != p)
+            Ref.Swap(ref part, hash, value, update, (x, h, k, u) => x.AddOrUpdate(h, k, u));
+    }
+
+    /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partition</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, V value, Update<K, V> update, int partHashMask = PARTITION_HASH_MASK)
+    {
+        ref var part = ref parts[hash & partHashMask];
+        var p = part;
+        if (Interlocked.CompareExchange(ref part, p.AddOrUpdate(hash, key, value, update), p) != p)
+            Ref.Swap(ref part, hash, key, value, update, (x, h, k, v, u) => x.AddOrUpdate(h, k, v, u));
+    }
+
+    /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partition</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] parts, K key, V value, Update<K, V> update, int partHashMask = PARTITION_HASH_MASK) =>
+        parts.AddOrUpdate(key.GetHashCode(), key, value, update);
+
+    /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or the same kept partition</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static void AddOrKeep<V>(this ImHashMap<int, V>[] parts, int hash, V value, int partHashMask = PARTITION_HASH_MASK)
+    {
+        ref var part = ref parts[hash & partHashMask];
+        var p = part;
+        if (Interlocked.CompareExchange(ref part, p.AddOrKeep(hash, value), p) != p)
+            RefAddOrKeepPart(ref part, hash, value);
+    }
+
+    private static void RefAddOrKeepPart<V>(ref ImHashMap<int, V> part, int hash, V value) =>
+        Ref.Swap(ref part, hash, value, (x, h, v) => x.AddOrUpdate(h, v));
+
+    /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or the same kept partition</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static void AddOrKeep<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, V value, int partHashMask = PARTITION_HASH_MASK)
+    {
+        ref var part = ref parts[hash & partHashMask];
+        var p = part;
+        if (Interlocked.CompareExchange(ref part, p.AddOrKeep(hash, key, value), p) != p)
+            RefAddOrKeepPart(ref part, hash, key, value);
+    }
+
+    private static void RefAddOrKeepPart<K, V>(ref ImHashMap<K, V> part, int hash, K key, V value) =>
+        Ref.Swap(ref part, hash, key, value, (x, h, k, v) => x.AddOrUpdate(h, k, v));
+
+    /// <summary>Updates the map with the new value if the hash is found otherwise returns the same unchanged map.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static void Update<V>(this ImHashMap<int, V>[] parts, int hash, V value, int partHashMask = PARTITION_HASH_MASK)
+    {
+        ref var part = ref parts[hash & partHashMask];
+        var p = part;
+        if (Interlocked.CompareExchange(ref part, p.Update(hash, value), p) != p)
+            RefUpdatePart(ref part, hash, value);
+    }
+
+    private static void RefUpdatePart<V>(ref ImHashMap<int, V> part, int hash, V value) =>
+        Ref.Swap(ref part, hash, value, (x, h, v) => x.Update(h, v));
+
+    /// <summary>Enumerates the entries in order of their int keys (the hash is the same as the key).</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static Enumerable<V> Enumerate<V>(this ImHashMap<int, V>[] parts) => new Enumerable<V>(parts);
+
+    /// <summary>Non-allocating enumerator</summary>
+    public struct Enumerable<V> : IEnumerable<VEntry<V>>, IEnumerable
+    {
+        private readonly ImHashMap<int, V>[] _maps;
+        /// <summary>Constructor</summary>
+        public Enumerable(ImHashMap<int, V>[] maps) => _maps = maps;
+
+        /// <summary>Returns non-allocating enumerator</summary>
+        public Enumerator<V> GetEnumerator() => new Enumerator<V> { _maps = _maps };
+        IEnumerator<VEntry<V>> IEnumerable<VEntry<V>>.GetEnumerator() => new Enumerator<V> { _maps = _maps };
+        IEnumerator IEnumerable.GetEnumerator() => new Enumerator<V> { _maps = _maps };
+    }
+
+    /// <summary>Enumerator on stack, without allocation</summary>
+    public struct Enumerator<V> : IEnumerator<VEntry<V>>, IDisposable, IEnumerator
+    {
+        internal ImHashMap<int, V>[] _maps;
+        private bool _mapEnumerationInProgress;
+        private int _mapIndex;
+        private ImHashMap.Enumerator<V> _mapEn;
+        private VEntry<V> _current;
+        /// <inheritdoc />
+        public VEntry<V> Current => _current;
+        object IEnumerator.Current => _current;
+
+        /// <inheritdoc />
+        public bool MoveNext()
+        {
+        StartOver:
+            if (!_mapEnumerationInProgress)
             {
-                if (map == ImHashMap<int, V>.Empty)
-                    continue;
-                state = map.ForEach(state, handler, parents);
+                for (var i = _mapIndex; i < _maps.Length; ++i)
+                {
+                    var m = _maps[i];
+                    if (m == ImHashMap<int, V>.Empty)
+                        continue;
+                    _mapEn.ReInit(m);
+                    _mapEn.MoveNext();
+                    _current = _mapEn._current;
+                    _mapEnumerationInProgress = true;
+                    _mapIndex = i + 1; // set to next map
+                    return true;
+                }
+                return false;
             }
-            return state;
+            if (!_mapEn.MoveNext())
+            {
+                _mapEnumerationInProgress = false;
+                goto StartOver;
+            }
+            _current = _mapEn._current;
+            return true;
         }
 
-        /// <summary>Do something for each entry.
-        /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
-        /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
-        public static S ForEach<K, V, S>(this ImHashMap<K, V>[] parts, S state, Action<ImHashMapEntry<K, V>, int, S> handler, MapParentStack parents = null)
+        bool IEnumerator.MoveNext() => MoveNext();
+        void IEnumerator.Reset() => throw new NotSupportedException();
+        void IDisposable.Dispose() { }
+    }
+
+    /// <summary>Enumerates the entries in order of their hash.</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static Enumerable<K, V> Enumerate<K, V>(this ImHashMap<K, V>[] parts) => new Enumerable<K, V>(parts);
+
+    /// <summary>Non-allocating enumerator</summary>
+    public struct Enumerable<K, V> : IEnumerable<KVEntry<K, V>>, IEnumerable
+    {
+        private readonly ImHashMap<K, V>[] _maps;
+        /// <summary>Constructor</summary>
+        public Enumerable(ImHashMap<K, V>[] maps) => _maps = maps;
+        /// <summary>Returns non-allocating enumerator</summary>
+        public Enumerator<K, V> GetEnumerator() => new Enumerator<K, V> { _maps = _maps };
+        IEnumerator<KVEntry<K, V>> IEnumerable<KVEntry<K, V>>.GetEnumerator() => new Enumerator<K, V> { _maps = _maps };
+        IEnumerator IEnumerable.GetEnumerator() => new Enumerator<K, V> { _maps = _maps };
+    }
+
+    /// <summary>Enumerator on stack, without allocation</summary>
+    public struct Enumerator<K, V> : IEnumerator<KVEntry<K, V>>, IDisposable, IEnumerator
+    {
+        internal ImHashMap<K, V>[] _maps;
+        private bool _mapEnumerationInProgress;
+        private int _mapIndex;
+        private ImHashMap.Enumerator<K, V> _mapEn;
+        private KVEntry<K, V> _current;
+        /// <inheritdoc />
+        public KVEntry<K, V> Current => _current;
+        object IEnumerator.Current => _current;
+
+        /// <inheritdoc />
+        public bool MoveNext()
         {
-            if (parents == null)
-                parents = new MapParentStack();
-            foreach (var map in parts)
+        StartOver:
+            if (!_mapEnumerationInProgress)
             {
-                if (map == ImHashMap<K, V>.Empty)
-                    continue;
-                state = map.ForEach(state, handler, parents);
+                for (var i = _mapIndex; i < _maps.Length; ++i)
+                {
+                    var m = _maps[i];
+                    if (m == ImHashMap<K, V>.Empty)
+                        continue;
+                    _mapEn.ReInit(m);
+                    _mapEn.MoveNext();
+                    _current = _mapEn._current;
+                    _mapEnumerationInProgress = true;
+                    _mapIndex = i + 1; // set to next map
+                    return true;
+                }
+                return false;
             }
-            return state;
+            if (!_mapEn.MoveNext())
+            {
+                _mapEnumerationInProgress = false;
+                goto StartOver;
+            }
+            _current = _mapEn._current;
+            return true;
         }
+
+        bool IEnumerator.MoveNext() => MoveNext();
+        void IEnumerator.Reset() => throw new NotSupportedException();
+        void IDisposable.Dispose() { }
+    }
+
+    /// <summary>Do something for each entry.
+    /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
+    /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
+    public static S ForEach<V, S>(this ImHashMap<int, V>[] parts, S state, Action<VEntry<V>, int, S> handler, MapParentStack parents = null)
+    {
+        if (parents == null)
+            parents = new MapParentStack();
+        foreach (var map in parts)
+        {
+            if (map == ImHashMap<int, V>.Empty)
+                continue;
+            state = map.ForEach(state, handler, parents);
+        }
+        return state;
+    }
+
+    /// <summary>Do something for each entry.
+    /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
+    /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
+    public static S ForEach<K, V, S>(this ImHashMap<K, V>[] parts, S state, Action<ImHashMapEntry<K, V>, int, S> handler, MapParentStack parents = null)
+    {
+        if (parents == null)
+            parents = new MapParentStack();
+        foreach (var map in parts)
+        {
+            if (map == ImHashMap<K, V>.Empty)
+                continue;
+            state = map.ForEach(state, handler, parents);
+        }
+        return state;
     }
 }

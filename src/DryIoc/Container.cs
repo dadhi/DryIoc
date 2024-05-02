@@ -1721,7 +1721,7 @@ namespace DryIoc
             }
 
             public readonly DefaultKey LastDefaultKey;
-            public readonly KV<object, Factory>[] Factories; // todo: @perf convert to KVar[], SmallMap?
+            public readonly KV<object, Factory>[] Factories; // todo: @perf convert KV to struct, c?
 
             // lastDefaultKey may be null
             public FactoriesEntry(DefaultKey lastDefaultKey, KV<object, Factory>[] factories)
