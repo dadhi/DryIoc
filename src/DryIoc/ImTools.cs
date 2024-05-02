@@ -1731,50 +1731,6 @@ namespace DryIoc.ImTools
         public override int GetHashCode() => Hasher.Combine(Key, Value);
     }
 
-    /// <summary>Immutable Key-Value pair. The value type with the mutable Value comparing to the `KV` type.
-    /// In addition provides <see cref="Equals"/> and <see cref="GetHashCode"/> implementations.</summary>
-    /// <typeparam name="K">Type of Key.</typeparam><typeparam name="V">Type of Value.</typeparam>
-    public struct KVar<K, V> : IPrintable
-    {
-        /// <summary>Key.</summary>
-        public readonly K Key;
-
-        /// <summary>Value.</summary>
-        public V Value;
-
-        /// <summary>Creates Key-Value object by providing key and value. Does Not check either one for null.</summary>
-        /// <param name="key">key.</param><param name="value">value.</param>
-        public KVar(K key, V value)
-        {
-            Key = key;
-            Value = value;
-        }
-
-        /// <inheritdoc />
-        public StringBuilder Print(StringBuilder s, Func<StringBuilder, object, StringBuilder> printer)
-        {
-            s.Append("(");
-            if (Key != null)
-                s = printer(s, Key);
-            s.Append(", ");
-            if (Value != null)
-                s = printer(s, Value);
-            return s.Append(')');
-        }
-
-        /// <summary>Creates a nice string view.</summary>
-        public override string ToString() =>
-            Print(new StringBuilder(), static (s, x) => s.Append(x)).ToString();
-
-        /// <summary>Returns true if both key and value are equal to corresponding key-value of other object.</summary>
-        public override bool Equals(object obj) => obj is KV<K, V> other &&
-            (ReferenceEquals(other.Key, Key) || Equals(other.Key, Key)) &&
-            (ReferenceEquals(other.Value, Value) || Equals(other.Value, Value));
-
-        /// <summary>Combines key and value hash code</summary>
-        public override int GetHashCode() => Hasher.Combine(Key, Value);
-    }
-
     /// <summary>Helpers for <see cref="KV{K,V}"/>.</summary>
     public static class KV
     {
@@ -1784,17 +1740,6 @@ namespace DryIoc.ImTools
 
         /// <summary>Creates the pair with the new value</summary>
         public static KV<K, V> WithValue<K, V>(this KV<K, V> kv, V value) => new KV<K, V>(kv.Key, value);
-    }
-
-    /// <summary>Helpers for <see cref="KVar{K,V}"/>.</summary>
-    public static class KVar
-    {
-        /// <summary>Creates the key value pair.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static KVar<K, V> Of<K, V>(K key, V value) => new KVar<K, V>(key, value);
-
-        /// <summary>Creates the pair with the new value</summary>
-        public static KVar<K, V> WithValue<K, V>(this KVar<K, V> kv, V value) => new KVar<K, V>(kv.Key, value);
     }
 
     /// Simple helper for creation of the pair of two parts.
