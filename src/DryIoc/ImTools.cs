@@ -206,36 +206,6 @@ public static class St
     }
 }
 
-// todo: @perf add 2, 4 heads on stack
-/// <summary>Stack with the Head on Stack and the rest on Heap</summary>
-public struct SmallStack<T>
-{
-    /// <summary>The payload value</summary>
-    public T Value;
-
-    private Tail _tail;
-    internal SmallStack(Tail tail, T value)
-    {
-        _tail = tail;
-        Value = value;
-    }
-
-    /// <summary>Pushes the new value to stack</summary>
-    public SmallStack<T> Push(in T value) => new SmallStack<T>(new Tail(_tail, Value), value);
-
-    internal sealed class Tail
-    {
-        public T Value;
-        private Tail _tail;
-        public Tail(Tail tail, T value)
-        {
-            _tail = tail;
-            Value = value;
-        }
-    }
-}
-
-
 /// <summary>Methods to work with immutable arrays and some sugar.</summary>
 public static class ArrayTools
 {
