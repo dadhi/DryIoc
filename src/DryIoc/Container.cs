@@ -26,7 +26,7 @@ THE SOFTWARE.
 #if !NET45 && !NET451 && !NET452 // todo: @wip try NET452_OR_LESS
 #define SUPPORTS_ASYNC_LOCAL
 #endif
-#if NETSTANDARD2_1 || NETCOREAPP3_1_OR_GREATER || NET5_0_OR_GREATER
+#if NETSTANDARD2_1 || NET5_0_OR_GREATER
 #define SUPPORTS_ASYNC_DISPOSABLE
 #endif
 #if !NET45 && !NET451 && !NET452 && !NET46 && !NET461 && !NET462 && !NET47 // todo: @wip try NET47_OR_LESS
@@ -42,11 +42,11 @@ namespace DryIoc
     using System.Collections;
     using System.Collections.Generic;
     using System.Diagnostics;              // for StackTrace
-    using System.Diagnostics.CodeAnalysis; // for SuppressMessage
     using System.Linq;
     using System.Reflection;
     using System.Reflection.Emit;
     using System.Runtime.CompilerServices; // for MethodImplAttribute
+    using System.Diagnostics.CodeAnalysis; // for SetsRequiredMembersAttribute
     using System.Text;
     using System.Threading;
 
@@ -59,8 +59,6 @@ namespace DryIoc
     using FastExpressionCompiler.LightExpression;
     using static FastExpressionCompiler.LightExpression.Expression;
     using static FastExpressionCompiler.LightExpression.ExpressionCompiler;
-    using Comp = FastExpressionCompiler.LightExpression.ExpressionCompiler;
-    using Emit = FastExpressionCompiler.LightExpression.ExpressionCompiler.EmittingVisitor;
 
     /// <summary>Inversion of control container</summary>
     public partial class Container : IContainer
