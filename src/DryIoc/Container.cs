@@ -1547,7 +1547,7 @@ namespace DryIoc
 
             // Select the first decorator without condition or the one which matches the condition
             // Iterate over all decorators and prevent caching if any of them has the condition,
-            // because no matter if condition is true or false, we need a gresh chain of decorators
+            // because no matter if condition is true or false, we need a fresh chain of decorators
             Factory firstMatchingDecorator = null;
             foreach (var d in decorators)
             {
@@ -1555,7 +1555,7 @@ namespace DryIoc
                 if (cond != null || d.Setup.UseDecorateeReuse)
                     request.Flags |= RequestFlags.DoNotCacheExpression;
 
-                if (firstMatchingDecorator == null && 
+                if (firstMatchingDecorator == null &&
                     (cond == null || cond(request.Isolate())))
                     firstMatchingDecorator = d;
             }
@@ -1857,7 +1857,7 @@ namespace DryIoc
         internal readonly Ref<ImHashMap<Type, object>> _registry; // either map of Services or the Registry class
         private readonly IScope _singletonScope;
         private readonly IDisposable _ownScopeOrContext; // null, or IScope or IScopeContext
-        private readonly IResolverContext _parent; // if (_parent is not null) then _ownScopeOrContext is not null for sure, but it can only be a ScopeContext or null for the parentless container, think about it 
+        private readonly IResolverContext _parent; // if (_parent is not null) then _ownScopeOrContext is not null for sure, but it can only be a ScopeContext or null for the parent-less container, think about it 
         private StackTrace _disposeStackTrace;
         private int _disposed;
 
@@ -3233,7 +3233,7 @@ namespace DryIoc
                 // in order to prevent waiting for the empty item entry in the subsequent resolutions, see #536, #619 for details.
                 //
                 // So we may:
-                // - Asume that the exception happened in the scoped item resolution.
+                // - Assume that the exception happened in the scoped item resolution.
                 // - Set the exception in the `Scope.NoItem` entry for the exceptional dependency 
                 //   (which is optimistically set before resolving the dependency),
                 //   so that exception will be re-thrown on the next resolution.
@@ -3288,11 +3288,11 @@ namespace DryIoc
                                 // The problem is when we are faster than the parallel thread and set the exception first. 
                                 // The solution to that is slow down before setting the exception and give other thread time to complete 
                                 // (via the timeout or spin wait).
-                                // It is wrong to put the responsiblity on the other thread to check for exception in the entry,
+                                // It is wrong to put the responsibility on the other thread to check for exception in the entry,
                                 // because the other thread has no way to notify us here of the wrong, because we are done already.
 
                                 // So, slowing down and given a chance for the other thread to set the NoItem entry to the value.
-                                Thread.Sleep(1); // per design, because Thead.Sleep(0) or Thread.Yield() are not reliable enough.
+                                Thread.Sleep(1); // per design, because Thread.Sleep(0) or Thread.Yield() are not reliable enough.
 
                                 var actualValueWas = Interlocked.CompareExchange(ref entry.Value, sex, Scope.NoItem);
                                 if (actualValueWas == Scope.NoItem)
@@ -4775,7 +4775,7 @@ namespace DryIoc
                     Throw.It(Error.FoundNoRootsToValidate, container);
 
                 // We try to find the registrations marked by `Setup.With(asResolutionRoot: true)` and if nothing found, fallback to the all found.
-                // This allow to make asResolutionRoot marking to be optional for validate, but if used - provide the convinient validation by convention. 
+                // This allow to make asResolutionRoot marking to be optional for validate, but if used - provide the convenient validation by convention. 
                 roots = allNonGenericRegistrations.Match(static r => r.Factory.Setup.AsResolutionRoot);
                 if (roots.Length == 0)
                     roots = allNonGenericRegistrations;
@@ -5924,7 +5924,7 @@ namespace DryIoc
 
     }
 
-    /// <summary>Enables de-duplication of service key by putting key into the pair with index of its paire service type.</summary>
+    /// <summary>Enables de-duplication of service key by putting key into the pair with index of its paired service type.</summary>
     public sealed class ServiceKeyToTypeIndex
     {
         // Logically, it is a mapping of ServiceKey to the List of pairs of { ServiceType, Count of the ServiceType registration with this key }
@@ -6970,7 +6970,7 @@ namespace DryIoc
         /// <summary>The optional compile-time (or any time) container implementation.</summary>
         public ICompileTimeContainer CompileTimeContainer { get; private set; }
 
-        /// <summary>Sets the compile-time container to the implementation or unsets it to `null`</summary>
+        /// <summary>Sets the compile-time container to the implementation or un-sets it to `null`</summary>
         public Rules WithCompileTimeContainer(ICompileTimeContainer container)
         {
             if (CompileTimeContainer == container)
@@ -8914,7 +8914,7 @@ namespace DryIoc
             Func<object, object, object, object, object, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null)
         {
-            var invokeMethod = typeof(Func<,,,,,>).MakeGenericType(dep1Type, dep2Type, dep3Type, dep4Type, dep5Type, typeof(object)).GetMethod(InvokeMethodName); 
+            var invokeMethod = typeof(Func<,,,,,>).MakeGenericType(dep1Type, dep2Type, dep3Type, dep4Type, dep5Type, typeof(object)).GetMethod(InvokeMethodName);
             r.RegisterFunc(serviceType, invokeMethod, factory, reuse, setup, ifAlreadyRegistered, serviceKey);
         }
 
@@ -9908,7 +9908,7 @@ namespace DryIoc
                 requiredServiceType = null;
 
             if (requiredServiceType == null & serviceKey == null & metadataKey == null & metadata == null)
-                return ifUnresolved == IfUnresolved.Throw ? serviceType 
+                return ifUnresolved == IfUnresolved.Throw ? serviceType
                     : ifUnresolved == IfUnresolved.ReturnDefault
                         ? new TypedIfUnresolvedReturnDefault(serviceType)
                         : new TypedIfUnresolvedReturnDefaultIfNotRegistered(serviceType);
@@ -10261,7 +10261,7 @@ namespace DryIoc
 
             var actualServiceType = serviceTypeOrInfo as Type ?? ((ServiceInfo)serviceTypeOrInfo).GetActualServiceType();
             var inputArgExprs = inputArgs?.Map(static a => Constant(a));
-            
+
             var req = RentRequestOrNull();
             return req == null
                 ? new Request(container, preResolveParent, 1, 0, null, flags, serviceTypeOrInfo, actualServiceType, inputArgExprs)
@@ -11424,8 +11424,8 @@ namespace DryIoc
                 ? null
                 : decorateeType != null & decorateeServiceKey != null
                     ? GetDecorateeCondition(decorateeType, decorateeServiceKey)
-                : decorateeType != null 
-                    ? GetDecorateeCondition(decorateeType) 
+                : decorateeType != null
+                    ? GetDecorateeCondition(decorateeType)
                     : GetDecorateeCondition(decorateeServiceKey);
             return DecoratorWith(cond, order, useDecorateeReuse, openResolutionScope, asResolutionCall,
                 preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient, disposalOrder);
@@ -13903,7 +13903,7 @@ namespace DryIoc
             return maps;
         }
 
-        // Creatres a single entry with an empty list of unordered disposables (the key 0 is reserved for  the unordered disposables)
+        // Creates a single entry with an empty list of unordered disposables (the key 0 is reserved for the unordered disposables)
         private static ImHashMap<int, ImList<IDisposable>> CreateEmptyDisposables() => ImHashMap.Entry(0, ImList<IDisposable>.Empty);
 
         internal ImHashMap<int, object>[] CloneMaps() => _maps.CopyNonEmpty();
