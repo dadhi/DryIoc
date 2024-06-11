@@ -10,8 +10,8 @@ namespace Playground
     {
         public static void Main()
         {
-            var di = RealisticUnitOfWorkBenchmark.PrepareDryIoc();
-            RealisticUnitOfWorkBenchmark.Measure(di);
+            // var di = RealisticUnitOfWorkBenchmark.PrepareDryIoc();
+            // RealisticUnitOfWorkBenchmark.Measure(di);
 
             // BenchmarkRunner.Run<ZeroArgs_CtorInvoke_Vs_ActivatorCreate>();
 
@@ -94,7 +94,8 @@ namespace Playground
             //BenchmarkRunner.Run<OpenNamedScopeAndResolveNamedScopedWithTransientNamedScopedDeps.BenchmarkFirstTimeResolutionResolution>();
 
             //BenchmarkRunner.Run<ActivatorCreateInstance_vs_CtorInvoke>();
-            //BenchmarkRunner.Run<AutoConcreteTypeResolutionBenchmark.Resolve>();
+            // BenchmarkRunner.Run<AutoConcreteTypeResolutionBenchmark.Resolve>();
+            BenchmarkRunner.Run<ConcreteTypeDynamicRegistrationsBenchmarks>();
             //BenchmarkRunner.Run<EnumerableWhere_vs_ArrayMatch_Have_some_matches>();
             //BenchmarkRunner.Run<EnumerableWhere_vs_ArrayMatch_Have_all_matches>();
 
