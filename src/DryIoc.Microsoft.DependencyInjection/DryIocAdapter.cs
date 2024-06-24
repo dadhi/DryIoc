@@ -188,7 +188,7 @@ namespace DryIoc.Microsoft.DependencyInjection
             rules.Parameters == SelectServiceKeyForParameterWithServiceKeyAttribute;
 
         /// <summary>Adapts the <paramref name="container"/> to Microsoft.DependencyInjection conventions,
-        /// builds and retunrs the <see cref="DryIocServiceProvider"/> implementation of <see cref="IServiceProvider"/>
+        /// builds and returns the <see cref="DryIocServiceProvider"/> implementation of <see cref="IServiceProvider"/>
         /// populated with the registered <paramref name="descriptors" />.
         /// 
         /// <b>NOTE:</b>The adapted container is available via <see cref="DryIocServiceProvider.Container"/> and actually 
