@@ -211,8 +211,8 @@ In DryIoc:
     }
     
     // configure:
-    container.Register<NestedDependency>(Reuse.InResolutionScopeOf<SomeService>());
-    container.Register<Dependency>(Reuse.InResolutionScopeOf<SomeService>());
+    container.Register<NestedDependency>(Reuse.ScopedToService<SomeService>());
+    container.Register<Dependency>(Reuse.ScopedToService<SomeService>());
     container.Register<SomeService>(setup: Setup.With(openResolutionScope: true));
     container.Register<SomeClient>();
 ```
