@@ -4272,16 +4272,6 @@ internal static class Converter
         if (convertMethod != null)
             return convertMethod.Invoke(null, new[] { source });
 
-        // todo: @wip
-        // if (source is Delegate sourceDelegate && typeof(Delegate).IsAssignableFrom(targetType))
-        // {
-        //     // tries to convert delegate from one type to another, e.g. Func<int> to custom delegate type, see #243
-        //     var targetDelegate = Delegate.CreateDelegate(
-        //         targetType, sourceDelegate.Target, sourceDelegate.Method, throwOnBindFailure: false);
-        //     if (targetDelegate != null)
-        //         return targetDelegate;
-        // }
-
         var sourceType = source.GetType();
         var sourceConvertOp = sourceType.FindConvertOperator(sourceType, targetType);
         if (sourceConvertOp != null)
