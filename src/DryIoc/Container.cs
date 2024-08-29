@@ -5697,8 +5697,12 @@ public static class WrappersSupport
         var typeArgs = wrapperType.GetGenericArguments();
         var requiredServiceKeyType = typeArgs[0];
         var serviceKey = request.ServiceKey;
-        if (serviceKey == null && requiredServiceKeyType.IsValueType ||
-            serviceKey != null && !requiredServiceKeyType.IsAssignableFrom(serviceKey.GetType()))
+
+        var actualServiceKey = serviceKey is ServiceKeyAndRequiredOpenGenericType skt ? skt.ServiceKey : serviceKey;
+        actualServiceKey = actualServiceKey is UniqueRegisteredServiceKey usk ? usk.ServiceKey : actualServiceKey;
+
+        if (actualServiceKey == null && requiredServiceKeyType.IsValueType ||
+            actualServiceKey != null && !requiredServiceKeyType.IsAssignableFrom(actualServiceKey.GetType()))
             return null;
 
         var serviceType = typeArgs[1];
@@ -5719,7 +5723,7 @@ public static class WrappersSupport
         if (serviceExpr == null)
             return null;
 
-        var keyExpr = request.Container.GetConstantExpression(serviceKey, requiredServiceKeyType);
+        var keyExpr = request.Container.GetConstantExpression(actualServiceKey, requiredServiceKeyType);
         return New(wrapperType.GetConstructors()[0], keyExpr, serviceExpr);
     }
 
@@ -5875,10 +5879,16 @@ internal sealed class UniqueRegisteredServiceKey : IPrintable, IConvertibleToExp
     public readonly int Index;
     public readonly object ServiceKey;
 
-    // the special constructor for the key resolved from the collection wrapper or ResolveMany, check the usages of it
-    internal UniqueRegisteredServiceKey(object serviceKey) => ServiceKey = serviceKey;
+    // A special constructor for the key resolved from the collection wrapper or ResolveMany, check the usages of it
+    internal UniqueRegisteredServiceKey(object serviceKey)
+    {
+        Debug.Assert(serviceKey != null);
+        ServiceKey = serviceKey;
+    }
+
     public UniqueRegisteredServiceKey(object serviceKey, int index)
     {
+        Debug.Assert(serviceKey != null);
         ServiceKey = serviceKey;
         Index = index;
     }

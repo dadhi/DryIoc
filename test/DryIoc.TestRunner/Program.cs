@@ -9,7 +9,8 @@ public class Program
 {
     public static void Main()
     {
-        new GHIssue643_WithConcreteTypeDynamicRegistrations_results_in_unintended_instantiation().Run();
+        // new GHIssue653_KeyValuePair_exposes_internal_DryIoc_structures().Run();
+        // new GHIssue643_WithConcreteTypeDynamicRegistrations_results_in_unintended_instantiation().Run();
         // new DecoratorTests().Run();
         // new GHIssue623_Scoped_service_decorator().Run();
         // new GHIssue191_Optional_IResolverContext_argument_in_Func_of_service().Run();
@@ -431,6 +432,7 @@ public class Program
             new GHIssue610_CustomDynamicRegistrationProvider_ConstructorWithResolvableArguments(),
             new GHIssue619_FaultySingletonDependency(),
             new GHIssue623_Scoped_service_decorator(),
+            new GHIssue653_KeyValuePair_exposes_internal_DryIoc_structures(),
         };
 
         var totalPassed = 0;
