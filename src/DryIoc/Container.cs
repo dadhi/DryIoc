@@ -15721,6 +15721,7 @@ public static class ReflectionTools
 #else
     private static Lazy<Action<Exception>> _preserveExceptionStackTraceAction = new Lazy<Action<Exception>>(() =>
         typeof(Exception).GetSingleMethodOrNull("InternalPreserveStackTrace", true)
+        // todo: @wip #642 @fixme assert the method has single parameter of Exception and void return type.
         ?.To(x => x.CreateDelegate(typeof(Action<Exception>)).To<Action<Exception>>()));
     private static void InternalPreserveStackTrace(Exception exception) =>
         _preserveExceptionStackTraceAction.Value?.Invoke(exception);
