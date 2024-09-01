@@ -16337,6 +16337,12 @@ public static class PrintTools
     public static string Print(this object x) => new StringBuilder().Print(x).ToString();
 }
 
+// todo: @wip @comptime
+[AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
+public class CompileTimeRegisterAttribute : Attribute
+{
+}
+
 /// <summary>Ports some methods from .Net 4.0/4.5</summary>
 public static partial class Portable
 {
