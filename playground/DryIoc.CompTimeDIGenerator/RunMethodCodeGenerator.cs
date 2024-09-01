@@ -14,7 +14,7 @@ public class RunMethodCodeGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        IncrementalValuesProvider<GeneratorData> provider = context.SyntaxProvider
+        var provider = context.SyntaxProvider
            .ForAttributeWithMetadataName(
                $"{nameof(DryIoc)}.{nameof(CompileTimeRegisterAttribute)}",
                predicate: static (s, _) => true,
@@ -28,8 +28,6 @@ public class RunMethodCodeGenerator : IIncrementalGenerator
     {
         var methodSymbol = source.Model.GetDeclaredSymbol(source.MethodSyntax) as IMethodSymbol;
         if (methodSymbol is null) return;
-
-
 
         // var options = ScriptOptions.Default
         //     .AddReferences(typeof(Func<>).Assembly)

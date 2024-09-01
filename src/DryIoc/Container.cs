@@ -16338,6 +16338,7 @@ public static class PrintTools
 }
 
 // todo: @wip @comptime
+/// <summary>Put it on the method like `GetContainerWithRegistrations` to generate CompileTimeDI</summary>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
 public class CompileTimeRegisterAttribute : Attribute
 {
