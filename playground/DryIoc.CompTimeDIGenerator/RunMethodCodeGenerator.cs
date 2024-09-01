@@ -1,42 +1,61 @@
 ﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Scripting;
 using Microsoft.CodeAnalysis.Text;
 using System;
+using System.Linq;
 using System.Text;
 
 namespace DryIoc.CompTimeDIGenerator;
-
-public record GeneratorData(SemanticModel Model, SyntaxNode MethodSyntax);
 
 [Generator]
 public class RunMethodCodeGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        var provider = context.SyntaxProvider
+        var syntax = context.SyntaxProvider
            .ForAttributeWithMetadataName(
                $"{nameof(DryIoc)}.{nameof(CompileTimeRegisterAttribute)}",
-               predicate: static (s, _) => true,
-               transform: static (ctx, _) => new GeneratorData(ctx.SemanticModel, ctx.TargetNode))
-           .Where(static m => m is not null);
+               predicate: static (_, _) => true,
+               transform: static (ctx, _) =>
+               {
+                   var ns = ctx.TargetSymbol.ContainingNamespace.ToString();
+                   var m = ctx.TargetNode as MethodDeclarationSyntax;
+                   return (ns, m);
+               });
 
-        context.RegisterSourceOutput(provider, Generate);
-    }
+        var references = context.CompilationProvider.Select(static (c, _) => c.References);
 
-    private static void Generate(SourceProductionContext context, GeneratorData source)
-    {
-        var methodSymbol = source.Model.GetDeclaredSymbol(source.MethodSyntax) as IMethodSymbol;
-        if (methodSymbol is null) return;
+        context.RegisterSourceOutput(syntax.Combine(references), static async (source, data) =>
+        {
+            var ((ns, m), references) = data;
+            var name = m.Identifier.ToString();
+            var body = m.Body.NormalizeWhitespace().ToFullString();
 
-        // var options = ScriptOptions.Default
-        //     .AddReferences(typeof(Func<>).Assembly)
-        //     .AddReferences(source.Model.References)
-        //     .AddImports(imports);
+            var usings = m.SyntaxTree
+                .GetRoot()
+                .DescendantNodes()
+                .OfType<UsingDirectiveSyntax>()
+                .Select(u => u.Name.ToString())
+                // .Append("System")
+                // .Append("System.Linq")
+                // .Append("System.Collections.Generic")
+                // .Append("System.Threading")
+                .Append(ns)
+                .Distinct()
+                .ToList();
 
-        // var result = await CSharpScript.EvaluateAsync(code, options);
+            var options = ScriptOptions.Default
+                .AddReferences(typeof(Action).Assembly)
+                .AddReferences(references)
+                .AddImports(usings);
 
-        context.AddSource($"CompileTimeDI.{"Foo"}.g.cs", SourceText.From(_sourceTemplate, Encoding.UTF8));
+            var result = await CSharpScript.EvaluateAsync(body, options);
+
+            source.AddSource($"CompileTimeDI.{"Foo"}.g.cs", SourceText.From(_sourceTemplate, Encoding.UTF8));
+        });
     }
 
     private const string _sourceTemplate = """
