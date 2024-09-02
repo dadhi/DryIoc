@@ -46,6 +46,20 @@
                 "kind": "build",
                 "isDefault": true
             }
+        },
+        {
+            "label": "build_usg",
+            "type": "process",
+            "command": "dotnet",
+            "args": [
+                "build",
+                "${workspaceFolder}/playground/DryIoc.UseCompileTimeDIGenerator/DryIoc.UseCompileTimeDIGenerator.csproj"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         }
     ]
 }

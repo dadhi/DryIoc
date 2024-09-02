@@ -45,6 +45,21 @@
             "requireExactSource": false // allows to for moderate code editing while debugging
         },
         {
+            "name": "UseSG",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build_usg",
+            // If you have changed target frameworks, make sure to update the program path.
+            "program": "${workspaceFolder}/playground/DryIoc.UseCompileTimeDIGenerator/bin/Debug/net8.0/DryIoc.UseCompileTimeDIGenerator.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/playground/DryIoc.UseCompileTimeDIGenerator",
+            // For more information about the 'console' field, see https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md#console-terminal-window
+            "console": "internalConsole",
+            "stopAtEntry": false,
+            "internalConsoleOptions": "openOnSessionStart",
+            "requireExactSource": false // allows to for moderate code editing while debugging
+        },
+        {
             "name": ".NET Core Attach",
             "type": "coreclr",
             "request": "attach",
