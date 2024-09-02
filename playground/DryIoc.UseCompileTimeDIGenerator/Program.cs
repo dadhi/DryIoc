@@ -5,6 +5,7 @@ using DryIoc;
 using System.Collections.Generic;
 using DryIoc.CompTimeDIGenerator;
 using System.Linq;
+using System.Diagnostics;
 
 namespace FooBar;
 
@@ -38,21 +39,35 @@ internal class Program
 
         var driver = CSharpGeneratorDriver.Create(new[] { generator }, driverOptions: driverOptions);
 
-        var compilationCopy = compilation.Clone();
 
         var result = driver.RunGenerators(compilation).GetRunResult();
-        var steps = result.Results[0]
+        var output = result.Results.Single();
+        Debug.Assert(output.Exception is null);
+
+        var steps = output
             .TrackedOutputSteps
             .SelectMany(x => x.Value) // step executions
             .SelectMany(x => x.Outputs) // execution results
             .ToList();
 
-        var nextResult = driver.RunGenerators(compilationCopy).GetRunResult();
-        var nextSteps = nextResult.Results[0]
+        var newCompilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText("// dummy"));
+        var newResult = driver.RunGenerators(newCompilation).GetRunResult();
+        var newOutput = newResult.Results.Single();
+        Debug.Assert(newOutput.Exception is null);
+        var newSteps = newOutput
             .TrackedOutputSteps
             .SelectMany(x => x.Value) // step executions
             .SelectMany(x => x.Outputs) // execution results
             .ToList();
+
+        // Assert.Collection(allOutputs, output => Assert.Equal(IncrementalStepRunReason.Cached, output.Reason));
+
+        // // Assert the driver use the cached result from AssemblyName and Syntax
+        // var assemblyNameOutputs = result.TrackedSteps["AssemblyName"].Single().Outputs;
+        // Assert.Collection(assemblyNameOutputs, output => Assert.Equal(IncrementalStepRunReason.Unchanged, output.Reason));
+
+        // var syntaxOutputs = result.TrackedSteps["Syntax"].Single().Outputs;
+        // Assert.Collection(syntaxOutputs, output => Assert.Equal(IncrementalStepRunReason.Unchanged, output.Reason));
 
         foreach (var r in result.Results)
         {

@@ -30,41 +30,41 @@ public class RunMethodCodeGenerator : IIncrementalGenerator
 
                    return (ns, m);
                })
-               .WithTrackingName("ExtractMethod")
-               .Where(x => x.m != null)
-               .WithTrackingName("RemoveNullMethods");
+               .Where(x => x.m != null);
 
-        var references = context.CompilationProvider.Select(static (c, t) =>
-            c.GetUsedAssemblyReferences(t));
+        // var references = context.CompilationProvider.Select(static (c, t) =>
+        //     c.GetUsedAssemblyReferences(t));
 
-        context.RegisterImplementationSourceOutput(syntax.Combine(references), static async (source, data) =>
+        context.RegisterImplementationSourceOutput(syntax, static (source, data) =>
+        // context.RegisterImplementationSourceOutput(syntax.Combine(references), static async (source, data) =>
         // context.RegisterSourceOutput(syntax.Combine(references), static async (source, data) =>
         {
-            var ((ns, m), references) = data;
+            // var ((ns, m), references) = data;
+            var (ns, m) = data;
             var methodName = m.Identifier.ToString();
             var body = m.Body.NormalizeWhitespace().ToFullString();
 
-            var usings = m.SyntaxTree
-                .GetRoot()
-                .DescendantNodes()
-                .OfType<UsingDirectiveSyntax>()
-                .Select(u => u.Name.ToString())
-                // .Append("System")
-                // .Append("System.Linq")
-                // .Append("System.Collections.Generic")
-                // .Append("System.Threading")
-                .Append(ns)
-                .Distinct()
-                .ToList();
+            // var usings = m.SyntaxTree
+            //     .GetRoot()
+            //     .DescendantNodes()
+            //     .OfType<UsingDirectiveSyntax>()
+            //     .Select(u => u.Name.ToString())
+            //     // .Append("System")
+            //     // .Append("System.Linq")
+            //     // .Append("System.Collections.Generic")
+            //     // .Append("System.Threading")
+            //     .Append(ns)
+            //     .Distinct()
+            //     .ToList();
 
-            var options = ScriptOptions.Default
-                .AddReferences(typeof(Action).Assembly)
-                .AddReferences(references)
-                .AddImports(usings);
+            // var options = ScriptOptions.Default
+            //     .AddReferences(typeof(Action).Assembly)
+            //     // .AddReferences(references)
+            //     .AddImports(usings);
 
-            var result = await CSharpScript.EvaluateAsync(body, options);
+            // var result = await CSharpScript.EvaluateAsync(body, options);
 
-            source.AddSource($"{ns}.{methodName}.generated.cs", SourceText.From(_source, Encoding.UTF8));
+            source.AddSource($"{ns}{methodName}.generated.cs", SourceText.From(_source, Encoding.UTF8));
         });
     }
 
