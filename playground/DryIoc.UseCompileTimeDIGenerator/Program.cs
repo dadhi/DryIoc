@@ -2,7 +2,6 @@
 using Microsoft.CodeAnalysis.CSharp;
 using System;
 using DryIoc;
-using System.Collections.Generic;
 using DryIoc.CompTimeDIGenerator;
 using System.Linq;
 using System.Diagnostics;
@@ -30,7 +29,6 @@ internal class Program
             references: references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-
         var generator = new RunMethodCodeGenerator().AsSourceGenerator();
 
         var driverOptions = new GeneratorDriverOptions(
@@ -38,7 +36,6 @@ internal class Program
             trackIncrementalGeneratorSteps: true);
 
         var driver = CSharpGeneratorDriver.Create(new[] { generator }, driverOptions: driverOptions);
-
 
         var result = driver.RunGenerators(compilation).GetRunResult();
         var output = result.Results.Single();
@@ -50,6 +47,8 @@ internal class Program
             .SelectMany(x => x.Outputs) // execution results
             .ToList();
 
+        steps.ForEach(x => Console.WriteLine(x.Reason));
+
         var newCompilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText("// dummy"));
         var newResult = driver.RunGenerators(newCompilation).GetRunResult();
         var newOutput = newResult.Results.Single();
@@ -59,6 +58,8 @@ internal class Program
             .SelectMany(x => x.Value) // step executions
             .SelectMany(x => x.Outputs) // execution results
             .ToList();
+
+        newSteps.ForEach(x => Console.WriteLine(x.Reason));
 
         // Assert.Collection(allOutputs, output => Assert.Equal(IncrementalStepRunReason.Cached, output.Reason));
 
@@ -85,7 +86,7 @@ internal class Program
 
         namespace FooBar
         {
-            public static class CompileTimeDI
+            public class Program
             {
                 [CompileTimeRegister]
                 public static IContainer GetContainerWithRegistrations()
@@ -117,26 +118,26 @@ internal class Program
 
         return container;
     }
+}
 
-    public interface IService { }
+public interface IService { }
 
-    public class MyService : IService
-    {
-        public MyService(IDependencyA a, DependencyB<string> b, RuntimeDependencyC c) { }
-    }
+public class MyService : IService
+{
+    public MyService(IDependencyA a, DependencyB<string> b, RuntimeDependencyC c) { }
+}
 
-    public interface IDependencyA { }
+public interface IDependencyA { }
 
-    public class DependencyA : IDependencyA { }
+public class DependencyA : IDependencyA { }
 
-    // let's make it struct for fun
-    public struct DependencyB<T>
-    {
-        public readonly IDependencyA A;
-        public DependencyB(IDependencyA a) => A = a;
-    }
+// let's make it struct for fun
+public struct DependencyB<T>
+{
+    public readonly IDependencyA A;
+    public DependencyB(IDependencyA a) => A = a;
+}
 
-    public class RuntimeDependencyC
-    {
-    }
+public class RuntimeDependencyC
+{
 }
