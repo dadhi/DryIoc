@@ -7,7 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DryIoc.CompTimeDIGenerator\DryIoc.CompTimeDIGenerator.csproj" OutputItemType="Analyzers"/>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
+    <!-- <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.11.0" /> -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- <ProjectReference Include="..\DryIoc.CompTimeDIGenerator\DryIoc.CompTimeDIGenerator.csproj" OutputItemType="Analyzers"/> -->
+    <ProjectReference Include="..\DryIoc.CompTimeDIGenerator\DryIoc.CompTimeDIGenerator.csproj" />
     <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
   </ItemGroup>
 

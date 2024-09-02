@@ -759,7 +759,7 @@ public static class ArrayTools
             {
                 // for accumulated matched items
                 if (i != 0 && i > matchStart)
-                    matches = matches == null 
+                    matches = matches == null
                         ? source.Copy(matchStart, i - matchStart)
                         : source.AppendTo(matches, matchStart, i - matchStart);
                 matchStart = i + 1; // guess the next match start will be after the non-matched item
@@ -767,8 +767,8 @@ public static class ArrayTools
 
         // when last match was found but not all items are matched (hence matchStart != 0)
         if (matchFound && matchStart != 0)
-            return matches == null 
-                ? source.Copy(matchStart, i - matchStart) 
+            return matches == null
+                ? source.Copy(matchStart, i - matchStart)
                 : source.AppendTo(matches, matchStart, i - matchStart);
 
         return matches ?? (matchStart != 0 ? Empty<T>() : source);
@@ -812,7 +812,7 @@ public static class ArrayTools
             {
                 // for accumulated matched items
                 if (i != 0 && i > matchStart)
-                    matches = matches == null 
+                    matches = matches == null
                         ? source.Copy(matchStart, i - matchStart)
                         : source.AppendTo(matches, matchStart, i - matchStart);
                 matchStart = i + 1; // guess the next match start will be after the non-matched item
@@ -820,8 +820,8 @@ public static class ArrayTools
 
         // when last match was found but not all items are matched (hence matchStart != 0)
         if (matchFound && matchStart != 0)
-            return matches == null 
-                ? source.Copy(matchStart, i - matchStart) 
+            return matches == null
+                ? source.Copy(matchStart, i - matchStart)
                 : source.AppendTo(matches, matchStart, i - matchStart);
 
         return matches ?? (matchStart != 0 ? Empty<T>() : source);
@@ -853,7 +853,7 @@ public static class ArrayTools
             {
                 // for accumulated matched items
                 if (i != 0 && i > matchStart)
-                    matches = matches == null 
+                    matches = matches == null
                         ? source.Copy(matchStart, i - matchStart)
                         : source.AppendTo(matches, matchStart, i - matchStart);
                 matchStart = i + 1; // guess the next match start will be after the non-matched item
@@ -861,8 +861,8 @@ public static class ArrayTools
 
         // when last match was found but not all items are matched (hence matchStart != 0)
         if (matchFound && matchStart != 0)
-            return matches == null 
-                ? source.Copy(matchStart, i - matchStart) 
+            return matches == null
+                ? source.Copy(matchStart, i - matchStart)
                 : source.AppendTo(matches, matchStart, i - matchStart);
 
         return matches ?? (matchStart != 0 ? Empty<T>() : source);
@@ -915,7 +915,7 @@ public static class ArrayTools
             {
                 // for accumulated matched items
                 if (i != 0 && i > matchStart)
-                    matches = matches == null 
+                    matches = matches == null
                         ? source.Copy(matchStart, i - matchStart, map)
                         : source.AppendTo(matches, matchStart, i - matchStart, map);
                 matchStart = i + 1; // guess the next match start will be after the non-matched item
@@ -923,8 +923,8 @@ public static class ArrayTools
 
         // when last match was found but not all items are matched (hence matchStart != 0)
         if (matchFound && matchStart != 0)
-            return matches == null 
-                ? source.Copy(matchStart, i - matchStart, map) 
+            return matches == null
+                ? source.Copy(matchStart, i - matchStart, map)
                 : source.AppendTo(matches, matchStart, i - matchStart, map);
 
         return matches ?? (matchStart == 0 ? source.Copy(0, source.Length, map) : Empty<R>());
@@ -977,7 +977,7 @@ public static class ArrayTools
             {
                 // for accumulated matched items
                 if (i != 0 && i > matchStart)
-                    matches = matches == null 
+                    matches = matches == null
                         ? source.Copy(state, matchStart, i - matchStart, map)
                         : source.AppendTo(state, matches, matchStart, i - matchStart, map);
                 matchStart = i + 1; // guess the next match start will be after the non-matched item
@@ -986,7 +986,7 @@ public static class ArrayTools
         // when last match was found but not all items are matched (hence matchStart != 0)
         if (matchFound && matchStart != 0)
             return matches == null
-                ? source.Copy(state, matchStart, i - matchStart, map) 
+                ? source.Copy(state, matchStart, i - matchStart, map)
                 : source.AppendTo(state, matches, matchStart, i - matchStart, map);
 
         return matches ?? (matchStart == 0 ? source.Copy(state, 0, source.Length, map) : Empty<R>());
@@ -1023,10 +1023,10 @@ public static class ArrayTools
             var c1 = condition(ref state, ref source[1]);
             var c2 = condition(ref state, ref source[2]);
             return c0 & c1 & c2 ? new[] { map(ref state, ref source[0]), map(ref state, ref source[1]), map(ref state, ref source[2]) }
-                : c0 ? (c1 ? new[] { map(ref state, ref source[0]), map(ref state, ref source[1]) } 
-                    : c2 ? new[] { map(ref state, ref source[0]), map(ref state, ref source[2]) } 
+                : c0 ? (c1 ? new[] { map(ref state, ref source[0]), map(ref state, ref source[1]) }
+                    : c2 ? new[] { map(ref state, ref source[0]), map(ref state, ref source[2]) }
                     : new[] { map(ref state, ref source[0]) })
-                : c1 ? (c2 ? new[] { map(ref state, ref source[1]), map(ref state, ref source[2]) } 
+                : c1 ? (c2 ? new[] { map(ref state, ref source[1]), map(ref state, ref source[2]) }
                     : new[] { map(ref state, ref source[1]) })
                 : c2 ? new[] { map(ref state, ref source[2]) }
                 : Empty<R>();
@@ -1042,7 +1042,7 @@ public static class ArrayTools
             {
                 // for accumulated matched items
                 if (i != 0 && i > matchStart)
-                    matches = matches == null 
+                    matches = matches == null
                         ? source.Copy(ref state, matchStart, i - matchStart, map)
                         : source.AppendTo(ref state, matches, matchStart, i - matchStart, map);
                 matchStart = i + 1; // guess the next match start will be after the non-matched item
@@ -1051,7 +1051,7 @@ public static class ArrayTools
         // when last match was found but not all items are matched (hence matchStart != 0)
         if (matchFound && matchStart != 0)
             return matches == null
-                ? source.Copy(ref state, matchStart, i - matchStart, map) 
+                ? source.Copy(ref state, matchStart, i - matchStart, map)
                 : source.AppendTo(ref state, matches, matchStart, i - matchStart, map);
 
         return matches ?? (matchStart == 0 ? source.Copy(ref state, 0, source.Length, map) : Empty<R>());
@@ -1092,7 +1092,7 @@ public static class ArrayTools
             {
                 // for accumulated matched items
                 if (i != 0 && i > matchStart)
-                    matches = matches == null 
+                    matches = matches == null
                         ? source.Copy(a, b, matchStart, i - matchStart, map)
                         : source.AppendTo(a, b, matches, matchStart, i - matchStart, map);
 
@@ -1102,7 +1102,7 @@ public static class ArrayTools
         // when last match was found but not all items are matched (hence matchStart != 0)
         if (matchFound && matchStart != 0)
             return matches == null
-                ? source.Copy(a, b, matchStart, i - matchStart, map) 
+                ? source.Copy(a, b, matchStart, i - matchStart, map)
                 : source.AppendTo(a, b, matches, matchStart, i - matchStart, map);
 
         return matches ?? (matchStart == 0 ? source.Copy(a, b, 0, source.Length, map) : Empty<R>());
