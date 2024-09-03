@@ -2,7 +2,7 @@
 using Microsoft.CodeAnalysis.CSharp;
 using System;
 using DryIoc;
-using DryIoc.CompTimeDIGenerator;
+using DryIoc.CompileTimeDIGenerator;
 using System.Linq;
 using System.Diagnostics;
 

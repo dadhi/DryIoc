@@ -12,8 +12,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- <ProjectReference Include="..\DryIoc.CompTimeDIGenerator\DryIoc.CompTimeDIGenerator.csproj" OutputItemType="Analyzers"/> -->
-    <ProjectReference Include="..\DryIoc.CompTimeDIGenerator\DryIoc.CompTimeDIGenerator.csproj" />
+    <ProjectReference Include="..\DryIoc.CompileTimeDIGenerator\DryIoc.CompileTimeDIGenerator.csproj" OutputItemType="Analyzers"/>
+    <!-- <ProjectReference Include="..\DryIoc.CompileTimeDIGenerator\DryIoc.CompileTimeDIGenerator.csproj" /> -->
     <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
   </ItemGroup>
 

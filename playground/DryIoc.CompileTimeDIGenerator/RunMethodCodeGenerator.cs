@@ -12,7 +12,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 
-namespace DryIoc.CompTimeDIGenerator;
+namespace DryIoc.CompileTimeDIGenerator;
 
 [Generator]
 public class RunMethodCodeGenerator : IIncrementalGenerator
