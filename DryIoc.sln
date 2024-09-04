@@ -133,9 +133,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MinimalWeb", "samples\Minim
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests", "test\DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests\DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests.csproj", "{94DA08B7-DF4A-4C85-833A-7DEBB6323E56}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.UseCompileTimeDIGenerator", "playground\DryIoc.UseCompileTimeDIGenerator\DryIoc.UseCompileTimeDIGenerator.csproj", "{486EAF5E-5259-47E0-9BDC-891D41404B20}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.CompileTimeDIGenerator", "playground\DryIoc.CompileTimeDIGenerator\DryIoc.CompileTimeDIGenerator.csproj", "{B60D6FFB-532F-4A1B-871B-92645D518A50}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.CompileTimeDIGenerator", "playground\DryIoc.CompileTimeDIGenerator\DryIoc.CompileTimeDIGenerator.csproj", "{AF753504-597B-4BA7-A25E-6D0736F8EB83}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.TestCompileTimeDIGenerator", "playground\DryIoc.TestCompileTimeDIGenerator\DryIoc.TestCompileTimeDIGenerator.csproj", "{0F959874-920B-4F38-AE3E-5851A9ADE968}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -287,14 +287,14 @@ Global
 		{94DA08B7-DF4A-4C85-833A-7DEBB6323E56}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{94DA08B7-DF4A-4C85-833A-7DEBB6323E56}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{94DA08B7-DF4A-4C85-833A-7DEBB6323E56}.Release|Any CPU.Build.0 = Release|Any CPU
-		{486EAF5E-5259-47E0-9BDC-891D41404B20}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{486EAF5E-5259-47E0-9BDC-891D41404B20}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{486EAF5E-5259-47E0-9BDC-891D41404B20}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{486EAF5E-5259-47E0-9BDC-891D41404B20}.Release|Any CPU.Build.0 = Release|Any CPU
-		{AF753504-597B-4BA7-A25E-6D0736F8EB83}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{AF753504-597B-4BA7-A25E-6D0736F8EB83}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{AF753504-597B-4BA7-A25E-6D0736F8EB83}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{AF753504-597B-4BA7-A25E-6D0736F8EB83}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B60D6FFB-532F-4A1B-871B-92645D518A50}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B60D6FFB-532F-4A1B-871B-92645D518A50}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B60D6FFB-532F-4A1B-871B-92645D518A50}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B60D6FFB-532F-4A1B-871B-92645D518A50}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0F959874-920B-4F38-AE3E-5851A9ADE968}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0F959874-920B-4F38-AE3E-5851A9ADE968}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0F959874-920B-4F38-AE3E-5851A9ADE968}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0F959874-920B-4F38-AE3E-5851A9ADE968}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -336,8 +336,8 @@ Global
 		{0CAC5A1E-FEB3-4C12-929C-AB9EF9171F73} = {38A94225-72AE-4869-88A2-61FCB48ED681}
 		{D9B3581F-F4E5-4225-82FE-5AAC1779B63B} = {38A94225-72AE-4869-88A2-61FCB48ED681}
 		{94DA08B7-DF4A-4C85-833A-7DEBB6323E56} = {69DDE71E-F688-44E9-9A60-AB0DE2D270FF}
-		{486EAF5E-5259-47E0-9BDC-891D41404B20} = {85CE6F42-1A5A-4475-9E8C-D3090BCC6EED}
-		{AF753504-597B-4BA7-A25E-6D0736F8EB83} = {85CE6F42-1A5A-4475-9E8C-D3090BCC6EED}
+		{B60D6FFB-532F-4A1B-871B-92645D518A50} = {85CE6F42-1A5A-4475-9E8C-D3090BCC6EED}
+		{0F959874-920B-4F38-AE3E-5851A9ADE968} = {85CE6F42-1A5A-4475-9E8C-D3090BCC6EED}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {722EDB85-282C-48BF-9384-BC9C5C230923}
