@@ -65,7 +65,7 @@ namespace DryIoc.MefAttributedModel
             var importMadeOf = prevFactorySelector == null
                 ? _defaultImportMadeOf
                 : Made.Of(
-                    // don't make this lambda static because we need the prevoius factory selector, 
+                    // don't make this lambda static because we need the previous factory selector, 
                     // and not the current one from the `request.Rules`, otherwise it will be recursive call to the fall back method.
                     request => GetImportingConstructor(request, prevFactorySelector),
                     GetImportedParameter,
