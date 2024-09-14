@@ -44,7 +44,7 @@ public static class DryIocInterception
 {
     private static readonly DefaultProxyBuilder _proxyBuilder = new DefaultProxyBuilder();
 
-    public static void Intercept<TService, TInterceptor>(this IRegistrator registrator, object serviceKey = null) 
+    public static void Intercept<TService, TInterceptor>(this IRegistrator registrator, object serviceKey = null)
         where TInterceptor : class, IInterceptor
     {
         var serviceType = typeof(TService);
@@ -123,20 +123,20 @@ which we may use to implement the interception of `async` methods.
 
 ```cs md*/
 
-    public class AsyncInterceptor<T> : AsyncDeterminationInterceptor where T : IAsyncInterceptor
-    {
-        public AsyncInterceptor(T asyncInterceptor) : base(asyncInterceptor) { }
-    }
+public class AsyncInterceptor<T> : AsyncDeterminationInterceptor where T : IAsyncInterceptor
+{
+    public AsyncInterceptor(T asyncInterceptor) : base(asyncInterceptor) { }
+}
 
-    public static class DryIocInterceptionAsync
+public static class DryIocInterceptionAsync
+{
+    public static void InterceptAsync<TService, TInterceptor>(this IRegistrator registrator, object serviceKey = null)
+        where TInterceptor : class, IAsyncInterceptor
     {
-        public static void InterceptAsync<TService, TInterceptor>(this IRegistrator registrator, object serviceKey = null)
-            where TInterceptor : class, IAsyncInterceptor
-        {
-            registrator.Register<AsyncInterceptor<TInterceptor>>();
-            registrator.Intercept<TService, AsyncInterceptor<TInterceptor>>(serviceKey);
-        }
+        registrator.Register<AsyncInterceptor<TInterceptor>>();
+        registrator.Intercept<TService, AsyncInterceptor<TInterceptor>>(serviceKey);
     }
+}
 
 /*md
 ```
@@ -145,7 +145,7 @@ And the usage example:
 
 ```cs md*/
 
-public class Register_and_use_async_interceptor 
+public class Register_and_use_async_interceptor
 {
     public interface IFoo
     {
@@ -163,7 +163,7 @@ public class Register_and_use_async_interceptor
 
     public class SomeAsyncInterceptor : ProcessingAsyncInterceptor<string>
     {
-        public List<string> Interseptions = new List<string>();
+        public List<string> Interceptions = new List<string>();
 
         protected override string StartingInvocation(IInvocation invocation)
         {
@@ -176,7 +176,7 @@ public class Register_and_use_async_interceptor
         {
             var method = invocation.GetConcreteMethod().Name;
             var res = invocation.ReturnValue;
-            Interseptions.Add(state + "intercept AFTER async method call of `{methodName}` with the result `{res}`;");
+            Interceptions.Add(state + "intercept AFTER async method call of `{methodName}` with the result `{res}`;");
         }
     }
 
@@ -194,7 +194,7 @@ public class Register_and_use_async_interceptor
         var result = await foo.HeyAsync("NyanCat");
 
         var interceptor = container.Resolve<SomeAsyncInterceptor>();
-        Assert.AreEqual(1, interceptor.Interseptions.Count);
+        Assert.AreEqual(1, interceptor.Interceptions.Count);
     }
 }
 
@@ -225,7 +225,7 @@ public static class DryIocInterceptionLinFu
 
         var createProxyMethod = _createProxyMethod.MakeGenericMethod(serviceType);
 
-        registrator.Register(serviceType, 
+        registrator.Register(serviceType,
             made: Made.Of(FactoryMethod.Of(createProxyMethod, _proxyFactory),
                 Parameters.Of.Type<IInvokeWrapper>(typeof(TInvokeWrapper)).Type<Type[]>(_ => null)),
             setup: Setup.DecoratorOf(useDecorateeReuse: true, decorateeServiceKey: serviceKey));

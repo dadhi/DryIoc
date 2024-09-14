@@ -162,7 +162,7 @@ public class Register_and_use_async_interceptor
 
     public class SomeAsyncInterceptor : ProcessingAsyncInterceptor<string>
     {
-        public List<string> Interseptions = new List<string>();
+        public List<string> Interceptions = new List<string>();
 
         protected override string StartingInvocation(IInvocation invocation)
         {
@@ -175,7 +175,7 @@ public class Register_and_use_async_interceptor
         {
             var method = invocation.GetConcreteMethod().Name;
             var res = invocation.ReturnValue;
-            Interseptions.Add(state + "intercept AFTER async method call of `{methodName}` with the result `{res}`;");
+            Interceptions.Add(state + "intercept AFTER async method call of `{methodName}` with the result `{res}`;");
         }
     }
 
@@ -193,7 +193,7 @@ public class Register_and_use_async_interceptor
         var result = await foo.HeyAsync("NyanCat");
 
         var interceptor = container.Resolve<SomeAsyncInterceptor>();
-        Assert.AreEqual(1, interceptor.Interseptions.Count);
+        Assert.AreEqual(1, interceptor.Interceptions.Count);
     }
 }
 
