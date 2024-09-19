@@ -91,7 +91,7 @@ using DryIoc;
 using NUnit.Framework;
 // ReSharper disable UnusedVariable
 
-class Disposable_transient_as_resolved_service
+public class Disposable_transient_as_resolved_service
 {
     [Test]
     public void Example()
@@ -117,7 +117,7 @@ No problem in this case.
 
 The second case, when the disposable transient is injected as a dependency:
 ```cs 
-class Disposable_transient_as_injected_dependency
+public class Disposable_transient_as_injected_dependency
 {
     [Test]
     public void Example()
@@ -153,7 +153,7 @@ In order to control (have an access) transient disposable object, the container 
 DryIoc provides a way to track a transient disposable object in the current open scope (if any) or in the singleton scope in the container.
 
 ```cs 
-class Tracking_disposable_transient
+public class Tracking_disposable_transient
 {
     [Test]
     public void Example()
@@ -200,7 +200,7 @@ container.Register<Y>(setup: Setup.With(preventDisposal: true));
 Another way to prevent tracking is wrapping disposable transient in `Func`:
 ```cs 
 
-class Prevent_disposable_tracking_with_Func
+public class Prevent_disposable_tracking_with_Func
 {
     [Test]
     public void Example()
@@ -247,7 +247,7 @@ or to automatically provide reuse preferred to your use-case.
 
 You can achieve this by setting the Container Rules:
 ```cs 
-class Default_reuse_per_container
+public class Default_reuse_per_container
 {
     [Test]
     public void Example()
@@ -275,7 +275,7 @@ What if I want a Transient reuse when `DefaultReuse` is different from Transient
 The same single instance per Container. Service instance will be created on first resolve or injection and will live until the container is disposed. If instance type is `IDisposable` then it will be disposed together with the container.
 
 ```cs 
-class Singleton_reuse
+public class Singleton_reuse
 {
     [Test]
     public void Example()
@@ -322,7 +322,7 @@ Resolving a service with `Scoped` reused from `scopedContainer` will store the s
 When you dispose `scopedContainer`, the open scope will be disposed as well together with the stored service instance.
 
 ```cs 
-class Scoped_reuse_register_and_resolve
+public class Scoped_reuse_register_and_resolve
 {
     [Test]
     public void Example()
@@ -359,7 +359,7 @@ An interesting thing, if you resolve `Car` from container wrapped in `Func<Car>`
 But when you try to use a lazy value in open scope it will throw.
 
 ```cs 
-class Scoped_reuse_resolve_wrapped_in_Lazy_outside_of_scope
+public class Scoped_reuse_resolve_wrapped_in_Lazy_outside_of_scope
 {
     [Test]
     public void Example()
@@ -397,7 +397,7 @@ a container may share the context with scoped containers, making possible lazy r
 when the scope is available __in shared scope context__.
 
 ```cs 
-class Scoped_reuse_resolve_Lazy_with_scope_context
+public class Scoped_reuse_resolve_Lazy_with_scope_context
 {
     [Test]
     public void Example()
@@ -441,7 +441,7 @@ __Note:__ `AsyncExecutionFlowScopeContext` may be considered a default option wh
 The scopes may be nested either with or without scope context present.
 
 ```cs 
-class Nested_scopes_without_scope_context
+public class Nested_scopes_without_scope_context
 {
     [Test]
     public void Example()
@@ -473,7 +473,7 @@ In absence of scope context, all the nested scopes exist and available __indepen
 Now we add `ScopeContext` to the mix:
 
 ```cs 
-class Nested_scopes_with_scope_context
+public class Nested_scopes_with_scope_context
 {
     [Test]
     public void Example()
@@ -526,7 +526,7 @@ You may tag the scope with the distinct "name" to resolve from the specific scop
 It also works both with or without the context scope.
 
 ```cs 
-class Named_open_scopes_and_scoped_to_name
+public class Named_open_scopes_and_scoped_to_name
 {
     [Test]
     public void Example()
@@ -554,7 +554,7 @@ class Named_open_scopes_and_scoped_to_name
 } 
 ```
 
-When resolving or injecting a service with `ScopeTo(name)` reuse DryIoc will look up starting from the current open scope, 
+When resolving or injecting a service with `ScopedTo(name)` reuse DryIoc will look up starting from the current open scope, 
 through the chain of its parents until the scope with the name is found or we reached the top scope.
 
 To define a name you may use object of any type with `Equals(object other)` and `GetHashCode()` available. 
@@ -576,7 +576,7 @@ Basically `Reuse.InWebRequest` and `Reuse.InThread` are just a scope reuses:
 
 ## Reuse.ScopedTo service type
 
-**Note:** `ScopedToService` methods are replacing the `ScopeTo` for the service type and the optional service key. The reason is the clash of overloading between the `ScopedTo(Type)` and the `ScopedTo(object)`, so the `ScopedToService(Type)` is added.
+**Note:** `ScopedToService` methods are replacing the `ScopedTo` for the service type and the optional service key. The reason is the clash of overloading between the `ScopedTo(Type)` and the `ScopedTo(object)`, so the `ScopedToService(Type)` is added.
 
 `ScopedToService<TService>(object serviceKey = null)` and `ScopedToService(Type serviceType, object serviceKey = null)` 
 define the reuse of the same dependency value in the service sub-graph.
@@ -609,7 +609,7 @@ class Example_of_reusing_dependency_as_variable
 In the example above `SubDependency` has a reuse `Reuse.ScopedToService<Foo>()`:
 
 ```cs 
-class Scoped_to_service_reuse
+public class Scoped_to_service_reuse
 {
     [Test] public void Example()
     {
@@ -670,7 +670,7 @@ var foo = container.OpenScope(new ResolutionScopeName(typeof(Foo))).Resolve<Foo>
 The de-sugared code also tells that the scope may be opened manually without the special setup. It may be useful for testing purposes.
 
 ```cs 
-class Emulating_openResolutionScope_setup
+public class Emulating_openResolutionScope_setup
 {
     [Test] public void Example()
     {
@@ -725,7 +725,7 @@ Therefore to avoid dangling scope the resolution scope will be automatically tra
 When the parent scope or container with singletons is disposed - the resolutions scope is disposed too.
 
 ```cs 
-class Scoped_to_service_reuse_with_dispose
+public class Scoped_to_service_reuse_with_dispose
 {
     [Test] public void Example()
     {
@@ -765,7 +765,7 @@ You may control the disposing of the resolution scope by injecting its `IResolve
 and then dispose it manually.
 
 ```cs 
-class Own_the_resolution_scope_disposal
+public class Own_the_resolution_scope_disposal
 {
     [Test] public void Example()
     {
@@ -827,7 +827,7 @@ Transient then it will be skipped until the first non-Transient ancestor found. 
 and the above rule is applied.
 
 ```cs 
-class Use_parent_reuse
+public class Use_parent_reuse
 {
     [Test]
     public void Example()
@@ -891,7 +891,7 @@ DryIoc reuses have the following lifespans:
 - `Transient`: 0. Indicate an absence of reuse and therefore the absence of a lifetime.
 
 ```cs 
-class Reuse_lifespan_mismatch_detection
+public class Reuse_lifespan_mismatch_detection
 {
     [Test]
     public void Example()
@@ -918,7 +918,7 @@ If you really want (say temporary) you may suppress the error via
 
 The error message is saying how to turn Off this error via rule `Rules.WithoutThrowIfDependencyHasShorterReuseLifespan()`
 ```cs 
-class Reuse_lifespan_mismatch_error_suppress
+public class Reuse_lifespan_mismatch_error_suppress
 {
     [Test]
     public void Example()
@@ -960,7 +960,7 @@ Another way to prevent the exception is wrapping a shorter reused dependency in 
 The user may decide to delay the creation of the dependency via `Lazy` or create multiple dependency values via `Func` 
 and be fully in control of their lifetime.
 ```cs 
-class Avoiding_reuse_lifespan_mismatch_for_Func_or_Lazy_dependency
+public class Avoiding_reuse_lifespan_mismatch_for_Func_or_Lazy_dependency
 {
     [Test]
     public void Example()

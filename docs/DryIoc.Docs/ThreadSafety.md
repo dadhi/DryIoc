@@ -81,7 +81,7 @@ __Note:__ Until the DryIoc v5 the `lock` is still used for the older platforms (
 
 Lock is required to ensure that creation of reused service happens only once. For instance for singleton service A:
 ```cs 
-class Resolving_singleton_in_parallel 
+public class Resolving_singleton_in_parallel 
 {
     [Test] public void Example() 
     {

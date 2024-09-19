@@ -100,7 +100,7 @@ The result container will have the following traits:
 Let's see the example:
 ```cs 
 
-class ChildExample
+public class ChildExample
 {
     public class A { public D D; public A(D d) => D = d; }
     public class A1 { public D D; public A1(D d) => D = d; }
@@ -164,7 +164,7 @@ Let's look into example:
 
 ```cs 
 
-class FacadeExample
+public class FacadeExample
 {
     public interface IService { }
     public class ProdService : IService { }
@@ -222,7 +222,7 @@ The reason for removing the cache may be the changing or removing the service re
 when the resolutions were already made and the things were cached. 
 
 ```cs 
-class Without_cache
+public class Without_cache
 {
     public interface I { }
     public class Prod : I { }
@@ -262,7 +262,7 @@ class Without_cache
 
 To remove resolved singleton instances from the container:
 ```cs 
-class Without_singletons
+public class Without_singletons
 {
     public class S { }
     [Test]public void Example()
@@ -288,7 +288,7 @@ The method will clone the container registrations but will drop the cache.
 and the vice versa.
 
 ```cs 
-class With_registrations_copy
+public class With_registrations_copy
 {
     class A { }
     class B { public B(A a) {} }

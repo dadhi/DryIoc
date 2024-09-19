@@ -266,7 +266,7 @@ namespace Autofac
         /// Reuse.ScopedTo{TService}()
         public static RegistrationInfo InstancePerOwned<TService>(this RegistrationInfo info) => info.WithReuse(Reuse.ScopedTo<Owned<TService>>());
 
-        /// <summary>Reuse.ScopeTo(name)</summary>
+        /// <summary>Reuse.ScopedTo(name)</summary>
         public static RegistrationInfo InstancePerMatchingLifetimeScope(this RegistrationInfo info, object scopeName) => info.WithReuse(Reuse.ScopedTo(scopeName));
 
         /// <summary>Specifies the service type</summary>

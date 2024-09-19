@@ -78,7 +78,7 @@ using System.Linq.Expressions;
 using DryIoc;
 using NUnit.Framework;
 
-class Register_many_implementation
+public class Register_many_implementation
 {
     [Test]
     public void Example()
@@ -100,7 +100,7 @@ class Register_many_implementation
 This default behavior is specified with the default value of `ifAlreadyRegistered` optional parameter in Register method. 
 The equivalent to the previous code would be: 
 ```cs 
-class Register_many_implementation_with_default_if_already_registered_behavior
+public class Register_many_implementation_with_default_if_already_registered_behavior
 {
     [Test]
     public void Example()
@@ -134,7 +134,7 @@ Registering with `asResolutionCall` `setup` makes consumers depend on the call t
 inline service creation (which is not replaceable):
 
 ```cs 
-class Register_with_ifAlreadyReplaced_option
+public class Register_with_ifAlreadyReplaced_option
 {
     [Test]
     public void Example()
@@ -178,7 +178,7 @@ multiple available it will throw `ContainerException` with message
 You may alter the container `Rules` how to select a service from multiple available. 
 For instance, to select the latest registration:
 ```cs 
-class Select_last_registered_service
+public class Select_last_registered_service
 {
     [Test]
     public void Example()
@@ -206,7 +206,7 @@ By default DryIoc is injecting dependency by directly putting dependency creatio
 (or property, field, factory method).
 
 ```cs 
-class AsResolutionCall_setup
+public class AsResolutionCall_setup
 {
     [Test]
     public void Example()
@@ -271,7 +271,7 @@ generally possible for `Lazy` and `Func` wrappers.
 By default DryIoc will implicitly filter out a service that does not have matching scope.
 
 ```cs 
-class Filter_out_service_that_do_not_have_a_matching_scope
+public class Filter_out_service_that_do_not_have_a_matching_scope
 {
     [Test]
     public void Example()
@@ -299,7 +299,7 @@ __Note:__ This way you may identify a service based on its reuse rather than hav
 
 A usual, the rule could be turned off:
 ```cs 
-class Turning_matching_scope_filtering_Off
+public class Turning_matching_scope_filtering_Off
 {
     [Test]
     public void Example() 
@@ -328,7 +328,7 @@ __Note:__ When both `Singleton` and `Transient` services are registered, DryIoc 
 In case you are using `Rules.WithFactorySelector(Rules.SelectLastRegisteredFactory())` and wandering how it relates to implicit reuse-based service selection,
 here is the example:
 ```cs 
-class Select_last_registered_factory_with_implicit_scope_selection
+public class Select_last_registered_factory_with_implicit_scope_selection
 {
     [Test]
     public void Example()
@@ -375,7 +375,7 @@ DryIoc makes `Container` interfaces automatically available (injected) because r
 especially in presence of the scope.
 
 ```cs 
-class Automatically_injected_container_interfaces
+public class Automatically_injected_container_interfaces
 {
     [Test]
     public void Example()
@@ -404,7 +404,7 @@ Given the example you can see that registering a `Container` object will not get
 
 The right way to register container interfaces manually with the correct scoping behavior may be this:
 ```cs 
-class Registering_container_interfaces_by_hand
+public class Registering_container_interfaces_by_hand
 {
     [Test]
     public void Example()
@@ -488,7 +488,7 @@ But the default behavior may be opt-out in the following ways:
 The rule will work if multiple constructors available, and will select the constructor with maximum number of parameters where each parameter is successfully resolved from container.
 
 ```cs 
-[TestFixture] public class Constructor_with_resolvable_arguments
+public class Constructor_with_resolvable_arguments
 {
     [Test] public void Example()
     {
@@ -532,7 +532,7 @@ The rule will work if multiple constructors available, and will select the const
 2. You may specify to use a specific constructor, or even the static or the instance method, the field or the property for producing the service. 
 The preferred way to do it is using the `Made.Of` expression specification:
 ```cs 
-[TestFixture] class Using_specific_ctor_or_factory_method
+public class Using_specific_ctor_or_factory_method
 {
     [Test] public void Example()
     {
@@ -570,8 +570,7 @@ On the other hand, writable properties usually specify dependencies that may be 
 
 As usual, you may override default behavior to throw an exception for unresolved property, or set the default value for unresolved parameter:
 ```cs 
-[TestFixture]
-class Specify_how_to_treat_unresolved_parameter_or_property
+public class Specify_how_to_treat_unresolved_parameter_or_property
 {
     [Test]public void Example()
     {
@@ -615,7 +614,7 @@ DryIoc has two predefined rules that you can use instead of [default policy](Rul
     
 For example you may register some dependencies to be available only inside opened scope like this:
 ```cs 
-[TestFixture] public class Using_factory_selector_to_change_the_default_preferred_service
+public class Using_factory_selector_to_change_the_default_preferred_service
 {
     [Test]
     public void Example()
@@ -662,7 +661,7 @@ The better alternative is the `WithDynamicRegistrations` - see below for details
 Example of how `ResolveMany` is  working with the `WithDynamicRegistration` and not working with the `UnknownServiceResolvers`:
 
 ```cs 
-class ResolveMany_does_not_work_WithUnknownResolvers 
+public class ResolveMany_does_not_work_WithUnknownResolvers
 {
     [Test]public void Example_not_working()
     {
@@ -721,7 +720,7 @@ class ResolveMany_does_not_work_WithUnknownResolvers
 DryIoc provides predefined rule `WithDynamicRegistrations` and `WithDynamicRegistrationsAsFallback` to register additional services 
 from the provided list of types or assemblies:
 ```cs 
-[TestFixture] public class Auto_register_unknown_service
+public class Auto_register_unknown_service
 {
     [Test] public void Example()
     {
@@ -751,7 +750,6 @@ The rule to "automatically" resolve concrete (non-interface, non-abstract) types
 
 Using the rule:
 ```cs 
-[TestFixture]
 public class Auto_concrete_dynamic_type_registrations
 {
     [Test]
@@ -811,7 +809,7 @@ When defining your own Reuse you may take advantage of the rule by defining spec
 
 Example:
 ```cs 
-[TestFixture] public class Throw_if_dependency_has_a_shorter_lifetime
+public class Throw_if_dependency_has_a_shorter_lifetime
 {
     [Test] public void Example()
     {
@@ -835,7 +833,7 @@ Example:
 
 You may disable the rule for Container, so lifespan mismatch will not throw exception.
 ```cs 
-[TestFixture] public class Disable_captive_dependency_exception
+public class Disable_captive_dependency_exception
 {
     [Test] public void Example()
     {
@@ -873,7 +871,7 @@ Using `Func` means that client is in charge of creating the dependency whenever 
 so the check does not make sense.
 
 ```cs 
-[TestFixture] public class Wrap_captive_dependency_in_Func
+public class Wrap_captive_dependency_in_Func
 {
     [Test] public void Example()
     {
@@ -900,7 +898,7 @@ That means you may register Transient `IDisposable` and forgot to dispose it, th
 To prevent the possible memory leaks due the ignored `Dispose`, DryIoc by default will throw the exception on registering 
 transient implementing `IDisposable` interface:
 ```cs 
-[TestFixture] public class Register_disposable_transient
+public class Register_disposable_transient
 {
     [Test] public void Example()
     {
@@ -921,7 +919,7 @@ transient implementing `IDisposable` interface:
 
 If you disagree, you may silence this exception per registration or per Container:
 ```cs
-[TestFixture]public class Silence_registering_disposable_transient_exception
+public class Silence_registering_disposable_transient_exception
 {
     [Test]public void Example()
     {
@@ -958,7 +956,7 @@ Allows to specify registration option per Container which is different from defa
 
 For instance I want my container to follow the "Register Once" registration semantics:
 ```cs 
-[TestFixture] public class Default_IfAlreadyRegistered
+public class Default_IfAlreadyRegistered
 {
     [Test] public void Example()
     {
@@ -979,7 +977,6 @@ Another interesting use is to make a "Collection registration explicit".
 Following the previous example I can explicitly specify `IfAlreadyRegistered.AppendNonKeyed` for individual registrations 
 to be added to collection:
 ```cs 
-[TestFixture]
 public class Default_IfAlreadyRegistered_AppendNotKeyed
 {
     [Test]

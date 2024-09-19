@@ -1,209 +1,208 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup>
-        <TargetFrameworks Condition="'$(DevMode)' == 'true'">net8.0;net7.0;net472</TargetFrameworks>
-        <TargetFrameworks Condition="'$(DevMode)' != 'true'">net7.0;net472</TargetFrameworks>
-        <IsPackable>false</IsPackable>
-        <IsTestProject>true</IsTestProject>
-        <MSBuildWarningsAsMessages>
+  <PropertyGroup>
+    <TargetFrameworks Condition="'$(DevMode)' == 'true'">net8.0;net7.0;net472</TargetFrameworks>
+    <TargetFrameworks Condition="'$(DevMode)' != 'true'">net7.0;net472</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <MSBuildWarningsAsMessages>
             $(MSBuildWarningsAsMessages);MSB3277
-        </MSBuildWarningsAsMessages>
-    </PropertyGroup>
+    </MSBuildWarningsAsMessages>
+  </PropertyGroup>
 
-    <ItemGroup>
-        <PackageReference Include="LinFu.DynamicProxy" Version="2.1.2" />
-        <PackageReference Include="Moq" Version="4.20.69" />
-        <PackageReference Include="log4net" Version="2.0.15" />
-        <PackageReference Include="Autofac" Version="7.1.0" />
-        <PackageReference Include="Castle.Core" Version="5.1.1" />
-        <PackageReference Include="Castle.Core.AsyncInterceptor" Version="2.1.0" />
-        <PackageReference Include="MediatR" Version="9.0.0" />
-        <PackageReference Include="NSubstitute" Version="5.1.0" />
-        <PackageReference Include="Serilog" Version="3.1.1" />
-    </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="LinFu.DynamicProxy" Version="2.1.2" />
+    <PackageReference Include="Moq" Version="4.20.69" />
+    <PackageReference Include="log4net" Version="2.0.15" />
+    <PackageReference Include="Autofac" Version="7.1.0" />
+    <PackageReference Include="Castle.Core" Version="5.1.1" />
+    <PackageReference Include="Castle.Core.AsyncInterceptor" Version="2.1.0" />
+    <PackageReference Include="MediatR" Version="9.0.0" />
+    <PackageReference Include="NSubstitute" Version="5.1.0" />
+    <PackageReference Include="Serilog" Version="3.1.1" />
+  </ItemGroup>
 
-    <ItemGroup>
-        <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
-        <ProjectReference Include="..\..\src\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj" />
-    </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
+    <ProjectReference Include="..\..\src\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj" />
+  </ItemGroup>
 
-    <ItemGroup>
-        <DocFile Include="**\*.cs" />
-    </ItemGroup>
+  <ItemGroup>
+    <DocFile Include="**\*.cs" />
+  </ItemGroup>
 
-    <Target Name="MdGenerate" BeforeTargets="BeforeBuild"
-        Condition="'$(SkipDocGen)' != 'true' AND '$(TargetFramework)' == 'net6.0' AND '$(Configuration)' == 'Debug' ">
-        <Message Text="Generating the Markdown documentation..." Importance="high"/>
-        <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet tool restore" />
-        <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet cstomd %(DocFile.Identity)" />
-    </Target>
+  <Target Name="MdGenerate" BeforeTargets="BeforeBuild" Condition="'$(SkipDocGen)' != 'true' AND '$(TargetFramework)' == 'net7.0' AND '$(Configuration)' == 'Debug' ">
+    <Message Text="Generating the Markdown documentation..." Importance="high"/>
+    <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet tool restore" />
+    <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet cstomd %(DocFile.Identity)" />
+  </Target>
 
-    <ItemGroup>
-      <Compile Update="Extensions\MefAttributedModel.cs">
-        <Generator>CsToMd</Generator>
-        <LastGenOutput>MefAttributedModel.md</LastGenOutput>
-      </Compile>
-      <Compile Update="CreatingAndDisposingContainer.cs">
-        <Generator>CsToMd</Generator>
-        <LastGenOutput>CreatingAndDisposingContainer.md</LastGenOutput>
-      </Compile>
-      <Compile Update="Decorators.cs">
-        <Generator>CsToMd</Generator>
-        <LastGenOutput>Decorators.md</LastGenOutput>
-      </Compile>
-      <Compile Update="ErrorDetectionAndResolution.cs">
-        <Generator>CsToMd</Generator>
-        <LastGenOutput>ErrorDetectionAndResolution.md</LastGenOutput>
-      </Compile>
-      <Compile Update="ExamplesContextBasedResolution.cs">
-        <Generator>CsToMd</Generator>
-        <LastGenOutput>ExamplesContextBasedResolution.md</LastGenOutput>
-      </Compile>
-      <Compile Update="Home.cs">
-        <Generator>CsToMd</Generator>
-        <LastGenOutput>Home.md</LastGenOutput>
-      </Compile>
-      <Compile Update="Interception.cs">
-        <Generator>CsToMd</Generator>
-        <LastGenOutput>Interception.md</LastGenOutput>
-      </Compile>
-      <Compile Update="KindsOfChildContainer.cs">
-        <Generator>CsToMd</Generator>
-        <LastGenOutput>KindsOfChildContainer.md</LastGenOutput>
-      </Compile>
-      <Compile Update="OpenGenerics.cs">
-        <Generator>CsToMd</Generator>
-        <LastGenOutput>OpenGenerics.md</LastGenOutput>
-      </Compile>
-      <Compile Update="RegisterResolve.cs">
-        <Generator>CsToMd</Generator>
-        <LastGenOutput>RegisterResolve.md</LastGenOutput>
-      </Compile>
-      <Compile Update="RequiredServiceType.cs">
-        <Generator>CsToMd</Generator>
-        <LastGenOutput>RequiredServiceType.md</LastGenOutput>
-      </Compile>
-      <Compile Update="ReuseAndScopes.cs">
-        <Generator>CsToMd</Generator>
-        <LastGenOutput>ReuseAndScopes.md</LastGenOutput>
-      </Compile>
-      <Compile Update="RulesAndDefaultConventions.cs">
-        <Generator>CsToMd</Generator>
-        <LastGenOutput>RulesAndDefaultConventions.md</LastGenOutput>
-      </Compile>
-      <Compile Update="SelectConstructorOrFactoryMethod.cs">
-        <Generator>CsToMd</Generator>
-        <LastGenOutput>SelectConstructorOrFactoryMethod.md</LastGenOutput>
-      </Compile>
-      <Compile Update="SpecifyDependencyAndPrimitiveValues.cs">
-        <Generator>CsToMd</Generator>
-        <LastGenOutput>SpecifyDependencyAndPrimitiveValues.md</LastGenOutput>
-      </Compile>
-      <Compile Update="ThreadSafety.cs">
-        <Generator>CsToMd</Generator>
-        <LastGenOutput>ThreadSafety.md</LastGenOutput>
-      </Compile>
-      <Compile Update="UsingInTestsWithMockingLibrary.cs">
-        <Generator>CsToMd</Generator>
-        <LastGenOutput>UsingInTestsWithMockingLibrary.md</LastGenOutput>
-      </Compile>
-      <Compile Update="Wrappers.cs">
-        <Generator>CsToMd</Generator>
-        <LastGenOutput>Wrappers.md</LastGenOutput>
-      </Compile>
-    </ItemGroup>
+  <ItemGroup>
+    <Compile Update="Extensions\MefAttributedModel.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>MefAttributedModel.md</LastGenOutput>
+    </Compile>
+    <Compile Update="CreatingAndDisposingContainer.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>CreatingAndDisposingContainer.md</LastGenOutput>
+    </Compile>
+    <Compile Update="Decorators.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>Decorators.md</LastGenOutput>
+    </Compile>
+    <Compile Update="ErrorDetectionAndResolution.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>ErrorDetectionAndResolution.md</LastGenOutput>
+    </Compile>
+    <Compile Update="ExamplesContextBasedResolution.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>ExamplesContextBasedResolution.md</LastGenOutput>
+    </Compile>
+    <Compile Update="Home.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>Home.md</LastGenOutput>
+    </Compile>
+    <Compile Update="Interception.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>Interception.md</LastGenOutput>
+    </Compile>
+    <Compile Update="KindsOfChildContainer.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>KindsOfChildContainer.md</LastGenOutput>
+    </Compile>
+    <Compile Update="OpenGenerics.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>OpenGenerics.md</LastGenOutput>
+    </Compile>
+    <Compile Update="RegisterResolve.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>RegisterResolve.md</LastGenOutput>
+    </Compile>
+    <Compile Update="RequiredServiceType.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>RequiredServiceType.md</LastGenOutput>
+    </Compile>
+    <Compile Update="ReuseAndScopes.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>ReuseAndScopes.md</LastGenOutput>
+    </Compile>
+    <Compile Update="RulesAndDefaultConventions.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>RulesAndDefaultConventions.md</LastGenOutput>
+    </Compile>
+    <Compile Update="SelectConstructorOrFactoryMethod.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>SelectConstructorOrFactoryMethod.md</LastGenOutput>
+    </Compile>
+    <Compile Update="SpecifyDependencyAndPrimitiveValues.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>SpecifyDependencyAndPrimitiveValues.md</LastGenOutput>
+    </Compile>
+    <Compile Update="ThreadSafety.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>ThreadSafety.md</LastGenOutput>
+    </Compile>
+    <Compile Update="UsingInTestsWithMockingLibrary.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>UsingInTestsWithMockingLibrary.md</LastGenOutput>
+    </Compile>
+    <Compile Update="Wrappers.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>Wrappers.md</LastGenOutput>
+    </Compile>
+  </ItemGroup>
 
-    <ItemGroup>
-      <None Update="Extensions\MefAttributedModel.md">
-        <DesignTime>True</DesignTime>
-        <AutoGen>True</AutoGen>
-        <DependentUpon>MefAttributedModel.cs</DependentUpon>
-      </None>
-      <None Update="CreatingAndDisposingContainer.md">
-        <DesignTime>True</DesignTime>
-        <AutoGen>True</AutoGen>
-        <DependentUpon>CreatingAndDisposingContainer.cs</DependentUpon>
-      </None>
-      <None Update="Decorators.md">
-        <DesignTime>True</DesignTime>
-        <AutoGen>True</AutoGen>
-        <DependentUpon>Decorators.cs</DependentUpon>
-      </None>
-      <None Update="ErrorDetectionAndResolution.md">
-        <DesignTime>True</DesignTime>
-        <AutoGen>True</AutoGen>
-        <DependentUpon>ErrorDetectionAndResolution.cs</DependentUpon>
-      </None>
-      <None Update="ExamplesContextBasedResolution.md">
-        <DesignTime>True</DesignTime>
-        <AutoGen>True</AutoGen>
-        <DependentUpon>ExamplesContextBasedResolution.cs</DependentUpon>
-      </None>
-      <None Update="Home.md">
-        <DesignTime>True</DesignTime>
-        <AutoGen>True</AutoGen>
-        <DependentUpon>Home.cs</DependentUpon>
-      </None>
-      <None Update="Interception.md">
-        <DesignTime>True</DesignTime>
-        <AutoGen>True</AutoGen>
-        <DependentUpon>Interception.cs</DependentUpon>
-      </None>
-      <None Update="KindsOfChildContainer.md">
-        <DesignTime>True</DesignTime>
-        <AutoGen>True</AutoGen>
-        <DependentUpon>KindsOfChildContainer.cs</DependentUpon>
-      </None>
-      <None Update="OpenGenerics.md">
-        <DesignTime>True</DesignTime>
-        <AutoGen>True</AutoGen>
-        <DependentUpon>OpenGenerics.cs</DependentUpon>
-      </None>
-      <None Update="RegisterResolve.md">
-        <DesignTime>True</DesignTime>
-        <AutoGen>True</AutoGen>
-        <DependentUpon>RegisterResolve.cs</DependentUpon>
-      </None>
-      <None Update="RequiredServiceType.md">
-        <DesignTime>True</DesignTime>
-        <AutoGen>True</AutoGen>
-        <DependentUpon>RequiredServiceType.cs</DependentUpon>
-      </None>
-      <None Update="ReuseAndScopes.md">
-        <DesignTime>True</DesignTime>
-        <AutoGen>True</AutoGen>
-        <DependentUpon>ReuseAndScopes.cs</DependentUpon>
-      </None>
-      <None Update="RulesAndDefaultConventions.md">
-        <DesignTime>True</DesignTime>
-        <AutoGen>True</AutoGen>
-        <DependentUpon>RulesAndDefaultConventions.cs</DependentUpon>
-      </None>
-      <None Update="SelectConstructorOrFactoryMethod.md">
-        <DesignTime>True</DesignTime>
-        <AutoGen>True</AutoGen>
-        <DependentUpon>SelectConstructorOrFactoryMethod.cs</DependentUpon>
-      </None>
-      <None Update="SpecifyDependencyAndPrimitiveValues.md">
-        <DesignTime>True</DesignTime>
-        <AutoGen>True</AutoGen>
-        <DependentUpon>SpecifyDependencyAndPrimitiveValues.cs</DependentUpon>
-      </None>
-      <None Update="ThreadSafety.md">
-        <DesignTime>True</DesignTime>
-        <AutoGen>True</AutoGen>
-        <DependentUpon>ThreadSafety.cs</DependentUpon>
-      </None>
-      <None Update="UsingInTestsWithMockingLibrary.md">
-        <DesignTime>True</DesignTime>
-        <AutoGen>True</AutoGen>
-        <DependentUpon>UsingInTestsWithMockingLibrary.cs</DependentUpon>
-      </None>
-      <None Update="Wrappers.md">
-        <DesignTime>True</DesignTime>
-        <AutoGen>True</AutoGen>
-        <DependentUpon>Wrappers.cs</DependentUpon>
-      </None>
-    </ItemGroup>
+  <ItemGroup>
+    <None Update="Extensions\MefAttributedModel.md">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>MefAttributedModel.cs</DependentUpon>
+    </None>
+    <None Update="CreatingAndDisposingContainer.md">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>CreatingAndDisposingContainer.cs</DependentUpon>
+    </None>
+    <None Update="Decorators.md">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Decorators.cs</DependentUpon>
+    </None>
+    <None Update="ErrorDetectionAndResolution.md">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>ErrorDetectionAndResolution.cs</DependentUpon>
+    </None>
+    <None Update="ExamplesContextBasedResolution.md">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>ExamplesContextBasedResolution.cs</DependentUpon>
+    </None>
+    <None Update="Home.md">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Home.cs</DependentUpon>
+    </None>
+    <None Update="Interception.md">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Interception.cs</DependentUpon>
+    </None>
+    <None Update="KindsOfChildContainer.md">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>KindsOfChildContainer.cs</DependentUpon>
+    </None>
+    <None Update="OpenGenerics.md">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>OpenGenerics.cs</DependentUpon>
+    </None>
+    <None Update="RegisterResolve.md">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>RegisterResolve.cs</DependentUpon>
+    </None>
+    <None Update="RequiredServiceType.md">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>RequiredServiceType.cs</DependentUpon>
+    </None>
+    <None Update="ReuseAndScopes.md">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>ReuseAndScopes.cs</DependentUpon>
+    </None>
+    <None Update="RulesAndDefaultConventions.md">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>RulesAndDefaultConventions.cs</DependentUpon>
+    </None>
+    <None Update="SelectConstructorOrFactoryMethod.md">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>SelectConstructorOrFactoryMethod.cs</DependentUpon>
+    </None>
+    <None Update="SpecifyDependencyAndPrimitiveValues.md">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>SpecifyDependencyAndPrimitiveValues.cs</DependentUpon>
+    </None>
+    <None Update="ThreadSafety.md">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>ThreadSafety.cs</DependentUpon>
+    </None>
+    <None Update="UsingInTestsWithMockingLibrary.md">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>UsingInTestsWithMockingLibrary.cs</DependentUpon>
+    </None>
+    <None Update="Wrappers.md">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Wrappers.cs</DependentUpon>
+    </None>
+  </ItemGroup>
 
 </Project>

@@ -7,13 +7,13 @@ public sealed class GHIssue631_Conditional_registrations : ITest
 {
     public int Run()
     {
-        // TestWithDefaultScopeToSingleton(); // todo: @fixme @wip the test
+        // TestWithDefaultScopedToSingleton(); // todo: @fixme @wip the test
         TestWithIdenticalScopes();
         return 2;
     }
 
     [Test]
-    public void TestWithDefaultScopeToSingleton()
+    public void TestWithDefaultScopedToSingleton()
     {
         var container = new Container();
 

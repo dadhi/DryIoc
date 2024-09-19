@@ -230,6 +230,7 @@ public class SelectConstructorOrFactoryMethod : ITest
         new Register_with_automatic_constructor_selection().Example();
         new Register_with_automatic_constructor_selection_for_entire_container().Example();
         new Register_with_static_factory_method().Example();
+        new Select_factory_method_based_on_condition().Example();
         new Register_with_instance_factory_method().Example();
         new Register_with_instance_property().Example();
         new Register_open_generics().Example();

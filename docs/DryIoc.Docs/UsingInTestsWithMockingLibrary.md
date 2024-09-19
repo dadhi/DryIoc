@@ -45,7 +45,7 @@ public class SomeConsumer
 
 Let's test a `SomeConsumer` by mocking its `Service` dependency:
 ```cs 
-class NSubstitute_example
+public class NSubstitute_example
 {
     readonly ConcurrentDictionary<System.Type, DynamicRegistration> _mockRegistrations =
         new ConcurrentDictionary<System.Type, DynamicRegistration>();
@@ -70,7 +70,7 @@ class NSubstitute_example
         DynamicRegistrationFlags.Service | DynamicRegistrationFlags.AsFallback));
 
     [Test]
-    public void Test()
+    public void Example()
     {
         var container = WithAutoMocking(new Container());
 
@@ -163,7 +163,7 @@ container to detach from the production container but provide the access to its 
 public class Moq_example_with_test_container
 {
     [Test]
-    public void Test()
+    public void Example()
     {
         var prodContainer = new Container();
 

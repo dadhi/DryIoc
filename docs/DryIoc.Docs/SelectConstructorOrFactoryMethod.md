@@ -8,6 +8,7 @@
   - [Selecting constructor with resolvable parameters](#selecting-constructor-with-resolvable-parameters)
   - [Factory Method instead of Constructor](#factory-method-instead-of-constructor)
     - [Using static factory method](#using-static-factory-method)
+    - [Select the constructor or factory method based on the condition](#select-the-constructor-or-factory-method-based-on-the-condition)
     - [Using instance factory method](#using-instance-factory-method)
   - [Property/Field as Factory Method](#propertyfield-as-factory-method)
   - [Open-generic Factory Method](#open-generic-factory-method)
@@ -34,6 +35,8 @@ using DryIocAttributes;
 using DryIoc.MefAttributedModel;
 using System.ComponentModel.Composition;
 using NUnit.Framework;
+using System.Linq;
+using System.Reflection;
 // ReSharper disable UnusedVariable
 ```
 </details>
@@ -41,8 +44,8 @@ using NUnit.Framework;
 
 ```cs
 public interface IDependency { }
-public class Dep : IDependency {}
-public class Foo 
+public class Dep : IDependency { }
+public class Foo
 {
     public IDependency Dep { get; }
     public Foo(IDependency dep) => Dep = dep;
@@ -54,7 +57,7 @@ There are multiple ways to select constructor:
 - The preferable way is strongly typed specification with [Expression Tree](https://msdn.microsoft.com/en-us/library/bb397951.aspx) expression:
 
 ```cs 
-class Register_strongly_typed_service_with_expression
+public class Register_strongly_typed_service_with_expression
 {
     [Test]
     public void Example()
@@ -74,7 +77,7 @@ class Register_strongly_typed_service_with_expression
 - Another way is using Reflection:
 
 ```cs 
-class Register_with_reflection
+public class Register_with_reflection
 {
     [Test]
     public void Example()
@@ -91,15 +94,15 @@ __Note:__ When registering open-generic the reflection is the only way:
 
 ```cs 
 public interface IDependency<T> { }
-public class Foo<T> 
+public class Foo<T>
 {
     public IDependency<T> Dep { get; }
     public Foo(IDependency<T> dep) => Dep = dep;
 }
 
-public class Dep<T> : IDependency<T> {} 
+public class Dep<T> : IDependency<T> { }
 
-class Register_open_generics_with_reflection
+public class Register_open_generics_with_reflection
 {
     [Test]
     public void Example()
@@ -125,7 +128,7 @@ The rule may be used:
 - Per service registration (preferable to pin-point problematic service but stay deterministic for rest of registrations):
 
 ```cs 
-class Register_with_automatic_constructor_selection
+public class Register_with_automatic_constructor_selection
 {
     [Test]
     public void Example()
@@ -142,7 +145,7 @@ class Register_with_automatic_constructor_selection
 - For the entire Container:
 
 ```cs 
-class Register_with_automatic_constructor_selection_for_entire_container
+public class Register_with_automatic_constructor_selection_for_entire_container
 {
     [Test]
     public void Example()
@@ -172,7 +175,7 @@ __Note:__ You may also consider using `RegisterDelegate<TDependencies..., TServi
 ### Using static factory method
 
 ```cs 
-class Register_with_static_factory_method
+public class Register_with_static_factory_method
 {
     [Test]
     public void Example()
@@ -183,7 +186,7 @@ class Register_with_static_factory_method
         Assert.IsNotNull(c.Resolve<IFoo>());
     }
 
-    public static class FooFactory 
+    public static class FooFactory
     {
         public static IFoo CreateFoo(Repo repo)
         {
@@ -193,11 +196,86 @@ class Register_with_static_factory_method
         }
     }
 
-    public interface IFoo {}
-    public class FooBar : IFoo {}
-    public class Repo 
+    public interface IFoo { }
+    public class FooBar : IFoo { }
+    public class Repo
     {
-        public void Add(IFoo foo) {}
+        public void Add(IFoo foo) { }
+    }
+}
+```
+
+### Select the constructor or factory method based on the condition
+
+Using `Made.Of` you may specify the condition to select the constructor or factory method based on the context 
+of the resolution or injection of the service. 
+
+**Note:** I advice to explore the overloads of the `Made.Of` and `FactoryMethod.Of` methods to see what's possible
+in the current DryIoc version.
+
+```cs 
+public class Select_factory_method_based_on_condition
+{
+    [Test]
+    public void Example()
+    {
+        var c = new Container();
+
+        c.Register<Consumer>();
+        c.Register<Consumer>(serviceKey: "special");
+        c.RegisterInstance(new FooNameProvider("foo"));
+
+        c.Register<IFoo>(made: Made.Of(req =>
+        {
+            // Use factory method of Consumer to produce foo if Foo is injected as dependency into any parent service,
+            // resolved or injected with "special" service key.
+            if (req.Parent.Any(p => "special".Equals(p.ServiceKey)))
+                return typeof(Consumer).GetMethod(nameof(Consumer.GetMyFoo), BindingFlags.Public | BindingFlags.Static);
+
+            // Use default constructor if IFoo is directly resolved and not injected as dependency (a resolution root)
+            if (req.IsResolutionRoot)
+                return typeof(Foo).GetConstructors().Where(c => c.GetParameters().Length == 0).FirstOrDefault();
+
+            // Use constructor with the NameProvider dependency for the rest of cases
+            return typeof(Foo).GetConstructors()
+                .Where(c => c.GetParameters().Any(p => p.ParameterType == typeof(FooNameProvider)))
+                .FirstOrDefault();
+        }));
+
+        var foo = c.Resolve<IFoo>();
+        Assert.AreEqual("default foo", foo.Name);
+
+        var specialConsumer = c.Resolve<Consumer>(serviceKey: "special");
+        Assert.AreEqual("special foo", specialConsumer.Foo.Name);
+
+        var normalConsumer = c.Resolve<Consumer>();
+        Assert.AreEqual("foo", normalConsumer.Foo.Name);
+    }
+
+    public interface IFoo
+    {
+        string Name { get; }
+    }
+
+    public class Foo : IFoo
+    {
+        public string Name { get; internal set; }
+        public Foo(FooNameProvider np) => Name = np.FooName;
+        public Foo() => Name = "default foo";
+    }
+
+    public class FooNameProvider
+    {
+        public readonly string FooName;
+        public FooNameProvider(string fooName) => FooName = fooName;
+    }
+
+    public class Consumer
+    {
+        public static IFoo GetMyFoo() => new Foo { Name = "special foo" };
+
+        public IFoo Foo { get; }
+        public Consumer(IFoo foo) => Foo = foo;
     }
 }
 ```
@@ -205,7 +283,7 @@ class Register_with_static_factory_method
 ### Using instance factory method
 
 ```cs 
-class Register_with_instance_factory_method
+public class Register_with_instance_factory_method
 {
     [Test]
     public void Example()
@@ -218,14 +296,14 @@ class Register_with_instance_factory_method
         Assert.IsNotNull(c.Resolve<IFoo>());
     }
 
-    public interface IFooFactory 
+    public interface IFooFactory
     {
         IFoo CreateFoo(Repo repo);
     }
     public class FooFactory : IFooFactory
     {
-    	public FooFactory(IDependency dep) { }
-    
+        public FooFactory(IDependency dep) { }
+
         public IFoo CreateFoo(Repo repo)
         {
             var foo = new FooBar();
@@ -234,11 +312,11 @@ class Register_with_instance_factory_method
         }
     }
 
-    public interface IFoo {}
-    public class FooBar : IFoo {}
-    public class Repo 
+    public interface IFoo { }
+    public class FooBar : IFoo { }
+    public class Repo
     {
-        public void Add(IFoo foo) {}
+        public void Add(IFoo foo) { }
     }
 }
 ```
@@ -253,7 +331,7 @@ If DryIoc supports factory methods then why not support Properties and Fields?
 Here we are:
 
 ```cs 
-class Register_with_instace_property
+public class Register_with_instance_property
 {
     [Test]
     public void Example()
@@ -270,12 +348,12 @@ class Register_with_instace_property
         public IFoo Foo { get; private set; }
         public FooFactory(Repo repo) { Foo = new Foo(repo); }
     }
-    public interface IFoo {}
+    public interface IFoo { }
     public class Foo : IFoo
     {
-        public Foo(Repo repo) {}
+        public Foo(Repo repo) { }
     }
-    public class Repo {}
+    public class Repo { }
 }
 ```
 
@@ -290,7 +368,7 @@ The generic parameter constraints are supported too.
 Example:
 
 ```cs 
-class Register_open_generics
+public class Register_open_generics
 {
     [Test]
     public void Example()
@@ -299,25 +377,25 @@ class Register_open_generics
 
         container.Register<Foo>();
         container.Register(typeof(Factory<>));
-        container.Register(typeof(IService<,>), 
+        container.Register(typeof(IService<,>),
             made: Made.Of(typeof(Factory<>).GetSingleMethodOrNull("Create"), ServiceInfo.Of(typeof(Factory<>))));
 
         Assert.IsNotNull(container.Resolve<IService<Foo, string>>());
     }
 
-    public interface IService<A, B> 
+    public interface IService<A, B>
     {
         void Initialize(A a);
     }
-    public class ServiceImpl<A, B> : IService<A, B> 
+    public class ServiceImpl<A, B> : IService<A, B>
     {
-        public void Initialize(A a) {}
+        public void Initialize(A a) { }
     }
 
-    public class Foo {}
+    public class Foo { }
 
     [Export]
-    public class Factory<A> 
+    public class Factory<A>
     {
         [Export]
         public IService<A, B> Create<B>(A a)
@@ -335,7 +413,7 @@ class Register_open_generics
 DryIoc provides the [DryIoc.MefAttributedModel](Extensions/MefAttributedModel) extension which enables the use of MEF `Export` and `Import` attributes for registrations and injections 
 which may help to register the open-generics. Look for the use of the `Export` attribute and for the `AsDecorator` (how simple is this).
 ```cs 
-class Register_open_generics_with_MefAttributedModel_extension
+public class Register_open_generics_with_MefAttributedModel_extension
 {
     [Test]
     public void Example()
@@ -347,26 +425,26 @@ class Register_open_generics_with_MefAttributedModel_extension
         Assert.IsNotNull(container.Resolve<IService<Foo, string>>());
     }
 
-    public interface IService<A, B> 
+    public interface IService<A, B>
     {
         void Initialize(A a);
     }
-    public class ServiceImpl<A, B> : IService<A, B> 
+    public class ServiceImpl<A, B> : IService<A, B>
     {
-        public void Initialize(A a) {}
+        public void Initialize(A a) { }
     }
 
     [Export]
-    public class Foo {}
+    public class Foo { }
 
     [Export, AsDecorator]
-    public class FooDecorator : Foo 
+    public class FooDecorator : Foo
     {
-        public FooDecorator(Foo f) {}
+        public FooDecorator(Foo f) { }
     }
 
     [Export]
-    public class Factory<A> 
+    public class Factory<A>
     {
         [Export]
         public IService<A, B> Create<B>(A a)

@@ -558,7 +558,7 @@ public class Named_open_scopes_and_scoped_to_name
 } /*md
 ```
 
-When resolving or injecting a service with `ScopeTo(name)` reuse DryIoc will look up starting from the current open scope, 
+When resolving or injecting a service with `ScopedTo(name)` reuse DryIoc will look up starting from the current open scope, 
 through the chain of its parents until the scope with the name is found or we reached the top scope.
 
 To define a name you may use object of any type with `Equals(object other)` and `GetHashCode()` available. 
@@ -580,7 +580,7 @@ Basically `Reuse.InWebRequest` and `Reuse.InThread` are just a scope reuses:
 
 ## Reuse.ScopedTo service type
 
-**Note:** `ScopedToService` methods are replacing the `ScopeTo` for the service type and the optional service key. The reason is the clash of overloading between the `ScopedTo(Type)` and the `ScopedTo(object)`, so the `ScopedToService(Type)` is added.
+**Note:** `ScopedToService` methods are replacing the `ScopedTo` for the service type and the optional service key. The reason is the clash of overloading between the `ScopedTo(Type)` and the `ScopedTo(object)`, so the `ScopedToService(Type)` is added.
 
 `ScopedToService<TService>(object serviceKey = null)` and `ScopedToService(Type serviceType, object serviceKey = null)` 
 define the reuse of the same dependency value in the service sub-graph.

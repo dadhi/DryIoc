@@ -90,7 +90,7 @@ using NUnit.Framework;
 </details>
 
 ```cs 
-class Basic_example 
+public class Basic_example
 {
     [Test] public void Example()
     {
@@ -145,7 +145,7 @@ but utilize the `Import` and `ImportingConstructor` attributes for dependency in
 Or other way around: you don't need to put `Export` attributes everyware to make advantage of Imports. 
 
 ``` 
-class Export_and_Import_used_separately
+public class Export_and_Import_used_separately
 {
     [Test] public void Example()
     {
@@ -206,7 +206,7 @@ Which should be generally faster than heavy-weight reflection scanning at run-ti
 Allows to specify service type and service key, aka `ContractType` and `ContractName` in MEF terms.
 
 ```cs
-class Export_example 
+public class Export_example
 {
     [Test] public void Example()
     {
@@ -248,7 +248,7 @@ that means the same `I` and `J` singleton for exported singleton.
 
 Allows to mark interface or base type as a service type once, and consider all the implementations as exported.
 ```cs
-class Using_InheritedExport
+public class Using_InheritedExport
 {
     [Test] public void Example()
     {
@@ -288,7 +288,7 @@ The difference from the normal MEF `ExportAttribute`, the extended DryIoc `Expor
 
 For example to ensure the _register-once_ semantics you can export type with the `IfAlreadyExported.Keep` option:
 ```cs
-class DryIocAttributes_ExportEx 
+class DryIocAttributes_ExportEx
 {
     [ExportEx(typeof(IService), IfAlreadyExported=IfAlreadyExported.Keep)]
     public class InOneFile : IService {} 
@@ -341,7 +341,7 @@ Additionally `ExportMany` provides the facilities to:
 - Allow `NonPublic` types for registration
 
 ```cs
-public class ExportMany_with_Except_and_NonPublic_options 
+public class ExportMany_with_Except_and_NonPublic_options
 {
     [Test] public void Example()
     {
@@ -428,7 +428,7 @@ All properties of `ImportAttribute` are supported by DryIoc:
 
 Example:
 ```cs 
-class Import_specification
+public class Import_specification
 {
     [Test] public void Example() 
     {
@@ -517,7 +517,7 @@ In addition `ImportExternal` allows to specify:
 
 ### WithMetadata
 
-Have two goals:
+Metadata has two goals:
 
 - Allows to specify metadata object associated with exported implementation.
 - Specifies the required metadata object for imported part, similar to MEF2 `RequiredMetadataAttribute`.
@@ -551,7 +551,7 @@ until the container-wide rule is set `Rules.WithoutThrowOnRegisteringDisposableT
 To prevent the exception for specific export you can mark it with `AllowDisposableTransientAttribute`:
 
 ```cs 
-class Exporting_disposable_transient
+public class Exporting_disposable_transient
 {
     [Test] public void Example() 
     {
@@ -588,7 +588,7 @@ Exported disposable transient marked with this attributed will be tracked by con
 The attribute corresponds to DryIoc registration option [trackDisposableTransient](..\ReuseAndScopes.md#disposable-transient)
 
 ```cs 
-class Exporting_with_TrackDisposableTransient
+public class Exporting_with_TrackDisposableTransient
 {
     [Export][TrackDisposableTransient]
     public class Foo : IDisposable

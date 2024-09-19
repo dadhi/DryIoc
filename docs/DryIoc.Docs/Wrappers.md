@@ -58,7 +58,7 @@ using DryIoc;
 using NUnit.Framework;
 // ReSharper disable UnusedVariable
 
-class Wrapper_example
+public class Wrapper_example
 {
     [Test] public void Example()
     {
@@ -113,7 +113,7 @@ __Note:__ `DryIoc.Meta<,>` type may just help to migrate from Autofac but you ma
 
 The important thing about `Lazy` and `Func` is that the wrapped dependency should be registered into the container when injecting wrappers.
 ```cs 
-class Lazy_and_Func_require_services_to_be_registered
+public class Lazy_and_Func_require_services_to_be_registered
 {
     [Test] public void Example()
     {
@@ -138,7 +138,7 @@ There is still a possibility to postpone a service registration:
 - Another one is globally, via `Rules.WithFuncAndLazyWithoutRegistration()`, see below:
 
 ```cs 
-class Func_works_without_registration
+public class Func_works_without_registration
 {
     [Test] public void Example()
     {
@@ -185,7 +185,7 @@ new B(arg => new A(new D(arg)))
 
 When the passed argument was not used it is maybe a mistake but maybe is not. It was a hard choice, but DryIoc will ignore this for now.
 ```cs 
-class Passed_argument_was_not_used
+public class Passed_argument_was_not_used
 {
     [Test] public void Example()
     {
@@ -206,7 +206,7 @@ There is another caveat related to reuse. You may say that passing a different a
 But what happens when service is registered with non-transient reuse? 
 By default, DryIoc will use the first call to `Func` to create a service and ignore the rest. 
 ```cs 
-class Func_with_args_and_reuse
+public class Func_with_args_and_reuse
 {
     [Test] public void Example()
     {
@@ -232,7 +232,7 @@ class Func_with_args_and_reuse
 
 If you don't like it this way, you may use a rule `Rules.WithIgnoringReuseForFuncWithArgs()`
 ```cs 
-class Func_with_args_with_rule_ignoring_reuse
+public class Func_with_args_with_rule_ignoring_reuse
 {
     [Test] public void Example()
     {
@@ -269,7 +269,7 @@ Second, the service keys in DryIoc may be of arbitrary types not restricted to s
 But DryIoc is powerful enough to emulate this feature without much hassle:
 
 ```cs 
-class Func_with_single_argument_to_resolve_service_by_key
+public class Func_with_single_argument_to_resolve_service_by_key
 {
     [Test] 
     public void Example()
@@ -318,7 +318,7 @@ Packs together resolved service A and associated metadata object. A bit similar 
 You may think of the metadata the same way as of `Attribute` defined for the implementation type. 
 Metadata may be provided with attributes when using [MefAttributedModel](Extensions/MefAttributedModel). 
 ```cs 
-class Providing_metadata
+public class Providing_metadata
 {
     [Test] public void Example()
     {
@@ -346,7 +346,7 @@ e.g. when registered as `string` but resolving with `int` metadata type. Resolvi
 
 Metadata may be also used for collection filtering. When nesting in collection wrapper, and when the metadata is not registered or not assignable, then no exception will be thrown. Instead, a service item will be filtered out from the collection (and collection may be empty as the result):
 ```cs 
-class Filtering_based_on_metadata
+public class Filtering_based_on_metadata
 {
     [Test] public void Example()
     {
@@ -370,7 +370,7 @@ Metadata value can be a non-primitive object or an `IDictionary<string, object>`
 In latter case you may `Resolve` by providing the type of any `object` value in a dictionary:
 
 ```cs 
-class Resolve_value_out_of_metadata_dictionary
+public class Resolve_value_out_of_metadata_dictionary
 {
     [Test] public void Example()
     {
@@ -434,7 +434,7 @@ The fixed array nature implies that all services will be created when the wrappe
 But maybe you need filter only some services (or inspect service count) and do not want to create the rest. 
 Nested `Func` or `Lazy` will help in this case:
 ```cs 
-class Collection_of_Lazy_things
+public class Collection_of_Lazy_things
 {
     [Test] public void Example()
     {
@@ -462,7 +462,7 @@ the collection wrapper will throw an exception instead of skipping the item.
 In all other cases, the item will be filtered out of the collection.
 
 ```cs 
-class Filtering_not_resolved_services
+public class Filtering_not_resolved_services
 {
     [Test] public void Example()
     {
@@ -488,7 +488,7 @@ class Filtering_not_resolved_services
 To achieve the custom ordering we may use the [Meta or Tuple with Metadata](#meta-or-tuple-of-a-with-metadata) wrapper and the [Decorator](Decorators.md) feature.
 
 ```cs 
-class Collection_with_custom_order
+public class Collection_with_custom_order
 {
     public sealed class OrderMetadata // may be an suitable data structure defined by you
     { 
@@ -530,7 +530,7 @@ then both types will be present in the result collection
 (_it may be obvious but I wanted to be clear on this_):
 
 ```cs 
-class Both_open_and_closed_generic_included_in_collection
+public class Both_open_and_closed_generic_included_in_collection
 {
     [Test] public void Example()
     {
@@ -562,7 +562,7 @@ Then if you have a class `B` assignable to `A` (`class B : A {}`), then their ha
 Proceeding to the collections you may have `IEnumerable<IHandler<A>>` with the elements of type `IHandler<A>` and `IHandler<B>`.
 
 ```cs 
-class Covariant_generics_collection
+public class Covariant_generics_collection
 {
     [Test] public void Example()
     {
@@ -594,7 +594,7 @@ If you don't want the co-variant types to be included into collection, you may d
 via `Rules.WithoutVariantGenericTypesInResolvedCollection()`:
 
 ```cs 
-class Covariant_generics_collection_suppressed
+public class Covariant_generics_collection_suppressed
 {
     [Test] public void Example()
     {
@@ -641,7 +641,7 @@ Therefore, a Composite pattern may be looked like a way to avoid such recursion 
 DryIoc does exactly that:
 
 ```cs 
-class DryIoc_composite_pattern
+public class DryIoc_composite_pattern
 {
     [Test] public void Example()
     {
@@ -676,7 +676,7 @@ Whether with composite or not, when you try to do `container.Resolve<A>()` the e
 because multiple implementation are registered. But sometimes you may prefer to resolve a composite if it is registered.
 
 ```cs 
-class Prefer_composite_when_resolving_a_single_service
+public class Prefer_composite_when_resolving_a_single_service
 {
     [Test] public void Example()
     {
@@ -711,7 +711,7 @@ When enumerating the collection, it will call `IResolver.ResolveMany` and will r
 By comparison, an array wrapper always returns a fixed set of services ignoring whatever was added or removed after resolve.
 
 ```cs 
-class LazeEnumerable_example
+public class LazyEnumerable_example
 {
     [Test] public void Example()
     {
@@ -746,7 +746,7 @@ as the `requiredServiceType`. It allows you to override default array injection 
 
 ```cs 
 
-class Specify_LazyEnumerable_per_dependency
+public class Specify_LazyEnumerable_per_dependency
 {
     [Test] public void Example()
     {
@@ -766,7 +766,7 @@ the implementation provided at registration time. It also keeps code container-a
 Another option is to specify `LazyEnumerable<>` implementation for `IEnumerable<>` globally via rules:
 
 ```cs 
-class Specify_to_use_LazyEnumerable_for_all_IEnumerable
+public class Specify_to_use_LazyEnumerable_for_all_IEnumerable
 {
     [Test] public void Example()
     {
@@ -790,7 +790,7 @@ You need to specify `object` as key to return all services including the ones wi
 Note: For service without key you will get the `DefaultKey` value for its key.
 
 ```cs 
-class Dictionary_of_services_with_their_keys
+public class Dictionary_of_services_with_their_keys
 {
     [Test] public void Example()
     {
@@ -845,7 +845,7 @@ It may be done even at compile-time.
 - To understand how DryIoc works internally.
 
 ```cs 
-class Resolve_expression
+public class Resolve_expression
 {
     [Test] public void Example()
     {
@@ -887,7 +887,7 @@ of container, compiling it and providing it with the scope (or any other contain
 as a `IResolverContext` argument to the compiled factory.
 
 ```cs 
-class Swap_container_in_factory_delegate
+public class Swap_container_in_factory_delegate
 {
     [Test] public void Example()
     {
@@ -951,7 +951,7 @@ container.Resolve<Meta<Func<Arg1, Arg2, IA>, object>>();
 
 To register your own wrapper just specify setup parameter as `Setup.Wrapper` or `Setup.WrapperWith`:
 ```cs 
-class User_defined_wrappers
+public class User_defined_wrappers
 {
     [Test] public void Example()
     {
@@ -991,7 +991,7 @@ you should identify wrapped service with [Required Service Type](RequiredService
 
 Example of the non-generic wrapper:
 ```cs 
-class Non_generic_wrapper
+public class Non_generic_wrapper
 {
     [Test] public void Example()
     {
