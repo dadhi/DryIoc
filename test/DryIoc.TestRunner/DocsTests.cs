@@ -235,7 +235,7 @@ public class SelectConstructorOrFactoryMethod : ITest
         new Register_with_instance_property().Example();
         new Register_open_generics().Example();
         new Register_open_generics_with_MefAttributedModel_extension().Example();
-        return 10;
+        return 11;
     }
 }
 

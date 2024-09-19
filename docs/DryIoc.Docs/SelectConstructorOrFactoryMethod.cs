@@ -9,6 +9,7 @@
   - [Selecting constructor with resolvable parameters](#selecting-constructor-with-resolvable-parameters)
   - [Factory Method instead of Constructor](#factory-method-instead-of-constructor)
     - [Using static factory method](#using-static-factory-method)
+    - [Select the constructor or factory method based on the condition](#select-the-constructor-or-factory-method-based-on-the-condition)
     - [Using instance factory method](#using-instance-factory-method)
   - [Property/Field as Factory Method](#propertyfield-as-factory-method)
   - [Open-generic Factory Method](#open-generic-factory-method)

@@ -652,7 +652,7 @@ public class Scoped_to_service_reuse
 ### Opening resolution scope per dependency
 
 In the example above the setup with `openResolutionScope: true` explains how things are working for the `ScopedToService<Type>()`. 
-The method is a thin layer over `ScopedTo(object name)` where the `name` is the type `ResolutionScopeName` wrapping together the `typeof(Foo)` and optional service key.
+The method is a thin layer over `ScopedToService(object name)` where the `name` is the type `ResolutionScopeName` wrapping together the `typeof(Foo)` and optional service key.
 
 Next thing is to open scope to satisfy the `ScopedToService` reuse. 
 
