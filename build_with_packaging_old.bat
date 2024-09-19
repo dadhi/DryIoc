@@ -40,7 +40,7 @@ echo:
 echo:## Starting: DOCUMENTATION GENERATION ##
 echo:
 
-dotnet build docs\DryIoc.Docs\DryIoc.Docs.csproj -f:net8.0 -target:MdGenerate
+dotnet build docs\DryIoc.Docs\DryIoc.Docs.csproj -f:net7.0 -target:MdGenerate
 
 echo:
 echo:## Finished: DOCUMENTATION GENERATION ##

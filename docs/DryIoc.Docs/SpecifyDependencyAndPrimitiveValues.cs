@@ -650,7 +650,7 @@ public class Match_the_parameter_name_to_the_service_key
 
 ### The solution 
 
-Use `Parameters.Of` https://www.fuget.org/packages/DryIoc.dll/4.2.5/lib/netstandard2.0/DryIoc.dll/DryIoc/Parameters
+Use `Parameters.Of`
 
 ```cs md*/
     [Test]

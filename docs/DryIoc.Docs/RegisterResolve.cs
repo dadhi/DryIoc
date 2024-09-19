@@ -180,8 +180,8 @@ public class One_level_deep_registration_API
 ```
 
 I would encourage you to investigate the constructors of the factories to see all the possible options, 
-and to [look inside the implementations](https://www.fuget.org/packages/DryIoc.dll/4.5.0/lib/netstandard2.0/DryIoc.dll/DryIoc/Registrator) of 
-the `Register` methods. 
+and to look inside the implementations of 
+the `Register` methods on GitHub.
 
 
 ## Registering as Singleton
