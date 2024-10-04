@@ -5138,9 +5138,9 @@ public static class ResolverContext
         public ResolverContextArgMethodCallExpression(MethodInfo method) => Method = method;
         public override bool IsIntrinsic => true;
 
-        public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
-            bool isNestedLambda, ref ClosureInfo rootClosure) =>
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, isNestedLambda, ref rootClosure, config);
+        public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
+            NestedLambdaInfo nestedLambda, ref SmallList<NestedLambdaInfo> rootNestedLambdas) =>
+            ExpressionCompiler.TryCollectInfo(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, nestedLambda, ref rootNestedLambdas, flags);
 
         public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
@@ -7032,9 +7032,14 @@ sealed class FuncInvoke0Expression : NotNullMethodCallExpression, IFuncInvokeExp
     public readonly Delegate Func;
     internal FuncInvoke0Expression(Delegate f, MethodInfo m) : base(m) => Func = f;
     public override bool IsIntrinsic => true;
-    public override bool TryCollectBoundConstants(
-        CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
+
+    public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
+        NestedLambdaInfo nestedLambda, ref SmallList<NestedLambdaInfo> rootNestedLambdas)
+    {
         closure.AddConstantOrIncrementUsageCount(Func.Target);
+        return Result.OK;
+    }
+
     public override bool TryEmit(
         CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
             EmittingVisitor.TryEmitNotNullConstant(true, Func.Target, il, ref closure) &&
@@ -7047,10 +7052,14 @@ sealed class FuncInvoke1Expression : OneArgumentMethodCallExpression, IFuncInvok
     public readonly Delegate Func;
     internal FuncInvoke1Expression(Delegate f, MethodInfo m, object a0) : base(m, a0) => Func = f;
     public override bool IsIntrinsic => true;
-    public override bool TryCollectBoundConstants(
-        CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
-        closure.AddConstantOrIncrementUsageCount(Func.Target) &&
-        ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument, paramExprs, isNestedLambda, ref rootClosure, config);
+
+    public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
+        NestedLambdaInfo nestedLambda, ref SmallList<NestedLambdaInfo> rootNestedLambdas)
+    {
+        closure.AddConstantOrIncrementUsageCount(Func.Target);
+        return ExpressionCompiler.TryCollectInfo(ref closure, Argument, paramExprs, nestedLambda, ref rootNestedLambdas, flags);
+    }
+
     public override bool TryEmit(
         CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
             EmittingVisitor.TryEmitNotNullConstant(true, Func.Target, il, ref closure)
@@ -7064,16 +7073,21 @@ sealed class FuncInvoke2Expression : TwoArgumentsMethodCallExpression, IFuncInvo
     public readonly Delegate Func;
     internal FuncInvoke2Expression(Delegate f, MethodInfo m, object a0, object a1) : base(m, a0, a1) => Func = f;
     public override bool IsIntrinsic => true;
-    public override bool TryCollectBoundConstants(
-        CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
-        closure.AddConstantOrIncrementUsageCount(Func.Target) &&
-        ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
-        ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config);
+
+    public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
+            NestedLambdaInfo nestedLambda, ref SmallList<NestedLambdaInfo> rootNestedLambdas)
+    {
+        closure.AddConstantOrIncrementUsageCount(Func.Target);
+        var r = Result.OK;
+        return (r = ExpressionCompiler.TryCollectInfo(ref closure, Argument0, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+            : ExpressionCompiler.TryCollectInfo(ref closure, Argument1, paramExprs, nestedLambda, ref rootNestedLambdas, flags);
+    }
+
     public override bool TryEmit(
-        CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
+        CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
         EmittingVisitor.TryEmitNotNullConstant(true, Func.Target, il, ref closure) &&
-        EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, config, parent) &&
-        EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, config, parent) &&
+        EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, flags, parent) &&
+        EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, flags, parent) &&
         EmittingVisitor.EmitMethodCall(il, Method);
 }
 
@@ -7083,12 +7097,17 @@ sealed class FuncInvoke3Expression : ThreeArgumentsMethodCallExpression, IFuncIn
     public readonly Delegate Func;
     internal FuncInvoke3Expression(Delegate f, MethodInfo m, object a0, object a1, object a2) : base(m, a0, a1, a2) => Func = f;
     public override bool IsIntrinsic => true;
-    public override bool TryCollectBoundConstants(
-        CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
-            closure.AddConstantOrIncrementUsageCount(Func.Target)
-            && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config)
-            && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config)
-            && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config);
+
+    public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
+            NestedLambdaInfo nestedLambda, ref SmallList<NestedLambdaInfo> rootNestedLambdas)
+    {
+        closure.AddConstantOrIncrementUsageCount(Func.Target);
+        var r = Result.OK;
+        return (r = ExpressionCompiler.TryCollectInfo(ref closure, Argument0, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+            : (r = ExpressionCompiler.TryCollectInfo(ref closure, Argument1, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+            : ExpressionCompiler.TryCollectInfo(ref closure, Argument2, paramExprs, nestedLambda, ref rootNestedLambdas, flags);
+    }
+
     public override bool TryEmit(
         CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
             EmittingVisitor.TryEmitNotNullConstant(true, Func.Target, il, ref closure)
@@ -7104,13 +7123,18 @@ sealed class FuncInvoke4Expression : FourArgumentsMethodCallExpression, IFuncInv
     public readonly Delegate Func;
     internal FuncInvoke4Expression(Delegate f, MethodInfo m, object a0, object a1, object a2, object a3) : base(m, a0, a1, a2, a3) => Func = f;
     public override bool IsIntrinsic => true;
-    public override bool TryCollectBoundConstants(
-        CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
-            closure.AddConstantOrIncrementUsageCount(Func.Target)
-            && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config)
-            && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config)
-            && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config)
-            && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument3, paramExprs, isNestedLambda, ref rootClosure, config);
+
+    public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
+            NestedLambdaInfo nestedLambda, ref SmallList<NestedLambdaInfo> rootNestedLambdas)
+    {
+        closure.AddConstantOrIncrementUsageCount(Func.Target);
+        var r = Result.OK;
+        return (r = ExpressionCompiler.TryCollectInfo(ref closure, Argument0, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+            : (r = ExpressionCompiler.TryCollectInfo(ref closure, Argument1, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+            : (r = ExpressionCompiler.TryCollectInfo(ref closure, Argument2, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+            : ExpressionCompiler.TryCollectInfo(ref closure, Argument3, paramExprs, nestedLambda, ref rootNestedLambdas, flags);
+    }
+
     public override bool TryEmit(
         CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
             EmittingVisitor.TryEmitNotNullConstant(true, Func.Target, il, ref closure)
@@ -7128,14 +7152,19 @@ sealed class FuncInvoke5Expression : FiveArgumentsMethodCallExpression, IFuncInv
     internal FuncInvoke5Expression(Delegate f, MethodInfo m, object a0, object a1, object a2, object a3, object a4)
         : base(m, a0, a1, a2, a3, a4) => Func = f;
     public override bool IsIntrinsic => true;
-    public override bool TryCollectBoundConstants(
-        CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
-            closure.AddConstantOrIncrementUsageCount(Func.Target) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument3, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument4, paramExprs, isNestedLambda, ref rootClosure, config);
+
+    public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
+            NestedLambdaInfo nestedLambda, ref SmallList<NestedLambdaInfo> rootNestedLambdas)
+    {
+        closure.AddConstantOrIncrementUsageCount(Func.Target);
+        var r = Result.OK;
+        return (r = ExpressionCompiler.TryCollectInfo(ref closure, Argument0, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+            : (r = ExpressionCompiler.TryCollectInfo(ref closure, Argument1, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+            : (r = ExpressionCompiler.TryCollectInfo(ref closure, Argument2, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+            : (r = ExpressionCompiler.TryCollectInfo(ref closure, Argument3, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+            : ExpressionCompiler.TryCollectInfo(ref closure, Argument4, paramExprs, nestedLambda, ref rootNestedLambdas, flags);
+    }
+
     public override bool TryEmit(
         CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
             EmittingVisitor.TryEmitNotNullConstant(true, Func.Target, il, ref closure) &&
@@ -7154,25 +7183,30 @@ sealed class FuncInvoke6Expression : SixArgumentsMethodCallExpression, IFuncInvo
     internal FuncInvoke6Expression(Delegate f, MethodInfo m, object a0, object a1, object a2, object a3, object a4, object a5)
         : base(m, a0, a1, a2, a3, a4, a5) => Func = f;
     public override bool IsIntrinsic => true;
-    public override bool TryCollectBoundConstants(
-        CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
-            closure.AddConstantOrIncrementUsageCount(Func.Target)
-            && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config)
-            && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config)
-            && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config)
-            && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument3, paramExprs, isNestedLambda, ref rootClosure, config)
-            && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument4, paramExprs, isNestedLambda, ref rootClosure, config)
-            && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument5, paramExprs, isNestedLambda, ref rootClosure, config);
+
+    public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
+         NestedLambdaInfo nestedLambda, ref SmallList<NestedLambdaInfo> rootNestedLambdas)
+    {
+        closure.AddConstantOrIncrementUsageCount(Func.Target);
+        var r = Result.OK;
+        return (r = ExpressionCompiler.TryCollectInfo(ref closure, Argument0, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+            : (r = ExpressionCompiler.TryCollectInfo(ref closure, Argument1, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+            : (r = ExpressionCompiler.TryCollectInfo(ref closure, Argument2, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+            : (r = ExpressionCompiler.TryCollectInfo(ref closure, Argument3, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+            : (r = ExpressionCompiler.TryCollectInfo(ref closure, Argument4, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+            : ExpressionCompiler.TryCollectInfo(ref closure, Argument5, paramExprs, nestedLambda, ref rootNestedLambdas, flags);
+    }
+
     public override bool TryEmit(
-        CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-            EmittingVisitor.TryEmitNotNullConstant(true, Func.Target, il, ref closure)
-            && EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, config, parent)
-            && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, config, parent)
-            && EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, config, parent)
-            && EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, config, parent)
-            && EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, config, parent)
-            && EmittingVisitor.TryEmit(Argument5, paramExprs, il, ref closure, config, parent)
-            && EmittingVisitor.EmitMethodCall(il, Method);
+       CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
+           EmittingVisitor.TryEmitNotNullConstant(true, Func.Target, il, ref closure)
+           && EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, config, parent)
+           && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, config, parent)
+           && EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, config, parent)
+           && EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, config, parent)
+           && EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, config, parent)
+           && EmittingVisitor.TryEmit(Argument5, paramExprs, il, ref closure, config, parent)
+           && EmittingVisitor.EmitMethodCall(il, Method);
 }
 
 sealed class FuncInvoke7Expression : SevenArgumentsMethodCallExpression, IFuncInvokeExpression
@@ -7182,16 +7216,21 @@ sealed class FuncInvoke7Expression : SevenArgumentsMethodCallExpression, IFuncIn
     internal FuncInvoke7Expression(Delegate f, MethodInfo m, object a0, object a1, object a2, object a3, object a4, object a5, object a6)
         : base(m, a0, a1, a2, a3, a4, a5, a6) => Func = f;
     public override bool IsIntrinsic => true;
-    public override bool TryCollectBoundConstants(
-        CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
-            closure.AddConstantOrIncrementUsageCount(Func.Target)
-            && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config)
-            && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config)
-            && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config)
-            && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument3, paramExprs, isNestedLambda, ref rootClosure, config)
-            && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument4, paramExprs, isNestedLambda, ref rootClosure, config)
-            && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument5, paramExprs, isNestedLambda, ref rootClosure, config)
-            && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument6, paramExprs, isNestedLambda, ref rootClosure, config);
+
+    public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
+         NestedLambdaInfo nestedLambda, ref SmallList<NestedLambdaInfo> rootNestedLambdas)
+    {
+        closure.AddConstantOrIncrementUsageCount(Func.Target);
+        var r = Result.OK;
+        return (r = ExpressionCompiler.TryCollectInfo(ref closure, Argument0, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+            : (r = ExpressionCompiler.TryCollectInfo(ref closure, Argument1, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+            : (r = ExpressionCompiler.TryCollectInfo(ref closure, Argument2, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+            : (r = ExpressionCompiler.TryCollectInfo(ref closure, Argument3, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+            : (r = ExpressionCompiler.TryCollectInfo(ref closure, Argument4, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+            : (r = ExpressionCompiler.TryCollectInfo(ref closure, Argument5, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+            : ExpressionCompiler.TryCollectInfo(ref closure, Argument6, paramExprs, nestedLambda, ref rootNestedLambdas, flags);
+    }
+
     public override bool TryEmit(
         CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
             EmittingVisitor.TryEmitNotNullConstant(true, Func.Target, il, ref closure)
@@ -13720,10 +13759,12 @@ internal class InvokeFactoryDelegateExpression : InvocationExpression
 
     public sealed override bool IsIntrinsic => true;
 
-    public sealed override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
-        bool isNestedLambda, ref ClosureInfo rootClosure) =>
-        closure.AddConstantOrIncrementUsageCount(FactoryDelegate) &&
-        ExpressionCompiler.TryCollectBoundConstants(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, isNestedLambda, ref rootClosure, config);
+    public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
+         NestedLambdaInfo nestedLambda, ref SmallList<NestedLambdaInfo> rootNestedLambdas)
+    {
+        closure.AddConstantOrIncrementUsageCount(FactoryDelegate);
+        return ExpressionCompiler.TryCollectInfo(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, nestedLambda, ref rootNestedLambdas, flags);
+    }
 
     public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
         ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
@@ -14513,10 +14554,13 @@ public sealed class CurrentScopeReuse : IReuse
 
         public override bool IsIntrinsic => true;
 
-        public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
-            bool isNestedLambda, ref ClosureInfo rootClosure) =>
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, FactoryDelegateExpr, paramExprs, isNestedLambda, ref rootClosure, config);
+        public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
+            NestedLambdaInfo nestedLambda, ref SmallList<NestedLambdaInfo> rootNestedLambdas)
+        {
+            var r = Result.OK;
+            return (r = ExpressionCompiler.TryCollectInfo(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ? r
+                : ExpressionCompiler.TryCollectInfo(ref closure, FactoryDelegateExpr, paramExprs, nestedLambda, ref rootNestedLambdas, flags);
+        }
 
         // Emitting the arguments for GetOrAddViaFactoryDelegateMethod(int id, Func<IResolverContext, object> createValue, IResolverContext r)
         public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
