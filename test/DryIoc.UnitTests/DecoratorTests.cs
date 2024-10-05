@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using NUnit.Framework;
 using DryIoc.ImTools;
+using DryIoc.FastExpressionCompiler.LightExpression;
 
 namespace DryIoc.UnitTests
 {
@@ -12,8 +13,8 @@ namespace DryIoc.UnitTests
     {
         public int Run()
         {
-            // todo: @fixme (also #638) - this test is failing with FEC error
-            // Delegate_decorator_consumer_with_the_runtime_service_types_RegisterDelegate_compiling_the_delegate();
+            Delegate_decorator_consumer_with_the_runtime_service_types_RegisterDelegate_compiling_the_delegate();
+            Delegate_decorator_consumer_with_the_runtime_service_types_RegisterDelegate_interpreter_only();
 
             Should_resolve_decorator();
             Should_resolve_decorator_of_decorator();
@@ -72,7 +73,7 @@ namespace DryIoc.UnitTests
             Can_use_different_reuses_for_decorators_based_on_different_decoratee_reuse_in_collection();
             Using_decorator_to_implement_IsResolved();
 
-            return 57;
+            return 58;
         }
 
         [Test]
@@ -467,9 +468,9 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Delegate_decorator_consumer_with_the_runtime_service_types_RegisterDelegate_compiling_the_delegate()
+        public void Delegate_decorator_consumer_with_the_runtime_service_types_RegisterDelegate_interpreter_only()
         {
-            var container = new Container();
+            var container = new Container(Rules.Default.WithUseInterpretation());
 
             container.Register<OperationConsumer>();
             container.Register<IOperation, SomeOperation>();
@@ -480,12 +481,47 @@ namespace DryIoc.UnitTests
 
             var opConsumer1 = container.Resolve<OperationConsumer>();
             Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(opConsumer1.Operation);
+            Assert.IsInstanceOf<SomeOperation>(((MeasureExecutionTimeOperationDecorator)opConsumer1.Operation).Decorated);
 
             var opConsumer2 = container.Resolve<OperationConsumer>();
             Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(opConsumer2.Operation);
+            Assert.IsInstanceOf<SomeOperation>(((MeasureExecutionTimeOperationDecorator)opConsumer2.Operation).Decorated);
 
             var opConsumer3 = container.Resolve<OperationConsumer>();
             Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(opConsumer3.Operation);
+            Assert.IsInstanceOf<SomeOperation>(((MeasureExecutionTimeOperationDecorator)opConsumer3.Operation).Decorated);
+        }
+
+        [Test]
+        public void Delegate_decorator_consumer_with_the_runtime_service_types_RegisterDelegate_compiling_the_delegate()
+        {
+            var container = new Container();
+
+            container.Register<OperationConsumer>();
+            container.Register<IOperation, SomeOperation>();
+
+            container.RegisterDelegate(typeof(IOperation), typeof(IOperation),
+                static op => new MeasureExecutionTimeOperationDecorator((IOperation)op),
+                setup: Setup.DecoratorWith(useDecorateeReuse: true));
+
+            var opConsumer1 = container.Resolve<OperationConsumer>();
+            Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(opConsumer1.Operation);
+            Assert.IsInstanceOf<SomeOperation>(((MeasureExecutionTimeOperationDecorator)opConsumer1.Operation).Decorated);
+
+            var expr = container.Resolve<LambdaExpression, OperationConsumer>();
+            expr.PrintCSharp();
+            expr.PrintExpression();
+
+            var fs = expr.CompileSys();
+            fs.PrintIL();
+
+            var opConsumer2 = container.Resolve<OperationConsumer>();
+            Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(opConsumer2.Operation);
+            Assert.IsInstanceOf<SomeOperation>(((MeasureExecutionTimeOperationDecorator)opConsumer2.Operation).Decorated);
+
+            var opConsumer3 = container.Resolve<OperationConsumer>();
+            Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(opConsumer3.Operation);
+            Assert.IsInstanceOf<SomeOperation>(((MeasureExecutionTimeOperationDecorator)opConsumer3.Operation).Decorated);
         }
 
         sealed class OperationConsumer

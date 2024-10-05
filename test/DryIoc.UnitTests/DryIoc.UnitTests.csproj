@@ -1,11 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-      <TargetFrameworks Condition="'$(DevMode)' == 'true'">net8.0;net7.0;net472</TargetFrameworks>
-      <TargetFrameworks Condition="'$(DevMode)' != 'true'">net7.0;net472</TargetFrameworks>
+    <TargetFrameworks Condition="'$(DevMode)' == 'true'">net8.0;net7.0;net472</TargetFrameworks>
+    <TargetFrameworks Condition="'$(DevMode)' != 'true'">net7.0;net472</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>
-      <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
+    <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
+    <ProjectReference Include="..\FastExpressionCompiler.ILDecoder\FastExpressionCompiler.ILDecoder.csproj" />
   </ItemGroup>
 </Project>

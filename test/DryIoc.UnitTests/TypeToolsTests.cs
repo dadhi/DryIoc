@@ -1,4 +1,5 @@
 using System.Linq;
+using DryIoc.FastExpressionCompiler.LightExpression;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests

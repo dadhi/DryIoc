@@ -113,31 +113,31 @@ namespace DryIoc
                 new DependencyA(),
                 ((DependencyB<string>)r.Resolve(
                     typeof(DependencyB<string>),
-                    default(object),
+                    null,
                     IfUnresolved.Throw,
-                    default(System.Type),
+                    (System.Type)null,
                     Request.Empty.Push(
                         typeof(IService),
                         1,
                         typeof(MyService),
                         Reuse.Transient,
                         RequestFlags.IsResolutionCall|RequestFlags.StopRecursiveDependencyCheck|RequestFlags.DoNotPoolRequest),
-                    default(object[]))),
+                    (object[])null)),
                 ((RuntimeDependencyC)r.Resolve(
                     typeof(RuntimeDependencyC),
-                    default(object),
+                    null,
                     IfUnresolved.Throw,
-                    default(System.Type),
+                    (System.Type)null,
                     Request.Empty.Push(
                         typeof(IService),
                         1,
                         typeof(MyService),
                         Reuse.Transient,
                         RequestFlags.IsResolutionCall|RequestFlags.DoNotPoolRequest),
-                    default(object[]))));
+                    (object[])null)));
 
         internal static BaseAConsumer Get_BaseAConsumer_1(IResolverContext r) =>
-            new BaseAConsumer(WrappersSupport.WrapInDictionary<object, BaseA>(new System.Collections.Generic.KeyValuePair<object, BaseA>[] {
+            new BaseAConsumer(WrappersSupport.WrapInDictionary<object, BaseA>(new System.Collections.Generic.KeyValuePair<object, BaseA>[]{
                 new System.Collections.Generic.KeyValuePair<object, BaseA>(
                     (object)"keyed",
                     new KeyedA()),

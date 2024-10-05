@@ -2,7 +2,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2016-2022 Maksim Volkau
+Copyright (c) 2016-2023 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -31,16 +31,16 @@ THE SOFTWARE.
 <#@ import Namespace="DryIoc.FastExpressionCompiler.LightExpression" #>
 <#@ include File="CompileTimeDI\CompileTimeRegistrations.ttinclude" #>
 <#
-// The rules for `ForExpressionGeneration` are required` here because later the `container` will be used for `GetRequestExpression` and `GetConstantExpression`,
-// otherwise we would need to get the container adjusted inside the `GenerateResolutionExpressions`
-var container = GetContainerWithRegistrations().With(rules => rules.ForExpressionGeneration());
+// todo: @simplify The rules for `WithExpressionGenerationSettingsOnly` are required` here because the container with generation rules is not returned by `GenerateResolutionExpressions`
+var container = GetContainerWithRegistrations().With(rules => rules.WithExpressionGenerationSettingsOnly());
 
 var result = container.GenerateResolutionExpressions(x => x.SelectMany(r =>
     SpecifyResolutionRoots(r).EmptyIfNull()).Concat(CustomResolutionRoots.EmptyIfNull()));
 
 string TrimUsings(string source)
 {
-    source = source.Replace("DryIoc.", "");
+    source = source.Replace("DryIoc.", ""); 
+    // todo: @wip remove unnecessary usings that's are System.Collections.Generic for KeyValuePair, etc.
     foreach (var x in NamespaceUsings)
         source = source.Replace(x + ".", "");
     return source;
@@ -76,33 +76,54 @@ var depCodes = result.ResolveDependencies.Select((r, i) =>
           ServiceKey = Code(r.Key.ServiceKey),
           ServiceKeyObject = r.Key.ServiceKey,
           Expression = Code(r.Value, getServiceBodyLineIdent),
+          ExpressionObject = r.Value,
           RequiredServiceType = Code(r.Key.RequiredServiceType),
           PreResolveParent = Code(r.Key.Parent, getServiceBodyLineIdent + 8),
-          CreateMethodName = "GetDependency_" + GetTypeNameOnly(r.Key.ServiceType.Name) + "_" + i });
+          PreResolveParentObject = r.Key.Parent,
+          CreateMethodName = "GetDependency_" + GetTypeNameOnly(r.Key.ServiceType.Name) + "_" + i })
+    .ToList();
 
 var includeVariants = container.Rules.VariantGenericTypesInResolvedCollection;
 #>
 /*
-========================================================================================================
-The code below is generated automatically at compile-time and changes to it will be lost on the next gen.
-========================================================================================================
-<#  var errCount = result.Errors.Count;
-    if (errCount == 0) { #>
-Generation is completed successfully.
-<# } else { #>
-There are <#=errCount#> generation issues (may be not an error dependent on context):
+======================================================================================================
+The code below is auto-generated at compile-time and changes here will be lost on the next generation.
+======================================================================================================
+<#  
+var errCount = result.Errors.Count;
+if (errCount != 0) { #>
+There are <#=errCount#> generation ERRORS:
 
-The issues with run-time registrations may be solved by `container.RegisterPlaceholder<T>()`
-in Registrations.ttinclude. Then you can replace placeholders using `Container.Register`
-at runtime.
-
-<# } #>
---------------------------------------------------------------------------------------------------------
-<#  var eNum = 0;
-    foreach(var e in result.Errors) { #>
+<#
+var eNum = 0;
+foreach(var e in result.Errors) { #>
 <#=++eNum#>. <#=e.Key#>
-Error: <#=e.Value.Message#>
-<#  } #>
+-  <#=e.Value.Message#>
+
+<#}
+}
+
+bool hasNotResolvedDeps = false;
+foreach (var dc in depCodes)
+    if (dc.ExpressionObject == null)
+    {
+        if (!hasNotResolvedDeps)
+        {
+            hasNotResolvedDeps = true;
+            WriteLine(@"
+WARNINGS: Some dependencies are missing. Register them at runtime or add to the compile-time registrations.
+");
+        }
+        WriteLine("- `{0}` {1}in {2}", 
+            dc.ServiceTypeOnly,
+            dc.ServiceKeyObject == null ? "" : "with key " + dc.ServiceKey + " ",
+            dc.PreResolveParentObject); // todo: @wip remove unnecessary info from the output
+    }
+
+if (hasNotResolvedDeps)
+    depCodes = depCodes.Where(d => d.ExpressionObject != null).ToList();
+#>
+--------------------------------------------------------------------------------------------------------
 */
 
 using System;
@@ -110,34 +131,49 @@ using System.Collections.Generic;
 using System.Threading;
 using DryIoc.ImTools;
 
-// Provided `NamespaceUsings`:
+// Provided by `NamespaceUsings`:
 <# foreach (var ns in NamespaceUsings) {#>
 using <#=ns#>;
 <#}#>
 
 namespace DryIoc
 {
-    partial class Container
+    ///<summary>The container provides access to the object graph generated using the DryIoc own tools at compile-time</summary>
+    public sealed class CompileTimeContainer : ICompileTimeContainer
     {
-        partial void HasCompileTimeGeneratedContainer(ref bool hasIt) => hasIt = true;
+        ///<summary>The instance if generated compile-time container.</summary>
+        public static readonly CompileTimeContainer Instance = new CompileTimeContainer();
 
-        partial void ResolveGenerated(ref object service, Type serviceType)
+        // todo: @wip tbd
+        /// <inheritdoc/>
+        public bool IsRegistered(Type serviceType) => false;
+        /// <inheritdoc/>
+        public bool IsRegistered(Type serviceType, object serviceKey) => false;
+
+        /// <inheritdoc/>
+        public bool TryResolve(out object service, IResolverContext r, Type serviceType)
         {
 <#
         var index = 0;
         foreach (var root in rootCodes.Where(f => f.ServiceKeyCode == "null"))
         {
-            if (index++ > 0) WriteLine(@"
-            else");
-#>
+            if (index++ > 0) {#>
+            else<#}#>
+
             if (serviceType == <#=root.ServiceTypeCode#>)
-                service = <#=root.CreateMethodName#>(this);
+            {
+                service = <#=root.CreateMethodName#>(r);
+                return true;
+            }
 <#
         }
 #>
+            service = null;
+            return false;
         }
 
-        partial void ResolveGenerated(ref object service,
+        /// <inheritdoc/>
+        public bool TryResolve(out object service, IResolverContext r,
             Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args)
         {
 <#
@@ -157,7 +193,10 @@ namespace DryIoc
                 else");
 #>
                 if (<#=root.ServiceKeyCode#>.Equals(serviceKey))
-                    service = <#=root.CreateMethodName#>(this);
+                {
+                    service = <#=root.CreateMethodName#>(r);
+                    return true;
+                }
 <#
             }
 #>
@@ -185,7 +224,10 @@ namespace DryIoc
                      : dep.ServiceKey + ".Equals(serviceKey)"#> &&
                     requiredServiceType == <#= dep.RequiredServiceType #> &&
                     Equals(preRequestParent, <#= dep.PreResolveParent #>))
-                    service = <#=dep.CreateMethodName#>(this);
+                {
+                    service = <#=dep.CreateMethodName#>(r);
+                    return true;
+                }
 <#
             }
 #>
@@ -193,14 +235,12 @@ namespace DryIoc
 <#
         }
 #>
+            service = null;
+            return false;
         }
 
-        partial void ResolveManyGenerated(ref IEnumerable<ResolveManyResult> services, Type serviceType)
-        {
-            services = ResolveManyGenerated(serviceType);
-        }
-
-        private IEnumerable<ResolveManyResult> ResolveManyGenerated(Type serviceType)
+        /// <inheritdoc/>
+        public IEnumerable<ResolveManyResult> ResolveMany(IResolverContext _, Type serviceType)
         {
 <#
         if (!rootCodes.Any())

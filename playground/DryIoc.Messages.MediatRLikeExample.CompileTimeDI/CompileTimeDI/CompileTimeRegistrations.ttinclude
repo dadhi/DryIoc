@@ -5,9 +5,6 @@
 // 3. Save the "Container.Generated.tt" file. Confirm the Visual Studio prompt if any.
 // 4. Check the "Container.Generated.cs" for the generated results and issues.
 //
-// Note: 
-// - When specifying assembly path, you may use $(SolutionDir), $(ProjectDir), $(Configuration) parameters.
-//
 #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="DryIoc.ImTools" #>
@@ -19,19 +16,22 @@
     {
         var container = new Container();
         
-        // TODO: Register compile-time resolved services using the same DryIoc API
-        // or move part (or all) of the existing registrations here from your current DI configuration.
+        // TODO: Register services in compile-time using the same DryIoc API
+        // or move her the part (or all) of already written runtime registrations.
         
         // These are example registrations to build the IService resolution root and its dependencies
         container.Register<IService, MyService>();
         container.Register<IDependencyA, DependencyA>();
         container.Register(typeof(DependencyB<>), setup: Setup.With(asResolutionCall: true));
 
-        // Note that `RegisterDelegate`, `RegisterInstance` and `Use` methods are not supported because
-        // they using the run-time state.
-        // Instead you may use `RegisterPlaceholder` to put a hole in the generated object graph,
-        // then you fill it in with the run-time registration, e.g. `container.Register<RuntimeDependency>();`
-        container.RegisterPlaceholder<RuntimeDependencyC>();
+        // Note that `RegisterDelegate`, `RegisterInstance`, `Use` methods are not supported because of runtime state use.
+        // Instead you may `RegisterPlaceholder` to put a hole in the generated object graph,
+        // then you can fill it with the runtime registration, e.g. `runtimeContainer.Register<RuntimeDependency>();`
+        //container.RegisterPlaceholder<RuntimeDependencyC>();
+
+        container.Register<BaseA, KeyedA>(serviceKey: "keyed");
+        container.Register<BaseA, NonKeyedA>();
+        container.Register<BaseAConsumer>(setup: Setup.With(asResolutionCall: true));
 
         // You may batch register assemblies as well
         // container.RegisterMany(new[] { MyAssembly });
@@ -43,17 +43,18 @@
     ServiceInfo[] SpecifyResolutionRoots(ServiceRegistrationInfo reg) =>
         reg.AsResolutionRoot ? reg.ToServiceInfo().One() : null;
 
-    // TODO: Specify the resolution roots explicitly
+    // TODO: Alternatively, specify the resolution roots explicitly
     ServiceInfo[] CustomResolutionRoots =
     {
         ServiceInfo.Of<Example.IService>(), 
+        ServiceInfo.Of<BaseAConsumer>(), 
     };
 
-    // TODO: Specify the namespace to go into `using` instead of qualifying its types all the times
+    // TODO: Specify the service namespaces to be imported via `using` instead of qualifying their types with the full names.
     // You may generate the Container.Generated.cs first, then look what you want to move to `using`
     string[] NamespaceUsings =
     {
-        "Example",
+        nameof(Example),
         //"Foo.Bar.Buzz",
     };
 #>

@@ -7050,7 +7050,7 @@ sealed class FuncInvoke1Expression : OneArgumentMethodCallExpression, IFuncInvok
 {
     public override Expression Object => Constant(Func.Target);
     public readonly Delegate Func;
-    internal FuncInvoke1Expression(Delegate f, MethodInfo m, object a0) : base(m, a0) => Func = f;
+    internal FuncInvoke1Expression(Delegate f, object a0) : base(f.Method, a0) => Func = f;
     public override bool IsIntrinsic => true;
 
     public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
@@ -7071,7 +7071,7 @@ sealed class FuncInvoke2Expression : TwoArgumentsMethodCallExpression, IFuncInvo
 {
     public override Expression Object => Constant(Func.Target);
     public readonly Delegate Func;
-    internal FuncInvoke2Expression(Delegate f, MethodInfo m, object a0, object a1) : base(m, a0, a1) => Func = f;
+    internal FuncInvoke2Expression(Delegate f, object a0, object a1) : base(f.Method, a0, a1) => Func = f;
     public override bool IsIntrinsic => true;
 
     public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
@@ -7095,7 +7095,7 @@ sealed class FuncInvoke3Expression : ThreeArgumentsMethodCallExpression, IFuncIn
 {
     public override Expression Object => Constant(Func.Target);
     public readonly Delegate Func;
-    internal FuncInvoke3Expression(Delegate f, MethodInfo m, object a0, object a1, object a2) : base(m, a0, a1, a2) => Func = f;
+    internal FuncInvoke3Expression(Delegate f, object a0, object a1, object a2) : base(f.Method, a0, a1, a2) => Func = f;
     public override bool IsIntrinsic => true;
 
     public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
@@ -7121,7 +7121,7 @@ sealed class FuncInvoke4Expression : FourArgumentsMethodCallExpression, IFuncInv
 {
     public override Expression Object => Constant(Func.Target);
     public readonly Delegate Func;
-    internal FuncInvoke4Expression(Delegate f, MethodInfo m, object a0, object a1, object a2, object a3) : base(m, a0, a1, a2, a3) => Func = f;
+    internal FuncInvoke4Expression(Delegate f, object a0, object a1, object a2, object a3) : base(f.Method, a0, a1, a2, a3) => Func = f;
     public override bool IsIntrinsic => true;
 
     public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
@@ -7149,8 +7149,8 @@ sealed class FuncInvoke5Expression : FiveArgumentsMethodCallExpression, IFuncInv
 {
     public override Expression Object => Constant(Func.Target);
     public readonly Delegate Func;
-    internal FuncInvoke5Expression(Delegate f, MethodInfo m, object a0, object a1, object a2, object a3, object a4)
-        : base(m, a0, a1, a2, a3, a4) => Func = f;
+    internal FuncInvoke5Expression(Delegate f, object a0, object a1, object a2, object a3, object a4)
+        : base(f.Method, a0, a1, a2, a3, a4) => Func = f;
     public override bool IsIntrinsic => true;
 
     public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
@@ -7180,8 +7180,8 @@ sealed class FuncInvoke6Expression : SixArgumentsMethodCallExpression, IFuncInvo
 {
     public override Expression Object => Constant(Func.Target);
     public readonly Delegate Func;
-    internal FuncInvoke6Expression(Delegate f, MethodInfo m, object a0, object a1, object a2, object a3, object a4, object a5)
-        : base(m, a0, a1, a2, a3, a4, a5) => Func = f;
+    internal FuncInvoke6Expression(Delegate f, object a0, object a1, object a2, object a3, object a4, object a5)
+        : base(f.Method, a0, a1, a2, a3, a4, a5) => Func = f;
     public override bool IsIntrinsic => true;
 
     public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
@@ -7213,8 +7213,8 @@ sealed class FuncInvoke7Expression : SevenArgumentsMethodCallExpression, IFuncIn
 {
     public override Expression Object => Constant(Func.Target);
     public readonly Delegate Func;
-    internal FuncInvoke7Expression(Delegate f, MethodInfo m, object a0, object a1, object a2, object a3, object a4, object a5, object a6)
-        : base(m, a0, a1, a2, a3, a4, a5, a6) => Func = f;
+    internal FuncInvoke7Expression(Delegate f, object a0, object a1, object a2, object a3, object a4, object a5, object a6)
+        : base(f.Method, a0, a1, a2, a3, a4, a5, a6) => Func = f;
     public override bool IsIntrinsic => true;
 
     public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
@@ -12878,12 +12878,12 @@ public class ReflectionFactory : Factory
         var rulesParams = rules._made.Parameters;
         var madeParams = Made.Parameters;
         Func<ParameterInfo, ParameterServiceInfo> paramSelector = null;
-        if (rulesParams != null || madeParams != null)
+        if (rulesParams != null | madeParams != null)
             paramSelector = (rules.OverrideRegistrationMade ? madeParams.OverrideWith(rulesParams) : rulesParams.OverrideWith(madeParams))(request);
 
         var inputArgs = request.InputArgExprs;
         var argsUsedMask = 0;
-        for (var i = 0; i < parameters.Length; i++)
+        for (var i = 0; i < parameters.Length; ++i)
         {
             var param = parameters[i];
             var paramType = param.ParameterType;
@@ -13002,25 +13002,25 @@ public class ReflectionFactory : Factory
                 : Call(factoryExpr, method, paramExprs);
         else if (a1 == null)
             serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0) : NewNoByRefArgs(ctor, a0)
-                : factoryFunc != null ? new FuncInvoke1Expression(factoryFunc, method, a0) : Call(factoryExpr, method, a0);
+                : factoryFunc != null ? new FuncInvoke1Expression(factoryFunc, a0) : Call(factoryExpr, method, a0);
         else if (a2 == null)
             serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1) : NewNoByRefArgs(ctor, a0, a1)
-                : factoryFunc != null ? new FuncInvoke2Expression(factoryFunc, method, a0, a1) : Call(factoryExpr, method, a0, a1);
+                : factoryFunc != null ? new FuncInvoke2Expression(factoryFunc, a0, a1) : Call(factoryExpr, method, a0, a1);
         else if (a3 == null)
             serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2) : NewNoByRefArgs(ctor, a0, a1, a2)
-                : factoryFunc != null ? new FuncInvoke3Expression(factoryFunc, method, a0, a1, a2) : Call(factoryExpr, method, a0, a1, a2);
+                : factoryFunc != null ? new FuncInvoke3Expression(factoryFunc, a0, a1, a2) : Call(factoryExpr, method, a0, a1, a2);
         else if (a4 == null)
             serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3) : NewNoByRefArgs(ctor, a0, a1, a2, a3)
-                : factoryFunc != null ? new FuncInvoke4Expression(factoryFunc, method, a0, a1, a2, a3) : Call(factoryExpr, method, a0, a1, a2, a3);
+                : factoryFunc != null ? new FuncInvoke4Expression(factoryFunc, a0, a1, a2, a3) : Call(factoryExpr, method, a0, a1, a2, a3);
         else if (a5 == null)
             serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4)
-                : factoryFunc != null ? new FuncInvoke5Expression(factoryFunc, method, a0, a1, a2, a3, a4) : Call(factoryExpr, method, a0, a1, a2, a3, a4);
+                : factoryFunc != null ? new FuncInvoke5Expression(factoryFunc, a0, a1, a2, a3, a4) : Call(factoryExpr, method, a0, a1, a2, a3, a4);
         else if (a6 == null)
             serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4, a5) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4, a5)
-                : factoryFunc != null ? new FuncInvoke6Expression(factoryFunc, method, a0, a1, a2, a3, a4, a5) : Call(factoryExpr, method, a0, a1, a2, a3, a4, a5);
+                : factoryFunc != null ? new FuncInvoke6Expression(factoryFunc, a0, a1, a2, a3, a4, a5) : Call(factoryExpr, method, a0, a1, a2, a3, a4, a5);
         else
             serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4, a5, a6) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4, a5, a6)
-                : factoryFunc != null ? new FuncInvoke7Expression(factoryFunc, method, a0, a1, a2, a3, a4, a5, a6) : Call(factoryExpr, method, a0, a1, a2, a3, a4, a5, a6);
+                : factoryFunc != null ? new FuncInvoke7Expression(factoryFunc, a0, a1, a2, a3, a4, a5, a6) : Call(factoryExpr, method, a0, a1, a2, a3, a4, a5, a6);
 
         if (ctor == null)
             return ConvertExpressionIfNeeded(serviceExpr, request, ctorOrMethod);
@@ -15922,11 +15922,6 @@ public static class ReflectionTools
             return default(T);
         }
     }
-
-    /// <summary>Returns true if class is compiler generated. Checking for CompilerGeneratedAttribute
-    /// is not enough, because this attribute is not applied for classes generated from "async/await".</summary>
-    public static bool IsCompilerGenerated(this Type type) =>
-        type.Name[0] == '<'; // consider the types with obstruct names like `<>blah` as compiler-generated
 
     /// <summary>Returns true if type is closed generic: does not have open generic parameters, only closed/concrete ones.</summary>
     [MethodImpl((MethodImplOptions)256)]
