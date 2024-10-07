@@ -31,7 +31,7 @@ THE SOFTWARE.
 <#@ import Namespace="DryIoc.FastExpressionCompiler.LightExpression" #>
 <#@ include File="CompileTimeDI\CompileTimeRegistrations.ttinclude" #>
 <#
-// todo: @simplify The rules for `WithExpressionGenerationSettingsOnly` are required` here because the container with generation rules is not returned by `GenerateResolutionExpressions`
+// todo: @simplify The rules for `WithExpressionGenerationSettingsOnly` are required here because the container with generation rules is not returned by `GenerateResolutionExpressions`
 var container = GetContainerWithRegistrations().With(rules => rules.WithExpressionGenerationSettingsOnly());
 
 var result = container.GenerateResolutionExpressions(x => x.SelectMany(r =>

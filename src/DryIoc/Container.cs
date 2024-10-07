@@ -4414,7 +4414,7 @@ internal sealed class FactoryDelegateExpression : Expression<Func<IResolverConte
 }
 
 /// <summary>Result of GenerateResolutionExpressions methods</summary>
-public class GeneratedExpressions
+public struct GeneratedExpressions
 {
     /// <summary>Resolutions roots</summary>
     public readonly List<KeyValuePair<ServiceInfo, Expression<Func<IResolverContext, object>>>> Roots = new();
@@ -4422,6 +4422,8 @@ public class GeneratedExpressions
     public readonly List<KeyValuePair<Request, Expression>> ResolveDependencies = new();
     /// <summary>Errors</summary>
     public readonly List<KeyValuePair<ServiceInfo, ContainerException>> Errors = new();
+    /// <summary>Default constructor</summary>
+    public GeneratedExpressions() { }
 }
 
 /// <summary>Container extended features.</summary>
@@ -4538,7 +4540,7 @@ public static class ContainerTools
 
     /// <summary>Prepares container for expression generation.</summary>
     public static T WithExpressionGeneration<T>(this T container, bool allowRuntimeState = false) where T : IContainer =>
-        container.With(allowRuntimeState, (rules, allow) => rules.WithExpressionGeneration(allow));
+        container.With(allowRuntimeState, static (rules, allow) => rules.WithExpressionGeneration(allow));
 
     /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
     /// But it will preserve resolved services in Singleton/Current scope.</summary>
@@ -4738,7 +4740,7 @@ public static class ContainerTools
     /// <summary>Generates expressions for provided root services</summary>
     public static GeneratedExpressions GenerateResolutionExpressions(
         this IContainer container, Func<ServiceRegistrationInfo, bool> condition) =>
-        container.GenerateResolutionExpressions(regs => regs.Where(condition.ThrowIfNull()).Select(r => r.ToServiceInfo()));
+        container.GenerateResolutionExpressions(regs => regs.Where(condition.ThrowIfNull()).Select(static r => r.ToServiceInfo()));
 
     /// <summary>Generates expressions for provided root services</summary>
     public static GeneratedExpressions GenerateResolutionExpressions(
@@ -15169,7 +15171,7 @@ public interface ICompileTimeContainer
     /// <summary>Returns the dependency object if it can be resolved</summary>
     bool TryResolve(out object service, IResolverContext r, Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args);
 
-    /// <summary>Resolve many services or no at all, if nothing are registered</summary>
+    /// <summary>Resolve many services or none at all (if no registerations found)</summary>
     IEnumerable<ResolveManyResult> ResolveMany(IResolverContext r, Type serviceType);
 }
 

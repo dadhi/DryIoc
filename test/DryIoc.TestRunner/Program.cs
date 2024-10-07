@@ -9,6 +9,7 @@ public class Program
 {
     public static void Main()
     {
+        new GHIssue503_Compile_time_container().Run();
         // new DecoratorTests().Run();
         // new GHIssue653_KeyValuePair_exposes_internal_DryIoc_structures().Run();
         // new GHIssue643_WithConcreteTypeDynamicRegistrations_results_in_unintended_instantiation().Run();
