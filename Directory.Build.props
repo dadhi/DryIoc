@@ -1,14 +1,14 @@
 <Project>
     <PropertyGroup>
-        <LangVersion>11</LangVersion>
+        <LangVersion>latest</LangVersion>
 
         <Authors>Maksim Volkau</Authors>
-        <Copyright>Copyright © 2013-2023 Maksim Volkau</Copyright>
+        <Copyright>Copyright © 2013-2024 Maksim Volkau</Copyright>
 
         <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
         <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
 
-        <DevMode>true</DevMode><!-- Hey, indicates the use of the new .NET frameworks -->
+        <DevMode>true</DevMode>        <!-- Hey, indicates the use of the new .NET frameworks -->
 
     </PropertyGroup>
 
