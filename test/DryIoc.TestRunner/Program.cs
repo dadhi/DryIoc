@@ -9,7 +9,7 @@ public class Program
 {
     public static void Main()
     {
-        new GHIssue503_Compile_time_container().Run();
+        // new GHIssue503_Compile_time_container().Run();
         // new DecoratorTests().Run();
         // new GHIssue653_KeyValuePair_exposes_internal_DryIoc_structures().Run();
         // new GHIssue643_WithConcreteTypeDynamicRegistrations_results_in_unintended_instantiation().Run();
@@ -33,7 +33,11 @@ public class Program
 
     public static void RunAllTests()
     {
-        // note: @important to remember to do the Tread.Sleep in tests less that this setting, 
+#if USE_COMPILATION_ONLY
+        DryIoc.Rules.UseCompilationOnly = true;
+        Console.WriteLine("USE_COMPILATION_ONLY=true");
+#endif
+        // note: @important to remember to do the Thread.Sleep in tests less that this setting, 
         // if you don't intentionally want the Error.WaitForScopedServiceIsCreatedTimeoutExpired exception, 
         // e.g. see GHIssue337_Singleton_is_created_twice, GHIssue391_Deadlock_during_Resolve, Issue157_ContainerResolveFactoryIsNotThreadSafe
 #if DEBUG

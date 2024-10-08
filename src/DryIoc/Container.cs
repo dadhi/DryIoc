@@ -6012,6 +6012,9 @@ public sealed class Rules
     /// <summary>Default rules as a staring point.</summary>
     public static readonly Rules Default = new Rules();
 
+    /// <summary>Statically apply the setting</summary>
+    public static bool UseCompilationOnly = false;
+
     // Logically, it is a mapping of ServiceKey to the List of pairs of { ServiceType, Count of the ServiceType registration with this key }
     // Practically, it is the map where Key is ServiceKey and the Value is Type | string | (KV<object, int> where object is Type | String) | (object[] where object is one of the mentioned before) 
     private ImHashMap<object, object> _serviceKeyToTypeIndex;
@@ -6914,6 +6917,9 @@ public sealed class Rules
     {
         _made = Made.Default;
         _settings = DEFAULT_SETTINGS;
+        if (UseCompilationOnly)
+            _settings &= ~(Settings.UseInterpretation | Settings.UseInterpretationForTheFirstResolution);
+
         DefaultReuse = Reuse.Transient;
         DefaultIfAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed;
         DependencyCountInLambdaToSplitBigObjectGraph = DefaultDependencyCountInLambdaToSplitBigObjectGraph;
@@ -7002,7 +7008,7 @@ public sealed class Rules
         AutoConcreteTypeResolution = 1 << 14, // informational flag // todo: @clarify consider for the obsoleting
         SelectLastRegisteredFactory = 1 << 15,// informational flag
         UsedForExpressionGeneration = 1 << 16,
-        // UseFastExpressionCompilerIfPlatformSupported = 1 << 17, // todo: the default in V5 without opt-out because of complexity, but the System.Compile(preferInterpretation?) is still used as a fallback  
+        // UseFastExpressionCompilerIfPlatformSupported = 1 << 17, // todo: @wip @remove the default in V5 without opt-out because of complexity, but the System.Compile(preferInterpretation?) is still used as a fallback  
         UseInterpretationForTheFirstResolution = 1 << 18,
         UseInterpretation = 1 << 19,
         UseDecorateeReuseForDecorators = 1 << 20,

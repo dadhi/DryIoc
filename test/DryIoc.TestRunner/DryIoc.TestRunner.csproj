@@ -9,6 +9,10 @@
     <SkipDocGen>true</SkipDocGen>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(UseCompilationOnly)' == 'true'">
+    <DefineConstants>$(DefineConstants);USE_COMPILATION_ONLY</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\DryIoc.UnitTests\DryIoc.UnitTests.csproj" />
     <ProjectReference Include="..\..\docs\DryIoc.Docs\DryIoc.Docs.csproj" />

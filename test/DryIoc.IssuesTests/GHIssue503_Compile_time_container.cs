@@ -37,6 +37,7 @@ public sealed class GHIssue503_Compile_time_container : ITest
             return source;
         }
 
+        // todo: @wip convert to the static methods
         string Code(object x, int lineIdent = 0) =>
             x == null ? "null" :
             x is Expression e ? TrimUsings(e.ToCSharpString(new StringBuilder(), lineIdent).ToString()) :
@@ -48,9 +49,10 @@ public sealed class GHIssue503_Compile_time_container : ITest
 
         string GetTypeNameOnly(string typeName) => typeName.Split('`').First().Split('.').Last();
 
-        string CommaOptArg(string arg) => arg == "null" ? "" : ", " + arg;
+        // todo: @wip use it
+        // string CommaOptArg(string arg) => arg == "null" ? "" : ", " + arg;
 
-        int getServiceBodyLineIdent = 16;
+        var getServiceBodyLineIdent = 16;
 
         var rootCodes = result.Roots.Select((r, i) =>
             new
