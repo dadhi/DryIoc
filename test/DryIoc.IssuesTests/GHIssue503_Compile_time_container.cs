@@ -108,7 +108,79 @@ public sealed class GHIssue503_Compile_time_container : ITest
             LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
             OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
             THE SOFTWARE.
-            */
+
+            =================================================================================================
+            The code below is generated at compile-time and changes here will be lost on the next generation.
+            =================================================================================================
             """);
+
+        var errCount = result.Errors.Count;
+        if (errCount != 0)
+        {
+            s.Append($"There are {errCount} generation ERRORS:\n\n");
+
+            var eNum = 0;
+            foreach (var e in result.Errors)
+                s.Append($"{++eNum}. {e.Key}\n- {e.Value.Message}\n\n");
+        }
+
+        var hasNotResolvedDeps = false;
+        foreach (var dc in depCodes)
+            if (dc.ExpressionObject == null)
+            {
+                if (!hasNotResolvedDeps)
+                {
+                    hasNotResolvedDeps = true;
+                    s.Append("\nWARNINGS: Some dependencies are missing. Register them at runtime or add to the compile-time registrations.\n\n");
+                }
+
+                // todo: @wip remove unnecessary info from the output
+                var serviceKey = dc.ServiceKeyObject == null ? "" : "with key " + dc.ServiceKey + " ";
+                s.Append($"- `{dc.ServiceTypeOnly}` {serviceKey}in {dc.PreResolveParentObject}\n");
+            }
+
+        if (hasNotResolvedDeps)
+            depCodes = depCodes.Where(d => d.ExpressionObject != null).ToList();
+
+        s.Append(
+            """
+            --------------------------------------------------------------------------------------------------------
+            */
+
+            using System;
+            using System.Collections.Generic;
+            using System.Threading;
+            using DryIoc.ImTools;
+
+            // Usings set in `NamespaceUsings`:
+            """
+        );
+
+        foreach (var ns in MyCompileTimeDI.NamespaceUsings)
+            s.Append($"using {ns};\n");
+
+        s.Append(
+            """
+
+            namespace DryIoc; // todo: @wip can we use User namespace here?
+
+            // todo: @wip customize the container class name
+            ///<summary>The container provides access to the object graph generated using the DryIoc own tools at compile-time</summary>
+            public sealed class CompileTimeContainer : ICompileTimeContainer
+            {
+                ///<summary>The instance if generated compile-time container.</summary>
+                public static readonly CompileTimeContainer Instance = new CompileTimeContainer();
+
+                // todo: @wip tbd
+                /// <inheritdoc/>
+                public bool IsRegistered(Type serviceType) => false;
+                /// <inheritdoc/>
+                public bool IsRegistered(Type serviceType, object serviceKey) => false;
+
+                /// <inheritdoc/>
+                public bool TryResolve(out object service, IResolverContext r, Type serviceType)
+                {
+            """
+        );
     }
 }
