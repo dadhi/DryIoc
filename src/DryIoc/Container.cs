@@ -6009,11 +6009,15 @@ public sealed class ServiceKeyToTypeIndex
 /// <summary> Defines resolution/registration rules associated with Container instance. They may be different for different containers.</summary>
 public sealed class Rules
 {
-    /// <summary>Default rules as a staring point.</summary>
-    public static readonly Rules Default = new Rules();
+    private static Rules _default = new Rules();
 
-    /// <summary>Statically apply the setting</summary>
-    public static bool UseCompilationOnly = false;
+    /// <summary>Default rules as a staring point.</summary>
+    public static Rules Default => _default;
+
+    /// <summary>For diagnostics and for the tests statically apply the setting.
+    /// Ensure that you do that before creating the container with default rules, or the rules inherited from the default</summary>
+    public static void UnsafeResetDefaultRulesToUseCompilationOnly() =>
+        _default = _default.WithoutUseInterpretation();
 
     // Logically, it is a mapping of ServiceKey to the List of pairs of { ServiceType, Count of the ServiceType registration with this key }
     // Practically, it is the map where Key is ServiceKey and the Value is Type | string | (KV<object, int> where object is Type | String) | (object[] where object is one of the mentioned before) 
@@ -6678,7 +6682,6 @@ public sealed class Rules
     private Settings GetSettingsForExpressionGeneration(bool allowRuntimeState = false) =>
         _settings & ~Settings.EagerCachingSingletonForFasterAccess
                     & ~Settings.ImplicitCheckForReuseMatchingScope
-                    & ~Settings.UseInterpretationForTheFirstResolution
                     & ~Settings.UseInterpretation
                     | Settings.GenerateResolutionCallForMissingDependency
                     | Settings.UsedForExpressionGeneration
@@ -6845,25 +6848,26 @@ public sealed class Rules
     public bool UseInterpretationForTheFirstResolution =>
         (_settings & Settings.UseInterpretationForTheFirstResolution) != 0;
 
-    /// <summary>The same as <see cref="WithoutInterpretationForTheFirstResolution"/></summary>
-    public Rules WithCompileServiceExpressionOnTheFirstResolution() => WithoutInterpretationForTheFirstResolution();
-
     ///<summary>Compile service expression on the first resolution. 
     /// By default the first resolution is interpreted to avoid time spend on the compilation process 
     /// (especially in case if you have only one resolution for the application lifetime).
-    /// If you need more resolutions then it make sense to compile to trade for the faster resolution times.</summary>
+    /// If you need more resolutions then it make sense to compile to trade for the faster resolution times.
+    /// Note: un-setting this effectively means the same as `WithoutUseInterpretation`, 
+    /// otherwise it would be strange to compile the first resolution but then throw it away and start interpreting the rest.</summary>
     public Rules WithoutInterpretationForTheFirstResolution() =>
-        WithSettings(_settings & ~Settings.UseInterpretationForTheFirstResolution & ~Settings.UseInterpretation);
+        WithSettings(_settings & ~Settings.UseInterpretation);
 
     /// Subject
     public bool UseInterpretation =>
         (_settings & Settings.UseInterpretation) != 0;
 
-    /// <summary>Uses DryIoc own interpretation mechanism or is falling back to `Compile(preferInterpretation: true)`</summary>
+    /// <summary>Uses DryIoc own interpretation mechanism or is falling back to `Compile(preferInterpretation: true)`.
+    /// Note: the setting includes the `UseInterpretationForTheFirstResolution`</summary>
     public Rules WithUseInterpretation() =>
-        WithSettings(_settings | Settings.UseInterpretation | Settings.UseInterpretationForTheFirstResolution);
+        WithSettings(_settings | Settings.UseInterpretation);
 
-    /// <summary>Uses DryIoc own interpretation mechanism or is falling back to `Compile(preferInterpretation: true)`</summary>
+    /// <summary>Un-setting this thing means that DryIoc will always use Compilation, even in the first resolution cycle, 
+    /// so it means as well the `WithoutInterpretationForTheFirstResolution`.</summary>
     public Rules WithoutUseInterpretation() =>
         WithSettings(_settings & ~Settings.UseInterpretation);
 
@@ -6917,9 +6921,6 @@ public sealed class Rules
     {
         _made = Made.Default;
         _settings = DEFAULT_SETTINGS;
-        if (UseCompilationOnly)
-            _settings &= ~(Settings.UseInterpretation | Settings.UseInterpretationForTheFirstResolution);
-
         DefaultReuse = Reuse.Transient;
         DefaultIfAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed;
         DependencyCountInLambdaToSplitBigObjectGraph = DefaultDependencyCountInLambdaToSplitBigObjectGraph;
@@ -7010,7 +7011,7 @@ public sealed class Rules
         UsedForExpressionGeneration = 1 << 16,
         // UseFastExpressionCompilerIfPlatformSupported = 1 << 17, // todo: @wip @remove the default in V5 without opt-out because of complexity, but the System.Compile(preferInterpretation?) is still used as a fallback  
         UseInterpretationForTheFirstResolution = 1 << 18,
-        UseInterpretation = 1 << 19,
+        UseInterpretation = 1 << 19 | UseInterpretationForTheFirstResolution,
         UseDecorateeReuseForDecorators = 1 << 20,
         UsedForValidation = 1 << 21, // informational flag, will appear in exceptions during validation
         ServiceProviderGetServiceShouldThrowIfUnresolved = 1 << 22,
@@ -9054,8 +9055,10 @@ public static class Registrator
     }
 
     /// <summary>Adding the factory directly to scope for resolution</summary> 
+#pragma warning disable CS8974 // Converting method group to non-delegate type
     public static void Use<TService>(this IResolverContext r, Func<IResolverContext, TService> factory) =>
         r.Use(typeof(TService), factory.ToFactoryDelegate);
+#pragma warning restore CS8974 // Converting method group to non-delegate type
 
     /// <summary>Adding the factory directly to the scope for resolution</summary>
     public static void Use(this IResolverContext r, Type serviceType, Func<IResolverContext, object> factory) =>

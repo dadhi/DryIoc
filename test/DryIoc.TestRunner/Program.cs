@@ -34,8 +34,8 @@ public class Program
     public static void RunAllTests()
     {
 #if USE_COMPILATION_ONLY
-        DryIoc.Rules.UseCompilationOnly = true;
         Console.WriteLine("USE_COMPILATION_ONLY=true");
+        Rules.UnsafeResetDefaultRulesToUseCompilationOnly();
 #endif
         // note: @important to remember to do the Thread.Sleep in tests less that this setting, 
         // if you don't intentionally want the Error.WaitForScopedServiceIsCreatedTimeoutExpired exception, 
