@@ -1834,9 +1834,12 @@ public static class SmallMap4
         }
     }
 
-    /// <summary>Finds the stored value by key. If found returns ref to the value it can be modified in place.</summary>
+    /// <summary>Finds the stored value by key.
+    /// UNSAFE: don't try to set the returned value if the `found == false`, because you will be setting the shared static value.
+    /// You may set the value ONLY if `found == true`,
+    /// If you want this kind of sematic use `AddOrGetValueRef`</summary>
     [MethodImpl((MethodImplOptions)256)]
-    public static ref V TryGetValueRef<K, V, TEq, TEntries>(this ref SmallMap4<K, V, TEq, TEntries> map, K key, out bool found)
+    public static ref V TryGetValueRefUnsafe<K, V, TEq, TEntries>(this ref SmallMap4<K, V, TEq, TEntries> map, K key, out bool found)
         where TEq : struct, IEq<K>
         where TEntries : struct, IEntries<K, V, TEq>
     {
