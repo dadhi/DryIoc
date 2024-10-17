@@ -14,6 +14,7 @@ namespace DryIoc.UnitTests
     {
         public int Run()
         {
+            Issue503_Can_ResolveMany_and_filter_out_scoped_services_with_disposal_order_WithoutInterpretation();
             Issue503_Can_ResolveMany_and_filter_out_scoped_services_WithoutInterpretation();
             Issue503_Can_ResolveMany_and_filter_out_scoped_services_Resolved_compiled_delegate();
 
@@ -37,7 +38,8 @@ namespace DryIoc.UnitTests
             Can_resolve_service_as_scoped_or_singleton_depending_on_scope_availability();
             Can_inject_service_as_scoped_or_singleton_depending_on_scope_availability();
             ValueType_scoped_dependency_should_be_correctly_interpreted_and_compiled();
-            return 20;
+
+            return 23;
         }
 
         [Test]
@@ -262,6 +264,24 @@ namespace DryIoc.UnitTests
             var depsEnum = container.ResolveMany<IDep>().ToArray();
             Assert.AreEqual(1, depsEnum.Length);
             Assert.IsInstanceOf<Dep>(depsEnum[0]);
+
+            var deps = container.Resolve<LazyEnumerable<IDep>>().ToArray();
+            Assert.AreEqual(1, deps.Length);
+            Assert.IsInstanceOf<Dep>(deps[0]);
+
+            using (var scope = container.OpenScope())
+            {
+                var allDepsIncludingScopes = scope.Resolve<LazyEnumerable<IDep>>().ToArray();
+                Assert.AreEqual(2, allDepsIncludingScopes.Length);
+            }
+        }
+
+        [Test]
+        public void Issue503_Can_ResolveMany_and_filter_out_scoped_services_with_disposal_order_WithoutInterpretation()
+        {
+            var container = new Container(Rules.Default.WithoutUseInterpretation());
+            container.Register<IDep, Dep>();
+            container.Register<IDep, DepScoped>(Reuse.InCurrentScope, setup: Setup.With(disposalOrder: 42));
 
             var deps = container.Resolve<LazyEnumerable<IDep>>().ToArray();
             Assert.AreEqual(1, deps.Length);

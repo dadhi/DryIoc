@@ -4166,14 +4166,21 @@ public static class Interpreter
         IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
     {
         Scope scope;
-        if (e is CurrentScopeReuse.GetScopedViaFactoryDelegateWithDisposalOrderExpression s)
+        if (e is CurrentScopeReuse.CurrentScopeGetScopedViaFactoryDelegateWithDisposalOrderExpression cs)
         {
-            scope = (Scope)r.CurrentScope;// todo: @perf cast IResolverContext and avoid virtual calls, @unsafe cast to Scope,
+            scope = (Scope)r.CurrentScope; // todo: @perf cast IResolverContext and avoid virtual calls, @unsafe cast to Scope
             if (scope == null)
-                return s.ThrowIfNoScope ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
+                return null;
+        }
+        else if (e is CurrentScopeReuse.ThrowIfNoScopeGetScopedViaFactoryDelegateWithDisposalOrderExpression ts)
+        {
+            scope = (Scope)r.CurrentScope;
+            if (scope == null)
+                return Throw.For<IScope>(Error.NoCurrentScope, r);
         }
         else
-            scope = (Scope)r.CurrentOrSingletonScope;// todo: @perf cast IResolverContext and avoid virtual calls, @unsafe cast to Scope,
+            scope = (Scope)r.CurrentOrSingletonScope; // todo: @perf cast IResolverContext and avoid virtual calls, @unsafe cast to Scope
+
 
         var id = e.FactoryID;
 
@@ -14507,7 +14514,9 @@ public sealed class CurrentScopeReuse : IReuse
                     ? (ifNoScopeThrow ?
                         new ThrowIfNoScopeGetScopedViaFactoryDelegateExpression(factoryId, serviceFactoryExpr) :
                         new CurrentScopeGetScopedViaFactoryDelegateExpression(factoryId, serviceFactoryExpr))
-                    : new GetScopedViaFactoryDelegateWithDisposalOrderExpression(ifNoScopeThrow, factoryId, serviceFactoryExpr, disposalOrder);
+                    : (ifNoScopeThrow ?
+                        new ThrowIfNoScopeGetScopedViaFactoryDelegateWithDisposalOrderExpression(factoryId, serviceFactoryExpr, disposalOrder) :
+                        new CurrentScopeGetScopedViaFactoryDelegateWithDisposalOrderExpression(factoryId, serviceFactoryExpr, disposalOrder));
 
             // todo: @perf optimize the same way as for scope without Name
             serviceFactoryExpr = serviceFactoryExpr is InvokeFactoryDelegateExpression i ? i.Expression : new FactoryDelegateExpression(serviceFactoryExpr);
@@ -14609,15 +14618,17 @@ public sealed class CurrentScopeReuse : IReuse
                 return false;
 
             EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure);
-            return EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod)
-                && il.EmitConvertObjectTo(Type);
+
+            EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod);
+            il.EmitConvertObjectTo(Type);
+
+            return true;
         }
     }
 
     internal class GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression : GetScopedOrSingletonViaFactoryDelegateExpression
     {
-        // todo: @perf make it true but for now it is a rare case to be so much optimized
-        public override bool IsIntrinsic => false;
+        public override bool IsIntrinsic => true;
 
         public override MethodInfo Method => Scope.GetOrAddViaFactoryDelegateWithDisposalOrderMethod;
         public readonly int DisposalOrder;
@@ -14629,6 +14640,25 @@ public sealed class CurrentScopeReuse : IReuse
             i == 0 ? FactoryIdExpr : i == 1 ? FactoryDelegateExpr : i == 2 ? FactoryDelegateCompiler.ResolverContextParamExpr : DisposalOrderExpr;
         internal GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression(
             int factoryId, Expression createValueExpr, int disposalOrder) : base(factoryId, createValueExpr) => DisposalOrder = disposalOrder;
+
+        // Emitting the arguments for GetOrAddViaFactoryDelegateWithDisposalOrderMethod(int id, Func<IResolverContext, object> createValue, IResolverContext r, int disposalOrder = 0)
+        public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+            ILGenerator il, ParentFlags parent, int byRefIndex = -1)
+        {
+            EmittingVisitor.TryEmit(Object, paramExprs, il, ref closure, config, parent);
+            EmittingVisitor.EmitLoadConstantInt(il, FactoryID);
+
+            if (!EmittingVisitor.TryEmit(FactoryDelegateExpr, paramExprs, il, ref closure, config, parent))
+                return false;
+
+            EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure);
+
+            EmittingVisitor.EmitLoadConstantInt(il, DisposalOrder);
+
+            EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateWithDisposalOrderMethod);
+            il.EmitConvertObjectTo(Type);
+            return true;
+        }
     }
 
     internal sealed class ThrowIfNoScopeGetScopedViaFactoryDelegateExpression : GetScopedOrSingletonViaFactoryDelegateExpression
@@ -14661,7 +14691,9 @@ public sealed class CurrentScopeReuse : IReuse
                 return false;
 
             EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure);
+
             EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod);
+
             il.EmitConvertObjectTo(Type);
 
             var result = il.DefineLabel();
@@ -14673,14 +14705,51 @@ public sealed class CurrentScopeReuse : IReuse
         }
     }
 
-    internal sealed class GetScopedViaFactoryDelegateWithDisposalOrderExpression : GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression
+    internal sealed class ThrowIfNoScopeGetScopedViaFactoryDelegateWithDisposalOrderExpression : GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression
     {
-        public override Expression Object => ThrowIfNoScope ? ResolverContext.GetCurrentScopeOrThrowExpr : ResolverContext.CurrentScopeExpr;
-        public readonly bool ThrowIfNoScope;
-        public ConstantExpression ThrowIfNoScopeExpr => Constant(ThrowIfNoScope);
-        internal GetScopedViaFactoryDelegateWithDisposalOrderExpression(
-            bool throwIfNoScope, int factoryId, Expression serviceFactoryExpr, int disposalOrder) :
-            base(factoryId, serviceFactoryExpr, disposalOrder) => ThrowIfNoScope = throwIfNoScope;
+        public override Expression Object => ResolverContext.GetCurrentScopeOrThrowExpr;
+        internal ThrowIfNoScopeGetScopedViaFactoryDelegateWithDisposalOrderExpression(
+            int factoryId, Expression serviceFactoryExpr, int disposalOrder) : base(factoryId, serviceFactoryExpr, disposalOrder) { }
+    }
+
+    internal sealed class CurrentScopeGetScopedViaFactoryDelegateWithDisposalOrderExpression : GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression
+    {
+        public override Expression Object => ResolverContext.CurrentScopeExpr;
+        internal CurrentScopeGetScopedViaFactoryDelegateWithDisposalOrderExpression(
+            int factoryId, Expression serviceFactoryExpr, int disposalOrder) : base(factoryId, serviceFactoryExpr, disposalOrder) { }
+
+        // Emitting the arguments for GetOrAddViaFactoryDelegateWithDisposalOrderMethod(int id, Func<IResolverContext, object> createValue, IResolverContext r, int disposalOrder = 0)
+        public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+            ILGenerator il, ParentFlags parent, int byRefIndex = -1)
+        {
+            EmittingVisitor.TryEmit(Object, paramExprs, il, ref closure, config, parent);
+
+            // The same way as in `InterpretGetScopedOrSingletonViaFactoryDelegate` check for null and immediatly return null as a result
+            // to avoid NRE when scope is absent and we specifically said to avoid throwing an exception.
+            Label nullScope = il.DefineLabel();
+            var scopeVar = EmittingVisitor.EmitStoreAndLoadLocalVariable(il, typeof(IScope));
+            il.Demit(OpCodes.Brfalse, nullScope);
+            EmittingVisitor.EmitLoadLocalVariable(il, scopeVar);
+
+            EmittingVisitor.EmitLoadConstantInt(il, FactoryID);
+
+            if (!EmittingVisitor.TryEmit(FactoryDelegateExpr, paramExprs, il, ref closure, config, parent))
+                return false;
+
+            EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure);
+
+            EmittingVisitor.EmitLoadConstantInt(il, DisposalOrder);
+
+            EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateWithDisposalOrderMethod);
+            il.EmitConvertObjectTo(Type);
+
+            var result = il.DefineLabel();
+            il.Demit(OpCodes.Br, result);
+            il.DmarkLabel(nullScope);
+            il.Demit(OpCodes.Ldnull);
+            il.DmarkLabel(result);
+            return true;
+        }
     }
 
     /// Subject
