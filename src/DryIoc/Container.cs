@@ -4403,7 +4403,8 @@ public static class FactoryDelegateCompiler
             );
     }
 }
-// todo: @perf can we make it an intrinsic?
+
+// It is not an intrinsic because it is harder to correctly isolate the nested lambda both in the Collecting and Emitting phase
 internal sealed class FactoryDelegateExpression : Expression<Func<IResolverContext, object>>
 {
     public override Type ReturnType => typeof(object);
@@ -5113,11 +5114,21 @@ public static class ResolverContext
     /// <summary>Access to the current scope or singletons.</summary>
     public static readonly PropertyExpression CurrentOrSingletonScopeExpr =
         new ResolverContextPropertyParamExpression(typeof(IResolverContext).GetProperty(nameof(IResolverContext.CurrentOrSingletonScope)));
-    // todo: @perf @wip may it an intrinsic, similar to `ResolverContextArgMethodCallExpression`
     internal sealed class ResolverContextPropertyParamExpression : PropertyExpression
     {
+        public override bool IsIntrinsic => true;
+
         public override Expression Expression => FactoryDelegateCompiler.ResolverContextParamExpr;
         internal ResolverContextPropertyParamExpression(PropertyInfo property) : base(property) { }
+
+        public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
+            NestedLambdaInfo nestedLambda, ref SmallList<NestedLambdaInfo> rootNestedLambdas) =>
+            ExpressionCompiler.TryCollectInfo(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, nestedLambda, ref rootNestedLambdas, flags);
+
+        public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+            ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
+            EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure) &&
+            EmittingVisitor.EmitVirtualMethodCall(il, PropertyInfo.GetMethod);
     }
 
     /// <summary>Indicates that context is scoped - that's is only possible if container is not the Root one and has a Parent context</summary>
@@ -5133,13 +5144,13 @@ public static class ResolverContext
 
     internal sealed class ResolverContextArgMethodCallExpression : MethodCallExpression
     {
+        public override bool IsIntrinsic => true;
+
         public override MethodInfo Method { get; }
         public override int ArgumentCount => 1;
         public override IReadOnlyList<Expression> Arguments => FactoryDelegateCompiler.ResolverContextParamExprs;
         public override Expression GetArgument(int i) => FactoryDelegateCompiler.ResolverContextParamExpr;
         public ResolverContextArgMethodCallExpression(MethodInfo method) => Method = method;
-        public override bool IsIntrinsic => true;
-
         public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
             NestedLambdaInfo nestedLambda, ref SmallList<NestedLambdaInfo> rootNestedLambdas) =>
             ExpressionCompiler.TryCollectInfo(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, nestedLambda, ref rootNestedLambdas, flags);
@@ -13762,6 +13773,8 @@ public class DelegateFactory : Factory
 
 internal class InvokeFactoryDelegateExpression : InvocationExpression
 {
+    public sealed override bool IsIntrinsic => true;
+
     public sealed override Type Type { get; }
     public readonly Func<IResolverContext, object> FactoryDelegate;
     public sealed override Expression Expression => ConstantOf(FactoryDelegate);
@@ -13773,8 +13786,6 @@ internal class InvokeFactoryDelegateExpression : InvocationExpression
         Type = type;
         FactoryDelegate = f;
     }
-
-    public sealed override bool IsIntrinsic => true;
 
     public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
          NestedLambdaInfo nestedLambda, ref SmallList<NestedLambdaInfo> rootNestedLambdas)
@@ -14599,6 +14610,9 @@ public sealed class CurrentScopeReuse : IReuse
 
     internal class GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression : GetScopedOrSingletonViaFactoryDelegateExpression
     {
+        // todo: @perf make it true but for now it is a rare case to be so much optimized
+        public override bool IsIntrinsic => false;
+
         public override MethodInfo Method => Scope.GetOrAddViaFactoryDelegateWithDisposalOrderMethod;
         public readonly int DisposalOrder;
         public ConstantExpression DisposalOrderExpr => ConstantInt(DisposalOrder);
@@ -14607,8 +14621,6 @@ public sealed class CurrentScopeReuse : IReuse
             new[] { FactoryIdExpr, FactoryDelegateExpr, FactoryDelegateCompiler.ResolverContextParamExpr, DisposalOrderExpr };
         public override Expression GetArgument(int i) =>
             i == 0 ? FactoryIdExpr : i == 1 ? FactoryDelegateExpr : i == 2 ? FactoryDelegateCompiler.ResolverContextParamExpr : DisposalOrderExpr;
-        // todo: @perf make it true but for now it is a rare case to be so much optimized
-        public override bool IsIntrinsic => false;
         internal GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression(
             int factoryId, Expression createValueExpr, int disposalOrder) : base(factoryId, createValueExpr) => DisposalOrder = disposalOrder;
     }
@@ -14625,15 +14637,15 @@ public sealed class CurrentScopeReuse : IReuse
         // Emitting the arguments for GetOrAddViaFactoryDelegateMethod(int id, Func<IResolverContext, object> createValue, IResolverContext r)
         public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
-        {   // todo: @perf check that the object is intrinsic
+        {
             EmittingVisitor.TryEmit(Object, paramExprs, il, ref closure, config, parent);
 
             // The same way as in `InterpretGetScopedOrSingletonViaFactoryDelegate` check for null and immediatly return null as a result
             // to avoid NRE when scope is absent and we specifically said to avoid throwing an exception.
             Label nullScope = default;
             if (!ThrowIfNoScope)
-            {   // Object.Type -> typeof(IScope)
-                var scopeVar = EmittingVisitor.EmitStoreAndLoadLocalVariable(il, Object.Type);
+            {
+                var scopeVar = EmittingVisitor.EmitStoreAndLoadLocalVariable(il, typeof(IScope));
                 il.Demit(OpCodes.Brfalse, nullScope = il.DefineLabel());
                 EmittingVisitor.EmitLoadLocalVariable(il, scopeVar);
             }

@@ -590,7 +590,7 @@ namespace DryIoc.FastExpressionCompiler
             public Type GetLambdaType() => (Lambda is NestedLambdaWithConstantsAndNestedLambdas n ? n.NestedLambda : Lambda).GetType();
 
             /// <summary>Compares 2 lambda expressions for equality</summary>
-            public bool HasTheSameLambdaExpression(LambdaExpression lambda) => // todo: @unclear parameters or is comparing the body is enough?
+            public bool HasTheSameLambdaExpression(LambdaExpression lambda) => // todo: @unclear parameters or is comparing the body enough?
                 ReferenceEquals(LambdaExpression, lambda) ||
                 ReferenceEquals(LambdaExpression.Body, lambda.Body)
 #if LIGHT_EXPRESSION
