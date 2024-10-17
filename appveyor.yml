@@ -1,7 +1,6 @@
 image:
   - Visual Studio 2022
   - Ubuntu
-  - macOS
 
 version: 6.0.0-preview-07-{build}
 
