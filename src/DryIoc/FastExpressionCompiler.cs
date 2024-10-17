@@ -1192,20 +1192,21 @@ namespace DryIoc.FastExpressionCompiler
                                 (r = TryCollectInfo(ref closure, callObjectExpr, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK)
                                 return r;
 
-                            var hasNestedInlinedLambdaInvoke = false;
-
+                            var hasComplexExpression = false;
                             for (var i = 0; i < argCount; i++)
                             {
                                 closure.HasComplexExpression = false; // reset the flag because we want to know the real result after the arg collection
                                 if ((r = TryCollectInfo(ref closure, callArgs.GetArgument(i), paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK)
                                     return r;
-                                hasNestedInlinedLambdaInvoke |= closure.HasComplexExpression;
+                                // if any argument is complex, then thw whole call should be complex,
+                                // because we cannot just store and restore a single argument, it should be done for all arguments
+                                hasComplexExpression |= closure.HasComplexExpression;
                             }
 
                             // propagate the value up the stack
-                            if (hasNestedInlinedLambdaInvoke)
+                            if (hasComplexExpression)
                             {
-                                closure.HasComplexExpression = hasNestedInlinedLambdaInvoke;
+                                closure.HasComplexExpression = true;
                                 closure.ArgsContainingComplexExpression.AddOrGetValueRef(callExpr, out _);
                             }
                             return r;
@@ -1230,20 +1231,19 @@ namespace DryIoc.FastExpressionCompiler
                             if (argCount == 0)
                                 return r;
 
-                            var hasNestedInlinedLambdaInvoke = false;
-
+                            var hasComplexExpression = false;
                             for (var i = 0; i < argCount; i++)
                             {
                                 closure.HasComplexExpression = false;
                                 if ((r = TryCollectInfo(ref closure, ctorArgs.GetArgument(i), paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK)
                                     return r;
-                                hasNestedInlinedLambdaInvoke |= closure.HasComplexExpression;
+                                hasComplexExpression |= closure.HasComplexExpression;
                             }
 
                             // pop the value up the stack 
-                            if (hasNestedInlinedLambdaInvoke)
+                            if (hasComplexExpression)
                             {
-                                closure.HasComplexExpression = hasNestedInlinedLambdaInvoke;
+                                closure.HasComplexExpression = true;
                                 closure.ArgsContainingComplexExpression.AddOrGetValueRef(newExpr, out _);
                             }
 
@@ -1439,8 +1439,12 @@ namespace DryIoc.FastExpressionCompiler
                         continue;
 
                     case ExpressionType.Try:
-                        return TryCollectTryExprConstants(ref closure, (TryExpression)expr, paramExprs, nestedLambda, ref rootNestedLambdas, flags);
-
+                        {
+                            closure.HasComplexExpression = false;
+                            r = TryCollectTryExprConstants(ref closure, (TryExpression)expr, paramExprs, nestedLambda, ref rootNestedLambdas, flags);
+                            closure.HasComplexExpression = true;
+                            return r;
+                        }
                     case ExpressionType.Label:
                         var labelExpr = (LabelExpression)expr;
                         closure.AddLabel(labelExpr.Target, closure.CurrentInlinedLambdaInvokeIndex);
@@ -1462,6 +1466,7 @@ namespace DryIoc.FastExpressionCompiler
                             switchExpr.DefaultBody != null &&
                             (r = TryCollectInfo(ref closure, switchExpr.DefaultBody, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK)
                             return r;
+
                         var switchCases = switchExpr.Cases;
                         for (var i = 0; i < switchCases.Count - 1; i++)
                             if ((r = TryCollectInfo(ref closure, switchCases[i].Body, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK)
@@ -1809,13 +1814,9 @@ namespace DryIoc.FastExpressionCompiler
                     closure.PopBlock();
             }
 
-            if (tryExpr.Finally != null)
-            {
-                closure.HasComplexExpression = false;
-                if ((r = TryCollectInfo(ref closure, tryExpr.Finally, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK)
-                    return r;
-                closure.HasComplexExpression = true;
-            }
+            if (tryExpr.Finally != null &&
+                (r = TryCollectInfo(ref closure, tryExpr.Finally, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK)
+                return r;
 
             return r;
         }
@@ -2477,6 +2478,7 @@ namespace DryIoc.FastExpressionCompiler
                 if (!TryEmit(left, paramExprs, il, ref closure, setup, flags))
                     return false;
 
+                var exprType = expr.Type;
                 var leftType = left.Type;
                 if (leftType.IsValueType)
                 {
@@ -2487,7 +2489,7 @@ namespace DryIoc.FastExpressionCompiler
 
                     il.Demit(OpCodes.Brfalse, labelFalse);
 
-                    if (expr.Type == leftType.GetUnderlyingNullableTypeUnsafe())
+                    if (exprType == Nullable.GetUnderlyingType(leftType))
                     {
                         // if the target expression type is of underlying nullable, and the left operand is not null,
                         // then extract its underlying value
@@ -2513,16 +2515,16 @@ namespace DryIoc.FastExpressionCompiler
                     if (!TryEmit(right, paramExprs, il, ref closure, setup, flags))
                         return false;
 
-                    if (right.Type != expr.Type)
+                    if (right.Type != exprType)
                         il.TryEmitBoxOf(right.Type);
 
-                    if (left.Type == expr.Type)
+                    if (left.Type == exprType)
                         il.DmarkLabel(labelFalse);
                     else
                     {
                         il.Demit(OpCodes.Br, labelDone);
                         il.DmarkLabel(labelFalse); // todo: @bug? should we insert the boxing for the Nullable value type before the Castclass
-                        il.Demit(OpCodes.Castclass, expr.Type);
+                        il.Demit(OpCodes.Castclass, exprType);
                         il.DmarkLabel(labelDone);
                     }
                 }
@@ -2971,7 +2973,7 @@ namespace DryIoc.FastExpressionCompiler
 #endif
                 ILGenerator il, ref ClosureInfo closure, CompilerFlags setup, ParentFlags parent)
             {
-                // todo: @perf! refactor this whole thing in order to handle the hot path without heavy reflection calls
+                // todo: @perf refactor this whole thing in order to handle the hot path without heavy reflection calls
                 var opExpr = expr.Operand;
                 var method = expr.Method;
                 if (method != null && method.Name != "op_Implicit" && method.Name != "op_Explicit")
@@ -3020,7 +3022,7 @@ namespace DryIoc.FastExpressionCompiler
                     {
                         EmitMethodCall(il, method);
                         if (underlyingNullableTargetType != null)
-                            il.Demit(OpCodes.Newobj, targetType.GetTypeInfo().DeclaredConstructors.GetFirst());
+                            il.Demit(OpCodes.Newobj, targetType.GetNullableConstructor());
                         return il.EmitPopIfIgnoreResult(parent);
                     }
                 }
@@ -3068,7 +3070,7 @@ namespace DryIoc.FastExpressionCompiler
                         {
                             EmitMethodCall(il, method);
                             if (underlyingNullableTargetType != null)
-                                il.Demit(OpCodes.Newobj, targetType.GetTypeInfo().DeclaredConstructors.GetFirst());
+                                il.Demit(OpCodes.Newobj, targetType.GetNullableConstructor());
                             return il.EmitPopIfIgnoreResult(parent);
                         }
                     }
@@ -3084,9 +3086,9 @@ namespace DryIoc.FastExpressionCompiler
                     if (underlyingNullableSourceType == null)
                     {
                         if (!underlyingNullableTargetType.IsEnum && // todo: @clarify hope the source type is convertible to enum, huh 
-                            !TryEmitValueConvert(underlyingNullableTargetType, il, isChecked: false))
+                            !TryEmitValueConvert(sourceType, underlyingNullableTargetType, il, isChecked: false))
                             return false;
-                        il.Demit(OpCodes.Newobj, targetType.GetTypeInfo().DeclaredConstructors.GetFirst());
+                        il.Demit(OpCodes.Newobj, targetType.GetNullableConstructor());
                     }
                     else
                     {
@@ -3114,14 +3116,14 @@ namespace DryIoc.FastExpressionCompiler
                         }
                         else
                         {
-                            if (!TryEmitValueConvert(underlyingNullableTargetType, il, expr.NodeType == ExpressionType.ConvertChecked))
+                            if (!TryEmitValueConvert(underlyingNullableSourceType, underlyingNullableTargetType, il, expr.NodeType == ExpressionType.ConvertChecked))
                             {
                                 method ??= underlyingNullableTargetType.FindConvertOperator(underlyingNullableSourceType, underlyingNullableTargetType);
                                 if (method == null)
                                     return false; // nor conversion nor conversion operator is found
                                 EmitMethodCall(il, method);
                             }
-                            il.Demit(OpCodes.Newobj, targetType.GetTypeInfo().DeclaredConstructors.GetFirst());
+                            il.Demit(OpCodes.Newobj, targetType.GetNullableConstructor());
                         }
                         il.DmarkLabel(labelDone);
                     }
@@ -3143,7 +3145,7 @@ namespace DryIoc.FastExpressionCompiler
                     }
 
                     // cast as the last resort and let's it fail if unlucky
-                    if (!TryEmitValueConvert(targetType, il, expr.NodeType == ExpressionType.ConvertChecked))
+                    if (!TryEmitValueConvert(underlyingNullableSourceType ?? sourceType, targetType, il, expr.NodeType == ExpressionType.ConvertChecked))
                     {
                         il.TryEmitBoxOf(sourceType);
                         il.Demit(OpCodes.Castclass, targetType);
@@ -3153,30 +3155,47 @@ namespace DryIoc.FastExpressionCompiler
                 return il.EmitPopIfIgnoreResult(parent);
             }
 
-            private static bool TryEmitValueConvert(Type targetType, ILGenerator il, bool isChecked)
+            private static bool TryEmitValueConvert(Type sourceType, Type targetType, ILGenerator il, bool isChecked)
             {
-                if (targetType == typeof(int))
-                    il.Demit(isChecked ? OpCodes.Conv_Ovf_I4 : OpCodes.Conv_I4);
-                else if (targetType == typeof(float))
-                    il.Demit(OpCodes.Conv_R4);
-                else if (targetType == typeof(uint))
-                    il.Demit(isChecked ? OpCodes.Conv_Ovf_U4 : OpCodes.Conv_U4);
-                else if (targetType == typeof(sbyte))
-                    il.Demit(isChecked ? OpCodes.Conv_Ovf_I1 : OpCodes.Conv_I1);
-                else if (targetType == typeof(byte))
-                    il.Demit(isChecked ? OpCodes.Conv_Ovf_U1 : OpCodes.Conv_U1);
-                else if (targetType == typeof(short))
-                    il.Demit(isChecked ? OpCodes.Conv_Ovf_I2 : OpCodes.Conv_I2);
-                else if (targetType == typeof(ushort) || targetType == typeof(char))
-                    il.Demit(isChecked ? OpCodes.Conv_Ovf_U2 : OpCodes.Conv_U2);
-                else if (targetType == typeof(long))
-                    il.Demit(isChecked ? OpCodes.Conv_Ovf_I8 : OpCodes.Conv_I8);
-                else if (targetType == typeof(ulong))
-                    il.Demit(isChecked ? OpCodes.Conv_Ovf_U8 : OpCodes.Conv_U8); // should we consider if sourceType.IsUnsigned == false and using the OpCodes.Conv_I8 (seems like the System.Compile does it)
-                else if (targetType == typeof(double))
-                    il.Demit(OpCodes.Conv_R8);
-                else
-                    return false;
+                switch (Type.GetTypeCode(targetType))
+                {
+                    case TypeCode.SByte:
+                        il.Demit(isChecked ? OpCodes.Conv_Ovf_I1 : OpCodes.Conv_I1);
+                        break;
+                    case TypeCode.Byte:
+                        il.Demit(isChecked ? OpCodes.Conv_Ovf_U1 : OpCodes.Conv_U1);
+                        break;
+                    case TypeCode.Int16:
+                        il.Demit(isChecked ? OpCodes.Conv_Ovf_I2 : OpCodes.Conv_I2);
+                        break;
+                    case TypeCode.Int32:
+                        il.Demit(isChecked ? OpCodes.Conv_Ovf_I4 : OpCodes.Conv_I4);
+                        break;
+                    case TypeCode.Int64:
+                        il.Demit(isChecked ? OpCodes.Conv_Ovf_I8 : OpCodes.Conv_I8);
+                        break;
+                    case TypeCode.Double:
+                        il.Demit(OpCodes.Conv_R8);
+                        break;
+                    case TypeCode.Single:
+                        if (sourceType == typeof(uint))
+                            il.Demit(OpCodes.Conv_R_Un);
+                        il.Demit(OpCodes.Conv_R4);
+                        break;
+                    case TypeCode.UInt16:
+                    case TypeCode.Char:
+                        il.Demit(isChecked ? OpCodes.Conv_Ovf_U2 : OpCodes.Conv_U2);
+                        break;
+                    case TypeCode.UInt32:
+                        il.Demit(isChecked ? OpCodes.Conv_Ovf_U4 : OpCodes.Conv_U4);
+                        break;
+                    case TypeCode.UInt64:
+                        il.Demit(isChecked ? OpCodes.Conv_Ovf_U8 : OpCodes.Conv_U8); // should we consider if sourceType.IsUnsigned == false and using the OpCodes.Conv_I8 (seems like the System.Compile does it)
+                        break;
+                    default:
+                        // todo: @feature for net7+ add Half, Int128, UInt128
+                        return false;
+                }
                 return true;
             }
 
@@ -3235,11 +3254,11 @@ namespace DryIoc.FastExpressionCompiler
                     else
                     {
                         EmitLoadClosureArrayItem(il, constIndex);
-                        if (exprType.IsValueType)
+                        if (constType.IsValueType)
                         {
-                            il.Demit(OpCodes.Unbox_Any, exprType);
+                            il.Demit(OpCodes.Unbox_Any, constType);
                             if (byRefIndex != -1)
-                                EmitStoreAndLoadLocalVariableAddress(il, exprType);
+                                EmitStoreAndLoadLocalVariableAddress(il, constType);
                         }
 #if NETFRAMEWORK
                         else
@@ -3247,7 +3266,7 @@ namespace DryIoc.FastExpressionCompiler
                             // The cast probably required only for Full CLR starting, 
                             // e.g. `Test_283_Case6_MappingSchemaTests_CultureInfo_VerificationException`.
                             // .NET Core does not seem to care about verifiability and it's faster without the explicit cast.
-                            il.Demit(OpCodes.Castclass, exprType);
+                            il.Demit(OpCodes.Castclass, constType);
                         }
 #endif
                     }
@@ -3268,10 +3287,13 @@ namespace DryIoc.FastExpressionCompiler
                         return false;
                 }
 
-                if (exprType.IsValueType && exprType.IsNullable())
-                    il.Demit(OpCodes.Newobj, exprType.GetConstructors().GetFirst());
-                else if (exprType == typeof(object))
-                    return il.TryEmitBoxOf(constType); // using normal type for Enum instead of underlying type
+                if (exprType != constType && constType.IsValueType)
+                {
+                    if (exprType.IsNullable())
+                        il.Demit(OpCodes.Newobj, exprType.GetNullableConstructor());
+                    else if (exprType == typeof(object))
+                        il.Demit(OpCodes.Box, constType); // using normal type for Enum instead of underlying type
+                }
                 return true;
             }
 
@@ -4156,7 +4178,7 @@ namespace DryIoc.FastExpressionCompiler
 
                         if (leftIsNullable)
                         {
-                            // todo: @perf @simplify avoid the Dup and the Pop for this case
+                            // todo: @perf @simplify avoid the Dup and the Pop for this case via storing and loading local var same as in `TryEmitArithmetic`
                             if (leftIsByAddress | objExpr != null)
                             {
                                 var skipPopLeftDuppedInstance = il.DefineLabel();
@@ -4947,7 +4969,8 @@ namespace DryIoc.FastExpressionCompiler
                 var equalityMethod = customEqualMethod != null
                     ? customEqualMethod
                     : !checkType.IsPrimitive && !checkType.IsEnum
-                        ? FindComparisonMethod(il, "op_Equality", switchValueType, switchValueType) ?? _objectEqualsMethod
+                        ? FindBinaryOperandMethod("op_Equality", switchValueType, switchValueType, switchValueType, typeof(bool))
+                        ?? _objectEqualsMethod
                         : null;
 
                 var operandParent = parent & ~ParentFlags.IgnoreResult & ~ParentFlags.InstanceAccess;
@@ -5067,13 +5090,16 @@ namespace DryIoc.FastExpressionCompiler
                 return true;
             }
 
-            private static MethodInfo FindComparisonMethod(ILGenerator il, string methodName, Type leftOpType, Type rightOpType)
+
+            // todo: @perf cache found method, because for some cases there many methods to search from, e.g. 157 methods in BigInteger
+            private static MethodInfo FindBinaryOperandMethod(
+                string methodName, Type sourceType, Type leftOpType, Type rightOpType, Type resultType)
             {
-                var methods = leftOpType.GetMethods();
+                var methods = sourceType.GetMethods();
                 for (var i = 0; i < methods.Length; i++)
                 {
                     var m = methods[i];
-                    if (m.IsSpecialName && m.IsStatic && m.Name == methodName)
+                    if (m.IsSpecialName && m.IsStatic && m.Name == methodName && m.ReturnType == resultType)
                     {
                         var ps = m.GetParameters();
                         if (ps.Length == 2 && ps[0].ParameterType == leftOpType && ps[1].ParameterType == rightOpType)
@@ -5092,18 +5118,20 @@ namespace DryIoc.FastExpressionCompiler
 #endif
                 ILGenerator il, ref ClosureInfo closure, CompilerFlags setup, ParentFlags parent)
             {
-                var leftOpType = left.Type;
-                var leftIsNullable = leftOpType.IsNullable();
-                var rightOpType = right.Type;
+                var leftType = left.Type;
+                var leftIsNullable = leftType.IsNullable();
+                var rightType = right.Type;
 
-                // if on member is `null` object then list its type to match other member
+                // if one operand is `null` then coalesce the types
                 var rightIsNull = IsNullContainingExpression(right);
-                if (rightIsNull & rightOpType == typeof(object))
-                    rightOpType = leftOpType;
+                var comparingObjectWithNull = rightIsNull & rightType == typeof(object);
+                if (comparingObjectWithNull)
+                    rightType = leftType;
 
                 var leftIsNull = IsNullContainingExpression(left);
-                if (leftIsNull & leftOpType == typeof(object))
-                    leftOpType = rightOpType;
+                comparingObjectWithNull = leftIsNull & leftType == typeof(object);
+                if (comparingObjectWithNull)
+                    leftType = rightType;
 
                 var operandParent = parent & ~ParentFlags.IgnoreResult & ~ParentFlags.InstanceAccess;
 
@@ -5115,58 +5143,105 @@ namespace DryIoc.FastExpressionCompiler
                     {
                         if (!TryEmit(left, paramExprs, il, ref closure, setup, operandParent))
                             return false;
-                        EmitStoreAndLoadLocalVariableAddress(il, leftOpType);
-                        EmitMethodCall(il, leftOpType.GetNullableHasValueGetterMethod());
+                        EmitStoreAndLoadLocalVariableAddress(il, leftType);
+                        EmitMethodCall(il, leftType.GetNullableHasValueGetterMethod());
                         if (nodeType == ExpressionType.Equal)
                             EmitEqualToZeroOrNull(il);
                         return il.EmitPopIfIgnoreResult(parent);
                     }
 
-                    if (leftIsNull && rightOpType.IsNullable())
+                    if (leftIsNull && rightType.IsNullable())
                     {
                         if (!TryEmit(right, paramExprs, il, ref closure, setup, operandParent))
                             return false;
-                        EmitStoreAndLoadLocalVariableAddress(il, rightOpType);
-                        EmitMethodCall(il, rightOpType.GetNullableHasValueGetterMethod());
+                        EmitStoreAndLoadLocalVariableAddress(il, rightType);
+                        EmitMethodCall(il, rightType.GetNullableHasValueGetterMethod());
                         if (nodeType == ExpressionType.Equal)
                             EmitEqualToZeroOrNull(il);
                         return il.EmitPopIfIgnoreResult(parent);
                     }
                 }
 
-                if (!TryEmit(left, paramExprs, il, ref closure, setup, operandParent))
-                    return false;
-
-                int lVarIndex = -1, rVarIndex = -1;
-                if (leftIsNullable)
+                var lVarIndex = -1;
+                var rightIsComplexExpression = false;
+                // just load the `null` later when done with the right operand, without need for go to nested TryEmit call
+                // and store, load the left result for the complex expressions, see `IsComplexExpression` and #422
+                if (!leftIsNull)
                 {
-                    lVarIndex = EmitStoreAndLoadLocalVariableAddress(il, leftOpType);
-                    il.Demit(OpCodes.Ldfld, leftOpType.GetNullableValueUnsafeAkaGetValueOrDefaultMethod());
-                    leftOpType = Nullable.GetUnderlyingType(leftOpType);
+                    if (!TryEmit(left, paramExprs, il, ref closure, setup, operandParent))
+                        return false;
+
+                    // save the left result to restore it later after the complex expression, see #422
+                    if (rightIsComplexExpression = right.IsComplexExpression())
+                        lVarIndex = EmitStoreLocalVariable(il, leftType);
+                    else if (leftIsNullable)
+                    {
+                        lVarIndex = EmitStoreAndLoadLocalVariableAddress(il, leftType);
+                        il.Demit(OpCodes.Ldfld, leftType.GetNullableValueUnsafeAkaGetValueOrDefaultMethod());
+                        leftType = Nullable.GetUnderlyingType(leftType);
+                    }
                 }
 
-                if (!TryEmit(right, paramExprs, il, ref closure, setup, operandParent))
+                if (rightIsNull)
+                    il.Demit(OpCodes.Ldnull);
+                else if (!TryEmit(right, paramExprs, il, ref closure, setup, operandParent))
                     return false;
 
-                if (leftOpType != rightOpType && leftOpType.IsClass && rightOpType.IsClass &&
-                    (leftOpType == typeof(object) | rightOpType == typeof(object)))
+                if (comparingObjectWithNull ||
+                    (leftType != rightType && leftType.IsClass && rightType.IsClass &&
+                    (leftType == typeof(object) | rightType == typeof(object))))
                 {
                     if (!isEqualityOp)
                         return false;
-                    il.Demit(OpCodes.Ceq); // todo: @question test it, why it is not _objectEqualsMethod 
+                    if (leftIsNull)
+                        il.Demit(OpCodes.Ldnull);
+                    else if (rightIsComplexExpression)
+                        EmitLoadLocalVariable(il, lVarIndex); // the order of comparison does not matter, because equality ops are commutative
+
+                    il.Demit(OpCodes.Ceq);
                     if (nodeType == ExpressionType.NotEqual)
                         EmitEqualToZeroOrNull(il);
+
                     return il.EmitPopIfIgnoreResult(parent);
                 }
 
-                if (rightOpType.IsNullable())
+                var rVarIndex = -1;
+                if (rightIsComplexExpression)
                 {
-                    rVarIndex = EmitStoreAndLoadLocalVariableAddress(il, rightOpType);
-                    il.Demit(OpCodes.Ldfld, rightOpType.GetNullableValueUnsafeAkaGetValueOrDefaultMethod());
-                    rightOpType = Nullable.GetUnderlyingType(rightOpType);
+                    rVarIndex = EmitStoreLocalVariable(il, rightType);
+                    if (!leftIsNullable)
+                        EmitLoadLocalVariable(il, lVarIndex);
+                    else
+                    {
+                        EmitLoadLocalVariableAddress(il, lVarIndex);
+                        il.Demit(OpCodes.Ldfld, leftType.GetNullableValueUnsafeAkaGetValueOrDefaultMethod());
+                        leftType = Nullable.GetUnderlyingType(leftType);
+                    }
+
+                    if (!rightType.IsNullable())
+                        EmitLoadLocalVariable(il, rVarIndex);
+                    else
+                    {
+                        EmitLoadLocalVariableAddress(il, rVarIndex);
+                        il.Demit(OpCodes.Ldfld, rightType.GetNullableValueUnsafeAkaGetValueOrDefaultMethod());
+                        rightType = Nullable.GetUnderlyingType(rightType);
+                    }
+                }
+                else if (leftIsNull)
+                {
+                    // here we're handling only non-nullable right, the nullable right with null left is handled above
+                    rVarIndex = EmitStoreLocalVariable(il, rightType);
+                    il.Demit(OpCodes.Ldnull);
+                    EmitLoadLocalVariable(il, rVarIndex);
+                }
+                else if (rightType.IsNullable())
+                {
+                    rVarIndex = EmitStoreAndLoadLocalVariableAddress(il, rightType);
+                    il.Demit(OpCodes.Ldfld, rightType.GetNullableValueUnsafeAkaGetValueOrDefaultMethod());
+                    rightType = Nullable.GetUnderlyingType(rightType);
                 }
 
-                if (!leftOpType.IsPrimitive && !leftOpType.IsEnum)
+                if (!leftType.IsPrimitive && !leftType.IsEnum)
                 {
                     var methodName
                         = nodeType == ExpressionType.Equal ? "op_Equality"
@@ -5178,8 +5253,10 @@ namespace DryIoc.FastExpressionCompiler
                         : null;
                     if (methodName == null)
                         return false;
-                    // todo: @bug? for now handling only the parameters of the same type
-                    var method = FindComparisonMethod(il, methodName, leftOpType, rightOpType);
+
+                    var method = FindBinaryOperandMethod(methodName, leftType, leftType, rightType, typeof(bool));
+                    if (method == null & leftType != rightType)
+                        method = FindBinaryOperandMethod(methodName, rightType, leftType, rightType, typeof(bool));
                     if (method != null)
                     {
                         var ok = EmitMethodCall(il, method);
@@ -5219,7 +5296,8 @@ namespace DryIoc.FastExpressionCompiler
                         break;
                     case ExpressionType.GreaterThanOrEqual:
                         // simplifying by using the LessThen (Clt) and comparing with negative outcome (Ceq 0)
-                        if (leftOpType.IsUnsigned() && rightOpType.IsUnsigned())
+                        if (leftType.IsUnsigned() && rightType.IsUnsigned() ||
+                            (leftType.IsFloatingPoint() || rightType.IsFloatingPoint()))
                             il.Demit(OpCodes.Clt_Un);
                         else
                             il.Demit(OpCodes.Clt);
@@ -5227,7 +5305,8 @@ namespace DryIoc.FastExpressionCompiler
                         break;
                     case ExpressionType.LessThanOrEqual:
                         // simplifying by using the GreaterThen (Cgt) and comparing with negative outcome (Ceq 0)
-                        if (leftOpType.IsUnsigned() && rightOpType.IsUnsigned())
+                        if (leftType.IsUnsigned() && rightType.IsUnsigned() ||
+                            (leftType.IsFloatingPoint() || rightType.IsFloatingPoint()))
                             il.Demit(OpCodes.Cgt_Un);
                         else
                             il.Demit(OpCodes.Cgt);
@@ -5241,7 +5320,7 @@ namespace DryIoc.FastExpressionCompiler
             nullableCheck:
                 if (leftIsNullable)
                 {
-                    var leftNullableHasValueGetterMethod = left.Type.GetNullableHasValueGetterMethod();
+                    var leftNullableHasValueGetterMethod = left.Type.GetNullableHasValueGetterMethod(); // asking from the left.Type because leftType now is set to the underlying type
 
                     EmitLoadLocalVariableAddress(il, lVarIndex);
                     EmitMethodCall(il, leftNullableHasValueGetterMethod);
@@ -5276,9 +5355,9 @@ namespace DryIoc.FastExpressionCompiler
                         case ExpressionType.GreaterThan:
                         case ExpressionType.LessThanOrEqual:
                         case ExpressionType.GreaterThanOrEqual:
-                            il.Demit(OpCodes.Ceq);
-                            il.Demit(OpCodes.Ldc_I4_1);
-                            il.Demit(OpCodes.Ceq);
+                            // left.HasValue `and` right.HasValue
+                            il.Demit(OpCodes.And);
+                            // `and` the prev result of comparison operation
                             il.Demit(OpCodes.And);
                             break;
 
@@ -5317,27 +5396,28 @@ namespace DryIoc.FastExpressionCompiler
                         ParentFlags.LambdaCall | ParentFlags.ReturnByRef))
                     | ParentFlags.Arithmetic;
 
-                var leftNoValueLabel = default(Label);
+                var noNullableValueLabel = default(Label);
                 var leftType = left.Type;
                 var leftIsNullable = leftType.IsNullable();
+                var leftVar = -1;
+                var leftValueVar = -1;
                 if (leftIsNullable)
                 {
-                    leftNoValueLabel = il.DefineLabel();
+                    noNullableValueLabel = il.DefineLabel();
                     if (!TryEmit(left, paramExprs, il, ref closure, setup, flags | ParentFlags.InstanceCall))
                         return false;
 
-                    if (!closure.LastEmitIsAddress)
-                        EmitStoreAndLoadLocalVariableAddress(il, leftType);
-
-                    il.Demit(OpCodes.Dup);
+                    leftVar = EmitStoreAndLoadLocalVariableAddress(il, leftType);
                     EmitMethodCall(il, leftType.GetNullableHasValueGetterMethod());
-                    il.Demit(OpCodes.Brfalse, leftNoValueLabel);
+                    il.Demit(OpCodes.Brfalse, noNullableValueLabel);
+
+                    EmitLoadLocalVariableAddress(il, leftVar);
                     il.Demit(OpCodes.Ldfld, leftType.GetNullableValueUnsafeAkaGetValueOrDefaultMethod());
+                    leftValueVar = EmitStoreLocalVariable(il, Nullable.GetUnderlyingType(leftType));
                 }
                 else if (!TryEmit(left, paramExprs, il, ref closure, setup, flags))
                     return false;
 
-                var rightNoValueLabel = default(Label);
                 var rightIsNullable = false;
                 if (right == null) // indicates the increment/decrement operation
                 {
@@ -5345,66 +5425,62 @@ namespace DryIoc.FastExpressionCompiler
                 }
                 else
                 {
-                    var rightType = right.Type;
-
-                    // stores the left value for later to restore it after the complex right emit,
+                    // Stores the left value for later to restore it after the complex right emit,
                     // it prevents the problems in cases of right being a block, try-catch, etc.
                     // see `Using_try_finally_as_arithmetic_operand_use_void_block_in_finally`
-                    var leftVar = -1;
-                    if (right.NodeType.IsBlockLikeOrConditional() || right.NodeType == ExpressionType.Invoke)
-                        leftVar = EmitStoreLocalVariable(il, leftType);
+                    var rightType = right.Type;
+                    if (leftValueVar == -1 && right.IsComplexExpression())
+                        leftValueVar = EmitStoreLocalVariable(il, leftType);
 
+                    var rightVar = -1;
+                    var rightValueVar = -1;
                     rightIsNullable = rightType.IsNullable();
                     if (rightIsNullable)
                     {
-                        rightNoValueLabel = il.DefineLabel();
                         if (!TryEmit(right, paramExprs, il, ref closure, setup, flags | ParentFlags.InstanceCall))
                             return false;
 
-                        if (!closure.LastEmitIsAddress)
-                            EmitStoreAndLoadLocalVariableAddress(il, rightType);
+                        rightVar = EmitStoreAndLoadLocalVariableAddress(il, rightType);
 
-                        il.Demit(OpCodes.Dup);
                         EmitMethodCall(il, rightType.GetNullableHasValueGetterMethod());
-                        il.Demit(OpCodes.Brfalse, rightNoValueLabel);
+                        il.Demit(OpCodes.Brfalse, noNullableValueLabel);
+
+                        EmitLoadLocalVariableAddress(il, rightVar);
                         il.Demit(OpCodes.Ldfld, rightType.GetNullableValueUnsafeAkaGetValueOrDefaultMethod());
+                        rightValueVar = EmitStoreLocalVariable(il, Nullable.GetUnderlyingType(rightType));
                     }
                     else if (!TryEmit(right, paramExprs, il, ref closure, setup, flags))
                         return false;
 
-                    if (leftVar != -1)
+                    // Means that it was complex right and the result of the left operation was stored
+                    // and should be restored now, so the left and right go in order before the arithmetic operation
+                    if (leftValueVar != -1)
                     {
-                        // restore the left and right in proper order for operation
-                        var rightVar = EmitStoreLocalVariable(il, rightType);
-                        EmitLoadLocalVariable(il, leftVar);
-                        EmitLoadLocalVariable(il, rightVar);
+                        if (rightValueVar == -1)
+                            rightValueVar = EmitStoreLocalVariable(il, rightType);
+                        EmitLoadLocalVariable(il, leftValueVar);
+                        EmitLoadLocalVariable(il, rightValueVar);
                     }
 
                     if (!TryEmitArithmeticOperation(leftType, rightType, nodeType, exprType, il))
                         return false;
                 }
 
-                if (leftIsNullable | rightIsNullable) // todo: @clarify that the emitted code is correct
+                if (leftIsNullable | rightIsNullable)
                 {
                     var valueLabel = il.DefineLabel();
                     il.Demit(OpCodes.Br, valueLabel);
 
-                    if (rightIsNullable)
-                        il.DmarkLabel(rightNoValueLabel);
-                    il.Demit(OpCodes.Pop);
-
-                    if (leftIsNullable)
-                        il.DmarkLabel(leftNoValueLabel);
-                    il.Demit(OpCodes.Pop);
+                    il.DmarkLabel(noNullableValueLabel);
 
                     if (exprType.IsNullable())
                     {
                         EmitLoadLocalVariable(il, InitValueTypeVariable(il, exprType));
-                        var endL = il.DefineLabel();
-                        il.Demit(OpCodes.Br_S, endL);
+                        var endLabel = il.DefineLabel();
+                        il.Demit(OpCodes.Br_S, endLabel);
                         il.DmarkLabel(valueLabel);
                         il.Demit(OpCodes.Newobj, exprType.GetNullableConstructor());
-                        il.DmarkLabel(endL);
+                        il.DmarkLabel(endLabel);
                     }
                     else
                     {
@@ -5429,20 +5505,6 @@ namespace DryIoc.FastExpressionCompiler
                 return null;
             }
 
-            private static MethodInfo FindStaticOperatorMethod(Type type, string methodName)
-            {
-                if (methodName == null)
-                    return null;
-                var methods = type.GetMethods();
-                for (var i = 0; i < methods.Length; i++)
-                {
-                    var m = methods[i];
-                    if (m.IsSpecialName && m.IsStatic && m.Name == methodName)
-                        return m;
-                }
-                return null;
-            }
-
             private static bool TryEmitArithmeticOperation(Type leftType, Type rightType, ExpressionType arithmeticNodeType, Type exprType, ILGenerator il)
             {
                 if (!exprType.IsPrimitive)
@@ -5452,11 +5514,28 @@ namespace DryIoc.FastExpressionCompiler
 
                     if (!exprType.IsPrimitive)
                     {
-                        var method = exprType != typeof(string)
-                            ? FindStaticOperatorMethod(exprType, arithmeticNodeType.GetArithmeticBinaryOperatorMethodName())
-                            : leftType != rightType || leftType != typeof(string)
-                                ? _stringObjectConcatMethod ?? (_stringObjectConcatMethod = GetStringConcatMethod(typeof(object)))
-                                : _stringStringConcatMethod ?? (_stringStringConcatMethod = GetStringConcatMethod(typeof(string)));
+                        var opMethodName = arithmeticNodeType.GetArithmeticBinaryOperatorMethodName();
+                        if (opMethodName == null)
+                            return false; // todo: @feature should return specific error
+
+                        MethodInfo method = null;
+                        if (exprType != typeof(string))
+                        {
+                            // Note, that the result operation Type may be different from the operand Type,
+                            // e.g. `TimeSpan op_Subtraction(DateTime, DateTime)`, that mean we should look
+                            // for the specific method in the operand types, then in the result (expr) type.
+                            method = FindBinaryOperandMethod(opMethodName, leftType, leftType, rightType, exprType);
+                            if (method == null & leftType != rightType)
+                                method = FindBinaryOperandMethod(opMethodName, rightType, leftType, rightType, exprType);
+                            if (method == null & leftType != exprType & rightType != exprType)
+                                method = FindBinaryOperandMethod(opMethodName, exprType, leftType, rightType, exprType);
+                            // todo: @feature should return specific error
+                            return method != null && EmitMethodCall(il, method);
+                        }
+
+                        method = leftType != rightType | leftType != typeof(string)
+                            ? _stringObjectConcatMethod ?? (_stringObjectConcatMethod = GetStringConcatMethod(typeof(object)))
+                            : _stringStringConcatMethod ?? (_stringStringConcatMethod = GetStringConcatMethod(typeof(string)));
 
                         return method != null && EmitMethodCallOrVirtualCall(il, method);
                     }
@@ -5758,7 +5837,7 @@ namespace DryIoc.FastExpressionCompiler
             }
 
             [MethodImpl((MethodImplOptions)256)]
-            private static bool EmitLoadLocalVariable(ILGenerator il, int location)
+            internal static bool EmitLoadLocalVariable(ILGenerator il, int location)
             {
                 if (location == 0)
                     il.Demit(OpCodes.Ldloc_0);
@@ -5809,7 +5888,7 @@ namespace DryIoc.FastExpressionCompiler
             }
 
             [MethodImpl((MethodImplOptions)256)]
-            private static void EmitStoreAndLoadLocalVariable(ILGenerator il, int location)
+            internal static void EmitStoreAndLoadLocalVariable(ILGenerator il, int location)
             {
                 if (location == 0)
                 {
@@ -5843,7 +5922,7 @@ namespace DryIoc.FastExpressionCompiler
                 }
             }
 
-            private static int EmitStoreAndLoadLocalVariable(ILGenerator il, Type t)
+            internal static int EmitStoreAndLoadLocalVariable(ILGenerator il, Type t)
             {
                 var location = il.GetNextLocalVarIndex(t);
                 EmitStoreAndLoadLocalVariable(il, location);
@@ -5978,14 +6057,21 @@ namespace DryIoc.FastExpressionCompiler
 
         /// <summary>Returns true if class is compiler generated. Checking for CompilerGeneratedAttribute
         /// is not enough, because this attribute is not applied for classes generated from "async/await".</summary>
+        [MethodImpl((MethodImplOptions)256)]
         public static bool IsCompilerGenerated(this Type type) =>
             type.Name[0] == '<'; // consider the types with obstruct names like `<>blah` as compiler-generated
 
+        [MethodImpl((MethodImplOptions)256)]
         internal static bool IsUnsigned(this Type type) =>
             type == typeof(byte) ||
             type == typeof(ushort) ||
             type == typeof(uint) ||
             type == typeof(ulong);
+
+        [MethodImpl((MethodImplOptions)256)]
+        internal static bool IsFloatingPoint(this Type type) =>
+            type == typeof(float) ||
+            type == typeof(double);
 
         internal static bool IsPrimitiveWithZeroDefault(this Type type)
         {
@@ -6019,9 +6105,6 @@ namespace DryIoc.FastExpressionCompiler
         [MethodImpl((MethodImplOptions)256)]
         internal static Type GetUnderlyingNullableTypeOrNull(this Type type) =>
             (type.IsValueType & type.IsGenericType) && type.GetGenericTypeDefinition() == typeof(Nullable<>) ? type.GetGenericArguments()[0] : null;
-
-        [MethodImpl((MethodImplOptions)256)]
-        internal static Type GetUnderlyingNullableTypeUnsafe(this Type type) => type.GetGenericArguments()[0];
 
         public static string GetArithmeticBinaryOperatorMethodName(this ExpressionType nodeType) =>
             nodeType switch
@@ -6057,18 +6140,21 @@ namespace DryIoc.FastExpressionCompiler
             _ => false
         };
 
+        [MethodImpl((MethodImplOptions)256)]
         internal static bool IsBlockLike(this ExpressionType nodeType) =>
             nodeType == ExpressionType.Try |
             nodeType == ExpressionType.Switch |
             nodeType == ExpressionType.Block |
             nodeType == ExpressionType.Loop;
 
+        [MethodImpl((MethodImplOptions)256)]
         internal static bool IsReturnable(this ExpressionType nodeType) =>
             nodeType != ExpressionType.Goto &
             nodeType != ExpressionType.Label &
             nodeType != ExpressionType.Throw &&
             !IsBlockLike(nodeType);
 
+        [MethodImpl((MethodImplOptions)256)]
         internal static bool IsBlockLikeOrConditional(this ExpressionType nodeType) =>
             nodeType == ExpressionType.Conditional | nodeType == ExpressionType.Coalesce ||
             IsBlockLike(nodeType);
@@ -6151,30 +6237,30 @@ namespace DryIoc.FastExpressionCompiler
         [RequiresUnreferencedCode(Trimming.Message)]
         [MethodImpl((MethodImplOptions)256)]
         internal static MethodInfo FindNullableValueGetterMethod(this Type type) =>
-            type == typeof(int?)
-                ? NullableReflected<int>.ValueGetterMethod
-                : type.GetProperty("Value").GetMethod;
+            type == typeof(int?) ? NullableReflected<int>.ValueGetterMethod :
+            type == typeof(double?) ? NullableReflected<double>.ValueGetterMethod :
+            type.GetProperty("Value").GetMethod;
 
         [RequiresUnreferencedCode(Trimming.Message)]
         [MethodImpl((MethodImplOptions)256)]
         internal static MethodInfo GetNullableHasValueGetterMethod(this Type type) =>
-            type == typeof(int?)
-                ? NullableReflected<int>.HasValueGetterMethod
-                : type.GetProperty("HasValue").GetMethod;
+            type == typeof(int?) ? NullableReflected<int>.HasValueGetterMethod :
+            type == typeof(double?) ? NullableReflected<double>.HasValueGetterMethod :
+            type.GetProperty("HasValue").GetMethod;
 
         [RequiresUnreferencedCode(Trimming.Message)]
         [MethodImpl((MethodImplOptions)256)]
         internal static FieldInfo GetNullableValueUnsafeAkaGetValueOrDefaultMethod(this Type type) =>
-            type == typeof(int?)
-                ? NullableReflected<int>.ValueField
-                : type.GetField("value", BindingFlags.Instance | BindingFlags.NonPublic);
+            type == typeof(int?) ? NullableReflected<int>.ValueField :
+            type == typeof(double?) ? NullableReflected<double>.ValueField :
+            type.GetField("value", BindingFlags.Instance | BindingFlags.NonPublic);
 
         [RequiresUnreferencedCode(Trimming.Message)]
         [MethodImpl((MethodImplOptions)256)]
         internal static ConstructorInfo GetNullableConstructor(this Type type) =>
-            type == typeof(int?)
-                ? NullableReflected<int>.Constructor
-                : type.GetConstructors()[0];
+            type == typeof(int?) ? NullableReflected<int>.Constructor :
+            type == typeof(double?) ? NullableReflected<double>.Constructor :
+            type.GetConstructors()[0];
 
         [RequiresUnreferencedCode(Trimming.Message)]
         internal static MethodInfo FindConvertOperator(this Type type, Type sourceType, Type targetType)
@@ -7398,7 +7484,7 @@ namespace DryIoc.FastExpressionCompiler
                             var a = args[0];
                             if (p.ParameterType.IsByRef && !a.IsConstantOrDefault())
                                 sb.Append(p.IsOut ? "out " : p.IsIn ? "in" : "ref ");
-                            a.ToCSharpString(sb, EnclosedIn.AvoidParens, lineIdent, stripNamespace, printType, identSpaces, notRecognizedToCode);
+                            a.ToCSharpExpression(sb, EnclosedIn.AvoidParens, false, lineIdent, stripNamespace, printType, identSpaces, notRecognizedToCode);
                         }
                         else if (args.Count > 1)
                         {
@@ -7409,7 +7495,7 @@ namespace DryIoc.FastExpressionCompiler
                                 var a = args[i];
                                 if (p.ParameterType.IsByRef && !a.IsConstantOrDefault())
                                     sb.Append(p.IsOut ? "out " : p.IsIn ? "in " : "ref ");
-                                a.ToCSharpString(sb, EnclosedIn.AvoidParens, lineIdent + identSpaces, stripNamespace, printType, identSpaces, notRecognizedToCode);
+                                a.ToCSharpExpression(sb, EnclosedIn.AvoidParens, false, lineIdent + identSpaces, stripNamespace, printType, identSpaces, notRecognizedToCode);
                             }
                         }
                         // for the different return and expression types wrapping the whole expression including the cast with additional parentheses
@@ -7576,6 +7662,7 @@ namespace DryIoc.FastExpressionCompiler
                         }
                         else
                         {
+                            sb.Append('(');
                             x.Test.ToCSharpString(sb, lineIdent, stripNamespace, printType, identSpaces, notRecognizedToCode);
                             sb.Append(" ? ");
                             var doNewLine = !x.IfTrue.IsParamOrConstantOrDefault();
@@ -7583,6 +7670,7 @@ namespace DryIoc.FastExpressionCompiler
                             sb.Append(" : ");
                             doNewLine = !x.IfFalse.IsParamOrConstantOrDefault();
                             x.IfFalse.ToCSharpExpression(sb, EnclosedIn.AvoidParens, doNewLine, lineIdent, stripNamespace, printType, identSpaces, notRecognizedToCode);
+                            sb.Append(')');
                         }
                         return sb;
                     }
@@ -8532,7 +8620,8 @@ namespace DryIoc.FastExpressionCompiler
         private static Type[] GetGenericTypeParametersOrArguments(this TypeInfo typeInfo) =>
             typeInfo.IsGenericTypeDefinition ? typeInfo.GenericTypeParameters : typeInfo.GenericTypeArguments;
 
-        /// <summary>Custom handler for output the object in valid C#. Note, the `printGenericTypeArgs` is excluded because it cannot be a open-generic object.
+        /// <summary>Custom handler for output the object in valid C#. 
+        /// Note, the `printGenericTypeArgs` is excluded because it cannot be a open-generic object.
         /// This handler is also used to allow user to fully control a Constant expression output</summary>
         public delegate string ObjectToCode(object x, bool stripNamespace = false, Func<Type, string, string> printType = null);
 

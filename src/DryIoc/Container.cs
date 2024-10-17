@@ -1137,7 +1137,7 @@ public partial class Container : IContainer
         if (initialMatchCount == 0)
             return null;
 
-        // Check the for the reuse matching scopes (for a single the check will be down the road) (BBIssue: #175)
+        // Check the for the reuse matching scopes (the check will be down the road) (BBIssue: #175)
         if (factories.Length > 1 && rules.ImplicitCheckForReuseMatchingScope)
         {
             KV<object, Factory> singleMatchedFactory = null;
@@ -4403,7 +4403,7 @@ public static class FactoryDelegateCompiler
             );
     }
 }
-
+// todo: @perf can we make it an intrinsic?
 internal sealed class FactoryDelegateExpression : Expression<Func<IResolverContext, object>>
 {
     public override Type ReturnType => typeof(object);
@@ -5113,7 +5113,7 @@ public static class ResolverContext
     /// <summary>Access to the current scope or singletons.</summary>
     public static readonly PropertyExpression CurrentOrSingletonScopeExpr =
         new ResolverContextPropertyParamExpression(typeof(IResolverContext).GetProperty(nameof(IResolverContext.CurrentOrSingletonScope)));
-
+    // todo: @perf @wip may it an intrinsic, similar to `ResolverContextArgMethodCallExpression`
     internal sealed class ResolverContextPropertyParamExpression : PropertyExpression
     {
         public override Expression Expression => FactoryDelegateCompiler.ResolverContextParamExpr;
@@ -5514,6 +5514,14 @@ public static class WrappersSupport
         return itemKey;
     }
 
+    // todo: @perf use UnsafeAccessor
+    // #if NET8_0_OR_GREATER
+    //     [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "InternalPreserveStackTrace")]
+    //     private static extern void InternalPreserveStackTrace(Exception exception);
+    // #else
+    private static readonly MethodInfo _enumerableCastMethod = typeof(Enumerable).GetMethod(nameof(Enumerable.Cast));
+    // #endif
+
     private static Expression GetLazyEnumerableExpressionOrDefault(Request request, Type itemType = null)
     {
         if (itemType == null)
@@ -5538,8 +5546,6 @@ public static class WrappersSupport
             // cast to object is not required cause Resolve already returns IEnumerable<object>
             itemType == typeof(object) ? resolveManyExpr : Call(_enumerableCastMethod.MakeGenericMethod(itemType), resolveManyExpr));
     }
-
-    private static readonly MethodInfo _enumerableCastMethod = typeof(Enumerable).GetMethod(nameof(Enumerable.Cast));
 
     /// <summary>Gets the expression for <see cref="Lazy{T}"/> wrapper.</summary>
     /// <param name="request">The resolution request.</param>
@@ -14544,6 +14550,8 @@ public sealed class CurrentScopeReuse : IReuse
 
     internal class GetScopedOrSingletonViaFactoryDelegateExpression : MethodCallExpression
     {
+        public override bool IsIntrinsic => true;
+
         public override Type Type => ServiceOrInvokeExpr.Type;
         public override Expression Object => ResolverContext.CurrentOrSingletonScopeExpr;
         public override MethodInfo Method => Scope.GetOrAddViaFactoryDelegateMethod;
@@ -14563,8 +14571,6 @@ public sealed class CurrentScopeReuse : IReuse
             ServiceOrInvokeExpr = serviceOrInvokeExpr;
         }
 
-        public override bool IsIntrinsic => true;
-
         public override Result TryCollectInfo(CompilerFlags flags, ref ClosureInfo closure, IParameterProvider paramExprs,
             NestedLambdaInfo nestedLambda, ref SmallList<NestedLambdaInfo> rootNestedLambdas)
         {
@@ -14573,6 +14579,7 @@ public sealed class CurrentScopeReuse : IReuse
                 : ExpressionCompiler.TryCollectInfo(ref closure, FactoryDelegateExpr, paramExprs, nestedLambda, ref rootNestedLambdas, flags);
         }
 
+        // todo: @wip @fixme intergrate null-propagation elvis operator when scope is null, the whole expression should return null, do it only for the ThrowIfNoScope == false
         // Emitting the arguments for GetOrAddViaFactoryDelegateMethod(int id, Func<IResolverContext, object> createValue, IResolverContext r)
         public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
@@ -14614,6 +14621,43 @@ public sealed class CurrentScopeReuse : IReuse
         internal GetScopedViaFactoryDelegateExpression(
             bool throwIfNoScope, int factoryId, Expression createValueExpr) :
             base(factoryId, createValueExpr) => ThrowIfNoScope = throwIfNoScope;
+
+        // Emitting the arguments for GetOrAddViaFactoryDelegateMethod(int id, Func<IResolverContext, object> createValue, IResolverContext r)
+        public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+            ILGenerator il, ParentFlags parent, int byRefIndex = -1)
+        {   // todo: @perf check that the object is intrinsic
+            EmittingVisitor.TryEmit(Object, paramExprs, il, ref closure, config, parent);
+
+            // The same way as in `InterpretGetScopedOrSingletonViaFactoryDelegate` check for null and immediatly return null as a result
+            // to avoid NRE when scope is absent and we specifically said to avoid throwing an exception.
+            Label nullScope = default;
+            if (!ThrowIfNoScope)
+            {   // Object.Type -> typeof(IScope)
+                var scopeVar = EmittingVisitor.EmitStoreAndLoadLocalVariable(il, Object.Type);
+                il.Demit(OpCodes.Brfalse, nullScope = il.DefineLabel());
+                EmittingVisitor.EmitLoadLocalVariable(il, scopeVar);
+            }
+
+            EmittingVisitor.EmitLoadConstantInt(il, FactoryID);
+
+            // todo: @perf more intelligent emit? Think harder!
+            if (!EmittingVisitor.TryEmit(FactoryDelegateExpr, paramExprs, il, ref closure, config, parent))
+                return false;
+
+            EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure);
+            EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod);
+            il.EmitConvertObjectTo(Type);
+
+            if (!ThrowIfNoScope)
+            {
+                var result = il.DefineLabel();
+                il.Demit(OpCodes.Br, result);
+                il.DmarkLabel(nullScope);
+                il.Demit(OpCodes.Ldnull);
+                il.DmarkLabel(result);
+            }
+            return true;
+        }
     }
 
     internal sealed class GetScopedViaFactoryDelegateWithDisposalOrderExpression : GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression
@@ -16333,12 +16377,12 @@ public static class ReflectionTools
     {
         if (t != typeof(object))
             if (t.IsValueType)
-                il.Emit(OpCodes.Unbox_Any, t);
+                il.Demit(OpCodes.Unbox_Any, t);
 #if NETFRAMEWORK
             // The cast is required only for Full CLR starting from NET45, e.g.
             // .NET Core does not seem to care about verifiability and it's faster without the explicit cast
             else
-                il.Emit(OpCodes.Castclass, t);
+                il.Demit(OpCodes.Castclass, t);
 #endif
         return true;
     }

@@ -1,7 +1,10 @@
 using System;
 using System.Linq;
+using System.Linq.Expressions;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
+
+using DryIoc.FastExpressionCompiler.LightExpression;
 // ReSharper disable MemberHidesStaticFromOuterClass
 
 namespace DryIoc.UnitTests
@@ -11,6 +14,9 @@ namespace DryIoc.UnitTests
     {
         public int Run()
         {
+            Issue503_Can_ResolveMany_and_filter_out_scoped_services_WithoutInterpretation();
+            Issue503_Can_ResolveMany_and_filter_out_scoped_services_Resolved_compiled_delegate();
+
             Can_reuse_instances_in_new_open_scope();
             Can_reuse_instances_in_three_level_nested_scope();
             Can_reuse_injected_dependencies_in_new_open_scope();
@@ -161,7 +167,7 @@ namespace DryIoc.UnitTests
 
             var ex = Assert.Throws<ContainerException>(() => getLog());
             Assert.AreEqual(
-                Error.NameOf(Error.NoCurrentScope), 
+                Error.NameOf(Error.NoCurrentScope),
                 ex.ErrorName);
         }
 
@@ -229,6 +235,68 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(1, deps.Length);
             Assert.IsInstanceOf<Dep>(deps[0]);
 
+            using (var scope = container.OpenScope())
+            {
+                var scopedDeps = scope.Resolve<LazyEnumerable<IDep>>().ToArray();
+                Assert.AreEqual(2, scopedDeps.Length);
+            }
+        }
+
+        [Test]
+        public void Issue503_Can_ResolveMany_and_filter_out_scoped_services_WithoutInterpretation()
+        {
+            var container = new Container(Rules.Default.WithoutUseInterpretation());
+            container.Register<IDep, Dep>();
+            container.Register<IDep, DepScoped>(Reuse.InCurrentScope);
+
+            var depsExpr = container.Resolve<FastExpressionCompiler.LightExpression.LambdaExpression, LazyEnumerable<IDep>>();
+            depsExpr.PrintCSharp();
+
+            var fs = (Func<IResolverContext, object>)depsExpr.CompileSys();
+            fs.PrintIL();
+            var deps0 = ((LazyEnumerable<IDep>)fs(container)).ToArray();
+
+            Assert.AreEqual(1, deps0.Length);
+            Assert.IsInstanceOf<Dep>(deps0[0]);
+
+            var depsEnum = container.ResolveMany<IDep>().ToArray();
+            Assert.AreEqual(1, depsEnum.Length);
+            Assert.IsInstanceOf<Dep>(depsEnum[0]);
+
+            var deps = container.Resolve<LazyEnumerable<IDep>>().ToArray();
+            Assert.AreEqual(1, deps.Length);
+            Assert.IsInstanceOf<Dep>(deps[0]);
+
+            using (var scope = container.OpenScope())
+            {
+                var allDepsIncludingScopes = scope.Resolve<LazyEnumerable<IDep>>().ToArray();
+                Assert.AreEqual(2, allDepsIncludingScopes.Length);
+            }
+        }
+
+        [Test]
+        public void Issue503_Can_ResolveMany_and_filter_out_scoped_services_Resolved_compiled_delegate()
+        {
+            var container = new Container();
+            container.Register<IDep, Dep>();
+            container.Register<IDep, DepScoped>(Reuse.InCurrentScope);
+
+            var deps = container.Resolve<LazyEnumerable<IDep>>().ToArray();
+            Assert.AreEqual(1, deps.Length);
+            Assert.IsInstanceOf<Dep>(deps[0]);
+
+            // resolve twice to get the cached compiled delegate
+            deps = container.Resolve<LazyEnumerable<IDep>>().ToArray();
+            Assert.AreEqual(1, deps.Length);
+            Assert.IsInstanceOf<Dep>(deps[0]);
+
+            using (var scope = container.OpenScope())
+            {
+                var scopedDeps = scope.Resolve<LazyEnumerable<IDep>>().ToArray();
+                Assert.AreEqual(2, scopedDeps.Length);
+            }
+
+            // resolve twice to get the cached compiled delegate
             using (var scope = container.OpenScope())
             {
                 var scopedDeps = scope.Resolve<LazyEnumerable<IDep>>().ToArray();
@@ -354,7 +422,7 @@ namespace DryIoc.UnitTests
             Assert.AreNotSame(blah1, blah2);
 
             scope1.Dispose();
-            scope2.Dispose(); 
+            scope2.Dispose();
         }
 
         [Test]
@@ -440,8 +508,9 @@ namespace DryIoc.UnitTests
             public Uno(DosValue dos) => Dos = dos;
         }
 
-        struct DosValue {
-            public DosValue() {}
+        struct DosValue
+        {
+            public DosValue() { }
         }
 
         public class SingletonBlahUser
