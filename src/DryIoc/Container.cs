@@ -4107,11 +4107,17 @@ public static class Interpreter
         IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
     {
         Scope scope;
-        if (e is CurrentScopeReuse.GetScopedViaFactoryDelegateExpression s)
+        if (e is CurrentScopeReuse.CurrentScopeGetScopedViaFactoryDelegateExpression cs)
         {
             scope = (Scope)r.CurrentScope; // todo: @perf cast IResolverContext and avoid virtual calls, @unsafe cast to Scope
             if (scope == null)
-                return s.ThrowIfNoScope ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
+                return null;
+        }
+        else if (e is CurrentScopeReuse.ThrowIfNoScopeGetScopedViaFactoryDelegateExpression ts)
+        {
+            scope = (Scope)r.CurrentScope;
+            if (scope == null)
+                return Throw.For<IScope>(Error.NoCurrentScope, r);
         }
         else
             scope = (Scope)r.CurrentOrSingletonScope; // todo: @perf cast IResolverContext and avoid virtual calls, @unsafe cast to Scope
@@ -14498,7 +14504,9 @@ public sealed class CurrentScopeReuse : IReuse
 
             if (Name == null)
                 return disposalOrder == 0
-                    ? new GetScopedViaFactoryDelegateExpression(ifNoScopeThrow, factoryId, serviceFactoryExpr)
+                    ? (ifNoScopeThrow ?
+                        new ThrowIfNoScopeGetScopedViaFactoryDelegateExpression(factoryId, serviceFactoryExpr) :
+                        new CurrentScopeGetScopedViaFactoryDelegateExpression(factoryId, serviceFactoryExpr))
                     : new GetScopedViaFactoryDelegateWithDisposalOrderExpression(ifNoScopeThrow, factoryId, serviceFactoryExpr, disposalOrder);
 
             // todo: @perf optimize the same way as for scope without Name
@@ -14590,7 +14598,6 @@ public sealed class CurrentScopeReuse : IReuse
                 : ExpressionCompiler.TryCollectInfo(ref closure, FactoryDelegateExpr, paramExprs, nestedLambda, ref rootNestedLambdas, flags);
         }
 
-        // todo: @wip @fixme intergrate null-propagation elvis operator when scope is null, the whole expression should return null, do it only for the ThrowIfNoScope == false
         // Emitting the arguments for GetOrAddViaFactoryDelegateMethod(int id, Func<IResolverContext, object> createValue, IResolverContext r)
         public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
@@ -14598,9 +14605,8 @@ public sealed class CurrentScopeReuse : IReuse
             EmittingVisitor.TryEmit(Object, paramExprs, il, ref closure, config, parent);
             EmittingVisitor.EmitLoadConstantInt(il, FactoryID);
 
-            // todo: @perf more intelligent emit?
             if (!EmittingVisitor.TryEmit(FactoryDelegateExpr, paramExprs, il, ref closure, config, parent))
-                return false; // todo: @bug uncomment the FEC NestedLambdaInfo.IsTheSameLambda and check why fallback System compile does not work
+                return false;
 
             EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure);
             return EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod)
@@ -14625,14 +14631,16 @@ public sealed class CurrentScopeReuse : IReuse
             int factoryId, Expression createValueExpr, int disposalOrder) : base(factoryId, createValueExpr) => DisposalOrder = disposalOrder;
     }
 
-    internal sealed class GetScopedViaFactoryDelegateExpression : GetScopedOrSingletonViaFactoryDelegateExpression
+    internal sealed class ThrowIfNoScopeGetScopedViaFactoryDelegateExpression : GetScopedOrSingletonViaFactoryDelegateExpression
     {
-        public override Expression Object => ThrowIfNoScope ? ResolverContext.GetCurrentScopeOrThrowExpr : ResolverContext.CurrentScopeExpr;
-        public readonly bool ThrowIfNoScope;
-        public ConstantExpression ThrowIfNoScopeExpr => Constant(ThrowIfNoScope);
-        internal GetScopedViaFactoryDelegateExpression(
-            bool throwIfNoScope, int factoryId, Expression createValueExpr) :
-            base(factoryId, createValueExpr) => ThrowIfNoScope = throwIfNoScope;
+        public override Expression Object => ResolverContext.GetCurrentScopeOrThrowExpr;
+        internal ThrowIfNoScopeGetScopedViaFactoryDelegateExpression(int factoryId, Expression createValueExpr) : base(factoryId, createValueExpr) { }
+    }
+
+    internal sealed class CurrentScopeGetScopedViaFactoryDelegateExpression : GetScopedOrSingletonViaFactoryDelegateExpression
+    {
+        public override Expression Object => ResolverContext.CurrentScopeExpr;
+        internal CurrentScopeGetScopedViaFactoryDelegateExpression(int factoryId, Expression createValueExpr) : base(factoryId, createValueExpr) { }
 
         // Emitting the arguments for GetOrAddViaFactoryDelegateMethod(int id, Func<IResolverContext, object> createValue, IResolverContext r)
         public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
@@ -14642,17 +14650,13 @@ public sealed class CurrentScopeReuse : IReuse
 
             // The same way as in `InterpretGetScopedOrSingletonViaFactoryDelegate` check for null and immediatly return null as a result
             // to avoid NRE when scope is absent and we specifically said to avoid throwing an exception.
-            Label nullScope = default;
-            if (!ThrowIfNoScope)
-            {
-                var scopeVar = EmittingVisitor.EmitStoreAndLoadLocalVariable(il, typeof(IScope));
-                il.Demit(OpCodes.Brfalse, nullScope = il.DefineLabel());
-                EmittingVisitor.EmitLoadLocalVariable(il, scopeVar);
-            }
+            Label nullScope = il.DefineLabel();
+            var scopeVar = EmittingVisitor.EmitStoreAndLoadLocalVariable(il, typeof(IScope));
+            il.Demit(OpCodes.Brfalse, nullScope);
+            EmittingVisitor.EmitLoadLocalVariable(il, scopeVar);
 
             EmittingVisitor.EmitLoadConstantInt(il, FactoryID);
 
-            // todo: @perf more intelligent emit? Think harder!
             if (!EmittingVisitor.TryEmit(FactoryDelegateExpr, paramExprs, il, ref closure, config, parent))
                 return false;
 
@@ -14660,14 +14664,11 @@ public sealed class CurrentScopeReuse : IReuse
             EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod);
             il.EmitConvertObjectTo(Type);
 
-            if (!ThrowIfNoScope)
-            {
-                var result = il.DefineLabel();
-                il.Demit(OpCodes.Br, result);
-                il.DmarkLabel(nullScope);
-                il.Demit(OpCodes.Ldnull);
-                il.DmarkLabel(result);
-            }
+            var result = il.DefineLabel();
+            il.Demit(OpCodes.Br, result);
+            il.DmarkLabel(nullScope);
+            il.Demit(OpCodes.Ldnull);
+            il.DmarkLabel(result);
             return true;
         }
     }
