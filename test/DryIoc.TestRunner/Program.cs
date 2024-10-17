@@ -9,7 +9,8 @@ public class Program
 {
     public static void Main()
     {
-        new ReuseInCurrentScopeTests().Run();
+        new GHIssue191_Optional_IResolverContext_argument_in_Func_of_service().Run();
+        // new ReuseInCurrentScopeTests().Run();
         // new GHIssue503_Compile_time_container().Run();
         // new DecoratorTests().Run();
         // new GHIssue653_KeyValuePair_exposes_internal_DryIoc_structures().Run();

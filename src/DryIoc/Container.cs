@@ -520,6 +520,9 @@ public partial class Container : IContainer
             request.ReturnToPool();
             if (factoryDelegate == null)
                 return null;
+
+            if (serviceType == typeof(Func<IResolverContext, object>))
+                return factoryDelegate;
         }
         else
         {
@@ -5641,7 +5644,7 @@ public static class WrappersSupport
             var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
             return expr == null ? null :
                 wrapperType == typeof(Func<IResolverContext, object>)
-                ? Constant(expr.CompileToFactoryDelegate(request.Container.Rules.UseInterpretation))
+                ? ConstantOf(expr.CompileToFactoryDelegate(request.Container.Rules.UseInterpretation))
                 : Constant(expr.CompileToFactoryDelegate(wrapperType, serviceType, request.Container.Rules.UseInterpretation), wrapperType);
         }
 

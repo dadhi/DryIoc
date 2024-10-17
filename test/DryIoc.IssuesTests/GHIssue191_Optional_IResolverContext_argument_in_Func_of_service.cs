@@ -9,6 +9,7 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
+            Can_resolve_as_FactoryDelegate_WithoutUseInterpretation();
             Can_resolve_as_FactoryDelegate();
             Main_test();
             Main_test_with_strongly_typed_FactoryDelegate();
@@ -30,6 +31,20 @@ namespace DryIoc.IssuesTests
             var b = f(container) as B;
 
             Assert.IsNotNull(b);
+        }
+
+        [Test]
+        public void Can_resolve_as_FactoryDelegate_WithoutUseInterpretation()
+        {
+            var container = new Container(Rules.Default.WithoutUseInterpretation());
+
+            container.Register<A>();
+            container.Register<B>();
+
+            var f = container.Resolve<Func<IResolverContext, object>>(typeof(B));
+            var obj = f(container);
+
+            Assert.IsInstanceOf<B>(obj);
         }
 
         [Test]
