@@ -390,9 +390,9 @@ public partial class Container : IContainer
         if (factory == null)
             return null;
 
+        var rules = Rules;
         bool requestCanCache;
         Func<IResolverContext, object> factoryDelegate;
-        var rules = Rules;
         if (rules.UseInterpretationForTheFirstResolution)
         {
             var expr = factory.GetExpressionOrDefault(request);
@@ -428,6 +428,7 @@ public partial class Container : IContainer
             factoryDelegate = factory.GetDelegateOrDefault(request);
             requestCanCache = request.CanCache();
             request.ReturnToPool();
+
             if (factoryDelegate == null)
                 return null;
         }
@@ -483,7 +484,7 @@ public partial class Container : IContainer
             }
         }
 
-        // Cache is missed, so get the factory and put it into cache:
+        // Cache is missed, so get the factory and put it into cache, but first check if the container is still alive
         ThrowIfRootContainerDisposed();
 
         var serviceTypeOrInfo = ServiceInfo.OrServiceType(serviceType, requiredServiceType, ifUnresolved, serviceKey);
@@ -513,20 +514,12 @@ public partial class Container : IContainer
             }
         }
 
+        var rules = Rules;
         Func<IResolverContext, object> factoryDelegate;
-        if (!Rules.UseInterpretationForTheFirstResolution)
-        {
-            factoryDelegate = factory.GetDelegateOrDefault(request);
-            request.ReturnToPool();
-            if (factoryDelegate == null)
-                return null;
-
-            if (serviceType == typeof(Func<IResolverContext, object>))
-                return factoryDelegate;
-        }
-        else
+        if (rules.UseInterpretationForTheFirstResolution)
         {
             var expr = factory.GetExpressionOrDefault(request);
+            // requestCanCache = request.CanCache(); // todo: @wip why I don't use this thing as I do in `ResolveAndCache`
             request.ReturnToPool();
             if (expr == null)
                 return null;
@@ -548,7 +541,14 @@ public partial class Container : IContainer
                 return instance;
 
             // 2) Fallback to expression compilation
-            factoryDelegate = expr.CompileToFactoryDelegate(Rules.UseInterpretation);
+            factoryDelegate = expr.CompileToFactoryDelegate(rules.UseInterpretation);
+        }
+        else
+        {
+            factoryDelegate = factory.GetDelegateOrDefault(request);
+            request.ReturnToPool();
+            if (factoryDelegate == null)
+                return null;
         }
 
         // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
@@ -4377,9 +4377,10 @@ public static class FactoryDelegateCompiler
     {
         if (expression is ConstantExpression constExpr)
         {
-            var value = constExpr.Value;
-            return value is Func<IResolverContext, object> f ? f : value.ToFactoryDelegate;
+            // todo: @wip @perf we might return the constant value as-is to the caller side, and then the caller should decide what to do with it
+            return constExpr.Value.ToFactoryDelegate;
         }
+
         // let's be on the safe side and convert value types to object if required
         expression = expression.NormalizeExpression();
         if (!preferInterpretation)
@@ -4400,15 +4401,16 @@ public static class FactoryDelegateCompiler
     }
 
     /// <summary>Compiles lambda expression to actual `Func{IResolverContext, object}` wrapper.</summary>
-    public static object CompileToFactoryDelegate(this Expression expression, Type factoryDelegateType, Type resultType, bool preferInterpretation)
+    public static object CompileToFactoryDelegateWithSpecificResultType(
+        this Expression expression, Type factoryDelegateType, Type resultType, bool preferInterpretation)
     {
         if (!preferInterpretation)
         {
-            var factoryDelegate = ExpressionCompiler.TryCompileBoundToFirstClosureParam(
+            var customFactoryDelegate = ExpressionCompiler.TryCompileBoundToFirstClosureParam(
                 factoryDelegateType, expression, FactoryDelegateParamExprs, _factoryDelegateAndClosureParams, resultType,
                 CompilerFlags.NoInvocationLambdaInlining);
-            if (factoryDelegate != null)
-                return factoryDelegate;
+            if (customFactoryDelegate != null)
+                return customFactoryDelegate;
         }
         // fallback for the platforms where FastExpressionCompiler does not support the expression
         return Lambda(factoryDelegateType, expression, ResolverContextParamExpr, resultType).ToLambdaExpression()
@@ -5645,7 +5647,7 @@ public static class WrappersSupport
             return expr == null ? null :
                 wrapperType == typeof(Func<IResolverContext, object>)
                 ? ConstantOf(expr.CompileToFactoryDelegate(request.Container.Rules.UseInterpretation))
-                : Constant(expr.CompileToFactoryDelegate(wrapperType, serviceType, request.Container.Rules.UseInterpretation), wrapperType);
+                : Constant(expr.CompileToFactoryDelegateWithSpecificResultType(wrapperType, serviceType, request.Container.Rules.UseInterpretation), wrapperType);
         }
 
         var argExprs = Empty<ParameterExpression>();
@@ -8882,7 +8884,7 @@ public static class Registrator
         r.RegisterFunc(typeof(TService), factory.Method, (Func<object, object>)factory.ToFuncWithObjParams,
             reuse, setup, ifAlreadyRegistered, serviceKey);
 
-    /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
+    /// <summary>Registers delegate with the explicit arguments to be injected by container and with object return type known Only at runtime</summary>
     public static void RegisterDelegate<TDep1>(
         this IRegistrator r, Type serviceType, Func<TDep1, object> factory,
         IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
@@ -8906,7 +8908,7 @@ public static class Registrator
         r.RegisterFunc(typeof(TService), factory.Method, (Func<object, object, object>)factory.ToFuncWithObjParams,
             reuse, setup, ifAlreadyRegistered, serviceKey);
 
-    /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
+    /// <summary>Registers delegate with the explicit arguments to be injected by container with object return type known Only at runtime</summary>
     public static void RegisterDelegate<TDep1, TDep2>(
         this IRegistrator r, Type serviceType, Func<TDep1, TDep2, object> factory,
         IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
@@ -8930,7 +8932,7 @@ public static class Registrator
         r.RegisterFunc(typeof(TService), factory.Method, (Func<object, object, object, object>)factory.ToFuncWithObjParams,
             reuse, setup, ifAlreadyRegistered, serviceKey);
 
-    /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
+    /// <summary>Registers delegate with the explicit arguments to be injected by container with object return type known Only at runtime</summary>
     public static void RegisterDelegate<TDep1, TDep2, TDep3>(
         this IRegistrator r, Type serviceType, Func<TDep1, TDep2, TDep3, object> factory,
         IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
@@ -8954,7 +8956,7 @@ public static class Registrator
         r.RegisterFunc(typeof(TService), factory.Method, (Func<object, object, object, object, object>)factory.ToFuncWithObjParams,
             reuse, setup, ifAlreadyRegistered, serviceKey);
 
-    /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
+    /// <summary>Registers delegate with the explicit arguments to be injected by container with object return type known Only at runtime</summary>
     public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4>(
         this IRegistrator r, Type serviceType, Func<TDep1, TDep2, TDep3, TDep4, object> factory,
         IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
@@ -8979,7 +8981,7 @@ public static class Registrator
         r.RegisterFunc(typeof(TService), factory.Method, (Func<object, object, object, object, object, object>)factory.ToFuncWithObjParams,
             reuse, setup, ifAlreadyRegistered, serviceKey);
 
-    /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
+    /// <summary>Registers delegate with the explicit arguments to be injected by container with object return type known Only at runtime</summary>
     public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TDep5>(
         this IRegistrator r, Type serviceType, Func<TDep1, TDep2, TDep3, TDep4, TDep5, object> factory,
         IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
@@ -9004,7 +9006,7 @@ public static class Registrator
         r.RegisterFunc(typeof(TService), factory.Method, (Func<object, object, object, object, object, object, object>)factory.ToFuncWithObjParams,
             reuse, setup, ifAlreadyRegistered, serviceKey);
 
-    /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
+    /// <summary>Registers delegate with the explicit arguments to be injected by container with object return type known Only at runtime</summary>
     public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6>(
         this IRegistrator r, Type serviceType, Func<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, object> factory,
         IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
@@ -9030,7 +9032,7 @@ public static class Registrator
             (Func<object, object, object, object, object, object, object, object>)factory.ToFuncWithObjParams,
             reuse, setup, ifAlreadyRegistered, serviceKey);
 
-    /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
+    /// <summary>Registers delegate with the explicit arguments to be injected by container with object return type known Only at runtime</summary>
     public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, TDep7>(
         this IRegistrator r, Type serviceType, Func<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, TDep7, object> factory,
         IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
@@ -15799,9 +15801,8 @@ public static class Throw
     /// <summary>Throws exception if <paramref name="arg0"/> is not assignable to type specified by <paramref name="arg1"/>,
     /// otherwise just returns <paramref name="arg0"/>.</summary>
     public static T ThrowIfNotInstanceOf<T>(this T arg0, Type arg1, int error = -1, object arg2 = null, object arg3 = null)
-        where T : class
     {
-        if (arg0 == null && (!arg1.IsValueType || arg1.IsGenericType && arg1.GetGenericTypeDefinition() == typeof(Nullable<>)) ||
+        if (ReferenceEquals(arg0, null) && (!arg1.IsValueType || arg1.IsGenericType && arg1.GetGenericTypeDefinition() == typeof(Nullable<>)) ||
             arg1.IsAssignableFrom(arg0.GetType()))
             return arg0;
         throw GetMatchedException(ErrorCheck.IsNotOfType, error, arg0, arg1, arg2, arg3, null);

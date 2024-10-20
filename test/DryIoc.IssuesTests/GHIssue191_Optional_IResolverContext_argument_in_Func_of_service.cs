@@ -9,6 +9,7 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
+            ResolverContext_is_ignored_in_resolved_Func_WithoutUseInterpretation();
             Can_resolve_as_FactoryDelegate_WithoutUseInterpretation();
             Can_resolve_as_FactoryDelegate();
             Main_test();
@@ -16,7 +17,7 @@ namespace DryIoc.IssuesTests
             Main_test_with_RegisterDelegate_and_strongly_typed_FactoryDelegate();
             ResolverContext_is_ignored_in_resolved_Func();
             ResolverContext_is_ignored_in_injected_Func();
-            return 6;
+            return 8;
         }
 
         [Test]
@@ -259,6 +260,20 @@ namespace DryIoc.IssuesTests
             var b = f(container);
 
             Assert.IsNotNull(b);
+        }
+
+        [Test]
+        public void ResolverContext_is_ignored_in_resolved_Func_WithoutUseInterpretation()
+        {
+            var container = new Container(Rules.Default.WithoutUseInterpretation());
+
+            container.Register<A>();
+            container.Register<B>();
+
+            var f = container.Resolve<Func<IResolverContext, B>>();
+            var b = f(container);
+
+            Assert.IsInstanceOf<B>(b);
         }
 
         [Test]
