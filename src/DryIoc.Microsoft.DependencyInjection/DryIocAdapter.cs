@@ -317,7 +317,7 @@ namespace DryIoc.Microsoft.DependencyInjection
         ///     });
         /// ]]></code>
         /// </example>
-        public static void Populate(this IContainer container, IEnumerable<ServiceDescriptor> descriptors,
+        public static void Populate(this IRegistrator container, IEnumerable<ServiceDescriptor> descriptors,
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
         {
             if (registerDescriptor == null)
@@ -338,7 +338,7 @@ namespace DryIoc.Microsoft.DependencyInjection
 
         /// <summary>Unpacks the service descriptor to register the service in DryIoc container
         /// with the default MS.DI convention of `IfAlreadyRegistered.AppendNotKeyed`</summary>
-        public static void RegisterDescriptor(this IContainer container, ServiceDescriptor descriptor) =>
+        public static void RegisterDescriptor(this IRegistrator container, ServiceDescriptor descriptor) =>
             container.RegisterDescriptor(descriptor, IfAlreadyRegistered.AppendNotKeyed);
 
         internal static readonly MethodInfo KeyedImplementationFactoryInvokeMethod =
@@ -346,7 +346,7 @@ namespace DryIoc.Microsoft.DependencyInjection
 
         /// <summary>Unpacks the service descriptor to register the service in DryIoc container
         /// with the specific `IfAlreadyRegistered` policy and the optional `serviceKey`</summary>
-        public static void RegisterDescriptor(this IContainer container, ServiceDescriptor descriptor, IfAlreadyRegistered ifAlreadyRegistered,
+        public static void RegisterDescriptor(this IRegistrator container, ServiceDescriptor descriptor, IfAlreadyRegistered ifAlreadyRegistered,
             object serviceKey = null)
         {
             var serviceType = descriptor.ServiceType;
