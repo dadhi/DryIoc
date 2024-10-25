@@ -345,14 +345,15 @@ namespace DryIoc.Microsoft.DependencyInjection
             typeof(Func<IServiceProvider, object, object>).GetMethod("Invoke");
 
         /// <summary>Unpacks the service descriptor to register the service in DryIoc container
-        /// with the specific `IfAlreadyRegistered` policy and the optional `serviceKey`</summary>
+        /// with the specific `IfAlreadyRegistered` policy and the optional `serviceKey`.
+        /// Provided `serviceKey` will override the `descriptor.IsKeyedService`</summary>
         public static void RegisterDescriptor(this IRegistrator container, ServiceDescriptor descriptor, IfAlreadyRegistered ifAlreadyRegistered,
             object serviceKey = null)
         {
             var serviceType = descriptor.ServiceType;
             if (descriptor.IsKeyedService)
             {
-                serviceKey = descriptor.ServiceKey;
+                serviceKey ??= descriptor.ServiceKey;
                 if (serviceKey == KeyedService.AnyKey)
                     serviceKey = Registrator.AnyKey;
 
