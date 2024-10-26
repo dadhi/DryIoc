@@ -565,7 +565,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IOperation>());
 
-            Assert.AreSame(Error.NameOf(Error.NoConversionOperatorFoundWhenInterpretingTheConvertExpression), ex.ErrorName);
+            Assert.AreSame(Error.NameOf(Error.RegisteredDelegateResultIsNotOfServiceType), ex.ErrorName);
         }
 
         [Test]

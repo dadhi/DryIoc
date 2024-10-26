@@ -8846,20 +8846,41 @@ public static class Registrator
 
     private const string InvokeMethodName = "Invoke";
     private static object ToFuncWithObjResult<TService>(this Func<TService> f) => f();
+
     private static object ToFuncWithObjParams<D1, TService>(this Func<D1, TService> f, object d1) => f((D1)d1);
+    private static Func<object, object> GetCheckedFuncWithObjParams<D1>(this Func<D1, object> f, Type serviceType) =>
+        d1 => f((D1)d1).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType);
+
     /// <summary>Exposed for the MS.DI DryIocAdapter</summary>
     public static object ToFuncWithObjParams<D1, D2, TService>(this Func<D1, D2, TService> f,
         object d1, object d2) => f((D1)d1, (D2)d2);
+    private static Func<object, object, object> GetCheckedFuncWithObjParams<D1, D2>(this Func<D1, D2, object> f, Type serviceType) =>
+        (d1, d2) => f((D1)d1, (D2)d2).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType);
+
     private static object ToFuncWithObjParams<D1, D2, D3, TService>(this Func<D1, D2, D3, TService> f,
         object d1, object d2, object d3) => f((D1)d1, (D2)d2, (D3)d3);
+    private static Func<object, object, object, object> GetCheckedFuncWithObjParams<D1, D2, D3>(this Func<D1, D2, D3, object> f, Type serviceType) =>
+        (d1, d2, d3) => f((D1)d1, (D2)d2, (D3)d3).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType);
+
     private static object ToFuncWithObjParams<D1, D2, D3, D4, TService>(this Func<D1, D2, D3, D4, TService> f,
         object d1, object d2, object d3, object d4) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4);
+    private static Func<object, object, object, object, object> GetCheckedFuncWithObjParams<D1, D2, D3, D4>(this Func<D1, D2, D3, D4, object> f, Type serviceType) =>
+        (d1, d2, d3, d4) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType);
+
     private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, TService>(this Func<D1, D2, D3, D4, D5, TService> f,
         object d1, object d2, object d3, object d4, object d5) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5);
+    private static Func<object, object, object, object, object, object> GetCheckedFuncWithObjParams<D1, D2, D3, D4, D5>(this Func<D1, D2, D3, D4, D5, object> f, Type serviceType) =>
+        (d1, d2, d3, d4, d5) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType);
+
     private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, D6, TService>(this Func<D1, D2, D3, D4, D5, D6, TService> f,
         object d1, object d2, object d3, object d4, object d5, object d6) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6);
+    private static Func<object, object, object, object, object, object, object> GetCheckedFuncWithObjParams<D1, D2, D3, D4, D5, D6>(this Func<D1, D2, D3, D4, D5, D6, object> f, Type serviceType) =>
+        (d1, d2, d3, d4, d5, d6) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType);
+
     private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, D6, D7, TService>(this Func<D1, D2, D3, D4, D5, D6, D7, TService> f,
         object d1, object d2, object d3, object d4, object d5, object d6, object d7) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6, (D7)d7);
+    private static Func<object, object, object, object, object, object, object, object> GetCheckedFuncWithObjParams<D1, D2, D3, D4, D5, D6, D7>(this Func<D1, D2, D3, D4, D5, D6, D7, object> f, Type serviceType) =>
+        (d1, d2, d3, d4, d5, d6, d7) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6, (D7)d7).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType);
 
     private static void RegisterFunc(this IRegistrator r,
         Type serviceType, MethodInfo sourceFuncMethod, Delegate funcWithObjParams,
@@ -8888,7 +8909,7 @@ public static class Registrator
     public static void RegisterDelegate<TDep1>(
         this IRegistrator r, Type serviceType, Func<TDep1, object> factory,
         IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-        r.RegisterFunc(serviceType, factory.Method, (Func<object, object>)factory.ToFuncWithObjParams,
+        r.RegisterFunc(serviceType, factory.Method, factory.GetCheckedFuncWithObjParams<TDep1>(serviceType),
             reuse, setup, ifAlreadyRegistered, serviceKey);
 
     /// <summary>Registers delegate with the explicit arguments to be injected by container.
@@ -8898,7 +8919,8 @@ public static class Registrator
         IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null)
     {
         var invokeMethod = typeof(Func<,>).MakeGenericType(depType, typeof(object)).GetMethod(InvokeMethodName);
-        r.RegisterFunc(serviceType, invokeMethod, factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+        r.RegisterFunc(serviceType, invokeMethod, factory.GetCheckedFuncWithObjParams<object>(serviceType),
+            reuse, setup, ifAlreadyRegistered, serviceKey);
     }
 
     /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
@@ -8912,7 +8934,7 @@ public static class Registrator
     public static void RegisterDelegate<TDep1, TDep2>(
         this IRegistrator r, Type serviceType, Func<TDep1, TDep2, object> factory,
         IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-        r.RegisterFunc(serviceType, factory.Method, (Func<object, object, object>)factory.ToFuncWithObjParams,
+        r.RegisterFunc(serviceType, factory.Method, factory.GetCheckedFuncWithObjParams<TDep1, TDep2>(serviceType),
             reuse, setup, ifAlreadyRegistered, serviceKey);
 
     /// <summary>Registers delegate with the explicit arguments to be injected by container.
@@ -8922,7 +8944,8 @@ public static class Registrator
         IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null)
     {
         var invokeMethod = typeof(Func<,,>).MakeGenericType(dep1Type, dep2Type, typeof(object)).GetMethod(InvokeMethodName);
-        r.RegisterFunc(serviceType, invokeMethod, factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+        r.RegisterFunc(serviceType, invokeMethod, factory.GetCheckedFuncWithObjParams<object, object>(serviceType),
+            reuse, setup, ifAlreadyRegistered, serviceKey);
     }
 
     /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
@@ -8936,7 +8959,7 @@ public static class Registrator
     public static void RegisterDelegate<TDep1, TDep2, TDep3>(
         this IRegistrator r, Type serviceType, Func<TDep1, TDep2, TDep3, object> factory,
         IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-        r.RegisterFunc(serviceType, factory.Method, (Func<object, object, object, object>)factory.ToFuncWithObjParams,
+        r.RegisterFunc(serviceType, factory.Method, factory.GetCheckedFuncWithObjParams<TDep1, TDep2, TDep3>(serviceType),
             reuse, setup, ifAlreadyRegistered, serviceKey);
 
     /// <summary>Registers delegate with the explicit arguments to be injected by container.
@@ -8946,7 +8969,8 @@ public static class Registrator
         IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null)
     {
         var invokeMethod = typeof(Func<,,,>).MakeGenericType(dep1Type, dep2Type, dep3Type, typeof(object)).GetMethod(InvokeMethodName);
-        r.RegisterFunc(serviceType, invokeMethod, factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+        r.RegisterFunc(serviceType, invokeMethod, factory.GetCheckedFuncWithObjParams<object, object, object>(serviceType),
+            reuse, setup, ifAlreadyRegistered, serviceKey);
     }
 
     /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
@@ -8960,7 +8984,7 @@ public static class Registrator
     public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4>(
         this IRegistrator r, Type serviceType, Func<TDep1, TDep2, TDep3, TDep4, object> factory,
         IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-        r.RegisterFunc(serviceType, factory.Method, (Func<object, object, object, object, object>)factory.ToFuncWithObjParams,
+        r.RegisterFunc(serviceType, factory.Method, factory.GetCheckedFuncWithObjParams<TDep1, TDep2, TDep3, TDep4>(serviceType),
             reuse, setup, ifAlreadyRegistered, serviceKey);
 
     /// <summary>Registers delegate with the explicit arguments to be injected by container.
@@ -8971,7 +8995,8 @@ public static class Registrator
         IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null)
     {
         var invokeMethod = typeof(Func<,,,,>).MakeGenericType(dep1Type, dep2Type, dep3Type, dep4Type, typeof(object)).GetMethod(InvokeMethodName);
-        r.RegisterFunc(serviceType, invokeMethod, factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+        r.RegisterFunc(serviceType, invokeMethod, factory.GetCheckedFuncWithObjParams<object, object, object, object>(serviceType),
+            reuse, setup, ifAlreadyRegistered, serviceKey);
     }
 
     /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
@@ -8985,7 +9010,7 @@ public static class Registrator
     public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TDep5>(
         this IRegistrator r, Type serviceType, Func<TDep1, TDep2, TDep3, TDep4, TDep5, object> factory,
         IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-        r.RegisterFunc(serviceType, factory.Method, (Func<object, object, object, object, object, object>)factory.ToFuncWithObjParams,
+        r.RegisterFunc(serviceType, factory.Method, factory.GetCheckedFuncWithObjParams<TDep1, TDep2, TDep3, TDep4, TDep5>(serviceType),
             reuse, setup, ifAlreadyRegistered, serviceKey);
 
     /// <summary>Registers delegate with the explicit arguments to be injected by container.
@@ -8996,7 +9021,8 @@ public static class Registrator
         IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null)
     {
         var invokeMethod = typeof(Func<,,,,,>).MakeGenericType(dep1Type, dep2Type, dep3Type, dep4Type, dep5Type, typeof(object)).GetMethod(InvokeMethodName);
-        r.RegisterFunc(serviceType, invokeMethod, factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+        r.RegisterFunc(serviceType, invokeMethod, factory.GetCheckedFuncWithObjParams<object, object, object, object, object>(serviceType),
+            reuse, setup, ifAlreadyRegistered, serviceKey);
     }
 
     /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
@@ -9010,7 +9036,7 @@ public static class Registrator
     public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6>(
         this IRegistrator r, Type serviceType, Func<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, object> factory,
         IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-        r.RegisterFunc(serviceType, factory.Method, (Func<object, object, object, object, object, object, object>)factory.ToFuncWithObjParams,
+        r.RegisterFunc(serviceType, factory.Method, factory.GetCheckedFuncWithObjParams<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6>(serviceType),
             reuse, setup, ifAlreadyRegistered, serviceKey);
 
     /// <summary>Registers delegate with the explicit arguments to be injected by container.
@@ -9021,7 +9047,8 @@ public static class Registrator
         IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null)
     {
         var invokeMethod = typeof(Func<,,,,,,>).MakeGenericType(dep1Type, dep2Type, dep3Type, dep4Type, dep5Type, dep6Type, typeof(object)).GetMethod(InvokeMethodName);
-        r.RegisterFunc(serviceType, invokeMethod, factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+        r.RegisterFunc(serviceType, invokeMethod, factory.GetCheckedFuncWithObjParams<object, object, object, object, object, object>(serviceType),
+            reuse, setup, ifAlreadyRegistered, serviceKey);
     }
 
     /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
@@ -9037,7 +9064,7 @@ public static class Registrator
         this IRegistrator r, Type serviceType, Func<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, TDep7, object> factory,
         IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
         r.RegisterFunc(serviceType, factory.Method,
-            (Func<object, object, object, object, object, object, object, object>)factory.ToFuncWithObjParams,
+            factory.GetCheckedFuncWithObjParams<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, TDep7>(serviceType),
             reuse, setup, ifAlreadyRegistered, serviceKey);
 
     /// <summary>Registers delegate with the explicit arguments to be injected by container.
@@ -9049,7 +9076,8 @@ public static class Registrator
     {
         var invokeMethod = typeof(Func<,,,,,,,>).MakeGenericType(dep1Type, dep2Type, dep3Type, dep4Type, dep5Type, dep6Type, dep7Type, typeof(object))
             .GetMethod(InvokeMethodName);
-        r.RegisterFunc(serviceType, invokeMethod, factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+        r.RegisterFunc(serviceType, invokeMethod, factory.GetCheckedFuncWithObjParams<object, object, object, object, object, object, object>(serviceType),
+            reuse, setup, ifAlreadyRegistered, serviceKey);
     }
 
     /// <summary>Registers a factory delegate for creating an instance of <paramref name="serviceType"/>.
@@ -9069,11 +9097,11 @@ public static class Registrator
         if (serviceType.IsOpenGeneric())
             Throw.It(Error.ImpossibleToRegisterOpenGenericWithRegisterDelegate, serviceType);
 
-        Func<IResolverContext, object> checkedDelegate = r => factoryDelegate(r)
-            .ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType);
-
-        var factory = DelegateFactory.Of(checkedDelegate, reuse, setup);
+        var factory = DelegateFactory.Of(CheckedFactoryDelegate, reuse, setup);
         registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
+
+        object CheckedFactoryDelegate(IResolverContext r) =>
+            factoryDelegate(r).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType);
     }
 
     ///<summary>Obsolete("Replaced with RegisterDelegate{MyService, Dep1...Dep2, MyService}((service, d1, d2) => new MyServiceDecorator(service, d1, d2), setup: Setup.DecoratorWith(useDecorateeReuse: true, condition: optional))")</summary>

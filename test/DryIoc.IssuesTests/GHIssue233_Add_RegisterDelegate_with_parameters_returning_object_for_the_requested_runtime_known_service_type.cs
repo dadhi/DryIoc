@@ -8,12 +8,12 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            // Should_throw_if_delegate_with_one_argument_returning_Wrong_object_WithoutUseInterpretation();
-            Should_be_able_to_register_delegate_with_runtime_service_type_with_one_argument_returning_object();
             Should_throw_if_delegate_with_one_argument_returning_Wrong_object();
+            Should_throw_if_delegate_with_one_argument_returning_Wrong_object_WithoutUseInterpretation();
+            Should_be_able_to_register_delegate_with_runtime_service_type_with_one_argument_returning_object();
             Should_be_able_to_register_delegate_with_runtime_service_type_with_two_arguments_returning_object();
             For_expression_generation_Should_be_able_to_register_delegate_with_runtime_service_type_with_two_arguments_returning_object();
-            return 4;
+            return 5;
         }
 
         [Test]
@@ -46,7 +46,7 @@ namespace DryIoc.IssuesTests
             Assert.IsTrue(container.IsRegistered<B>());
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<B>());
-            Assert.AreEqual(Error.NameOf(Error.NoConversionOperatorFoundWhenInterpretingTheConvertExpression), ex.ErrorName);
+            Assert.AreEqual(Error.NameOf(Error.RegisteredDelegateResultIsNotOfServiceType), ex.ErrorName);
         }
 
         [Test]
