@@ -439,23 +439,7 @@ public partial class Container : IContainer
         // Factory delegate may throw an exception, and in case it was thrown for the scoped dependency,
         // we need to be sure to re-throw it the next time the delegate is resolved.
         // The same way as it is done for the  first resolution in `TryInterpretAndUnwrapContainerException`.
-        return TryInvokeFactoryDelegateAndStoreNonContainerExceptionInScope(this, factoryDelegate);
-    }
-
-    // A similar thing to the `Interpreter.TryInterpretAndUnwrapContainerException` but for the compiled delegate,
-    // It rethrows the Container exception right away, but stores the other User exceptions into the Scoped item entry, 
-    // to be re-thrown on the next resolution and to prevent the futile wait for the empty item entry.
-    internal static object TryInvokeFactoryDelegateAndStoreNonContainerExceptionInScope(IResolverContext r, Func<IResolverContext, object> factoryDelegate)
-    {
-        try
-        {
-            return factoryDelegate(r);
-        }
-        catch (Exception ex) when (ex is not ContainerException)
-        {
-            var exSet = Interpreter.TrySetScopedOrSingletonItemException(r, ex);
-            throw;
-        }
+        return this.TryInvokeFactoryDelegateAndStoreNonContainerExceptionInScope(factoryDelegate);
     }
 
     /// <inheritdoc />
@@ -575,7 +559,7 @@ public partial class Container : IContainer
         if (cacheKey != null)
             TryCacheKeyedFactoryDelegateOrExprOrResult(serviceTypeHash, serviceType, cacheKey, factoryDelegate);
 
-        return factoryDelegate(this);
+        return this.TryInvokeFactoryDelegateAndStoreNonContainerExceptionInScope(factoryDelegate);
     }
 
     private static bool TryInterpretOrCompileCachedExpression(IResolverContext r, Registry.KeyedFactoryCacheEntry cacheEntry, bool useInterpretation, out object result)
@@ -3275,50 +3259,10 @@ public static class Interpreter
             // Or if unsuccessful, we may get the wrong exception, but it is even more unlikely the case.
             // It is unlikely in the first place because the majority of cases the scope access is not concurrent.
             //
-            var exSet = TrySetScopedOrSingletonItemException(r, ex);
+            var exSet = r.TrySetScopedOrSingletonItemException(ex);
 
             // todo: @improve should we try to `(ex as ContainerException)?.TryGetDetails(container)` here and include it into the cex message?
             throw ex.TryRethrowWithPreservedStackTrace();
-        }
-    }
-
-    internal static bool TrySetScopedOrSingletonItemException(IResolverContext r, Exception ex)
-    {
-        ScopedItemException sex = null;
-        for (var s = r.CurrentScope; s != null; s = s.Parent)
-            if (TryFindNoItemAndStoreWrappedException(s, ex, ref sex))
-                return true;
-        return TryFindNoItemAndStoreWrappedException(r.SingletonScope, ex, ref sex);
-
-        static bool TryFindNoItemAndStoreWrappedException(IScope scope, Exception ex, ref ScopedItemException sex)
-        {
-            var clonedMaps = ((Scope)scope).CloneMaps();
-            foreach (var m in clonedMaps)
-                if (!m.IsEmpty)
-                    foreach (var entry in m.Enumerate())
-                    {
-                        if (entry.Value == Scope.NoItem)
-                        {
-                            sex ??= new ScopedItemException(ex);
-
-                            // Here is the parallel thread may set the Value or exception.
-                            // For the Value - it is fine, because the thread knows exact set reference, and we are here just wandering around.
-                            // Therefore the entry is likely not our exception culprit. Let's proceed the search.
-                            // The problem is when we are faster than the parallel thread and set the exception first. 
-                            // The solution to that is slow down before setting the exception and give other thread time to complete 
-                            // (via the timeout or spin wait).
-                            // It is wrong to put the responsibility on the other thread to check for exception in the entry,
-                            // because the other thread has no way to notify us here of the wrong, because we are done already.
-
-                            // So, slowing down and given a chance for the other thread to set the NoItem entry to the value.
-                            Thread.Sleep(1); // per design, because Thread.Sleep(0) or Thread.Yield() are not reliable enough.
-
-                            var actualValueWas = Interlocked.CompareExchange(ref entry.Value, sex, Scope.NoItem);
-                            if (actualValueWas == Scope.NoItem)
-                                return true; // set, done
-                        }
-                    }
-            return false;
         }
     }
 
@@ -4968,6 +4912,64 @@ public static class ContainerTools
         }
         result = null;
         return false;
+    }
+
+    internal static bool TrySetScopedOrSingletonItemException(this IResolverContext r, Exception ex)
+    {
+        ScopedItemException sex = null;
+        for (var s = r.CurrentScope; s != null; s = s.Parent)
+            if (TryFindNoItemAndStoreWrappedException(s, ex, ref sex))
+                return true;
+        return TryFindNoItemAndStoreWrappedException(r.SingletonScope, ex, ref sex);
+
+        static bool TryFindNoItemAndStoreWrappedException(IScope scope, Exception ex, ref ScopedItemException sex)
+        {
+            var clonedMaps = ((Scope)scope).CloneMaps();
+            foreach (var m in clonedMaps)
+                if (!m.IsEmpty)
+                    foreach (var entry in m.Enumerate())
+                    {
+                        if (entry.Value == Scope.NoItem)
+                        {
+                            sex ??= new ScopedItemException(ex);
+
+                            // Here is the parallel thread may set the Value or exception.
+                            // For the Value - it is fine, because the thread knows exact set reference, and we are here just wandering around.
+                            // Therefore the entry is likely not our exception culprit. Let's proceed the search.
+                            // The problem is when we are faster than the parallel thread and set the exception first. 
+                            // The solution to that is slow down before setting the exception and give other thread time to complete 
+                            // (via the timeout or spin wait).
+                            // It is wrong to put the responsibility on the other thread to check for exception in the entry,
+                            // because the other thread has no way to notify us here of the wrong, because we are done already.
+
+                            // So, slowing down and given a chance for the other thread to set the NoItem entry to the value.
+                            Thread.Sleep(1); // per design, because Thread.Sleep(0) or Thread.Yield() are not reliable enough.
+
+                            var actualValueWas = Interlocked.CompareExchange(ref entry.Value, sex, Scope.NoItem);
+                            if (actualValueWas == Scope.NoItem)
+                                return true; // set, done
+                        }
+                    }
+            return false;
+        }
+    }
+
+    ///<summary>
+    /// A similar thing to the `Interpreter.TryInterpretAndUnwrapContainerException` but for the compiled delegate,
+    /// It rethrows the Container exception right away, but stores the other User exceptions into the Scoped item entry, 
+    /// to be re-thrown on the next resolution and to prevent the futile wait for the empty item entry.
+    ///</summary> 
+    internal static object TryInvokeFactoryDelegateAndStoreNonContainerExceptionInScope(this IResolverContext r, Func<IResolverContext, object> factoryDelegate)
+    {
+        try
+        {
+            return factoryDelegate(r);
+        }
+        catch (Exception ex) when (ex is not ContainerException)
+        {
+            var exSet = TrySetScopedOrSingletonItemException(r, ex);
+            throw;
+        }
     }
 }
 
@@ -12019,7 +12021,7 @@ public abstract class Factory
 
     /// <summary>Creates factory delegate from service expression and returns it.</summary>
     public virtual Func<IResolverContext, object> GetDelegateOrDefault(Request request) =>
-        GetExpressionOrDefault(request)?.CompileToFactoryDelegate(request.Rules.UseInterpretation);
+        GetExpressionOrDefault(request)?.CompileToFactoryDelegate(request.Rules.UseInterpretation); // todo: @wip split and expose possible evaluated constant value as output
 
     internal virtual bool ValidateAndNormalizeRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules, bool throwIfInvalid)
     {

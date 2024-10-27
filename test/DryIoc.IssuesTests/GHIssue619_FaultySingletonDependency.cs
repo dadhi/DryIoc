@@ -10,11 +10,12 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            Resolve_second_time_Fails_for_Lazy_of_singleton_failed_the_first_time_WithoutEagerSingletone_rule();
+            Resolve_second_time_Fails_for_Lazy_of_singleton_failed_the_first_time_WithoutEagerSingleton_WithoutUseInterpretation();
+            Resolve_second_time_Fails_for_Lazy_of_singleton_failed_the_first_time_WithoutEagerSingleton_rule();
             Resolve_second_time_Succeeds_for_Lazy_of_Singleton_failed_the_first_time_After_Replacing_the_registration();
             Resolve_second_time_Fails_for_Lazy_of_singleton_failed_the_first_time();
             Resolve_second_time_Succeeds_for_Lazy_of_Singleton_failed_the_first_time_After_Adding_new_registration();
-            return 4;
+            return 5;
         }
 
         [Test]
@@ -45,10 +46,40 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
-        public void Resolve_second_time_Fails_for_Lazy_of_singleton_failed_the_first_time_WithoutEagerSingletone_rule()
+        public void Resolve_second_time_Fails_for_Lazy_of_singleton_failed_the_first_time_WithoutEagerSingleton_rule()
         {
             var container = new Container(
                 Rules.Default.WithoutEagerCachingSingletonForFasterAccess()
+            ).WithMef();
+
+            container.RegisterExports(typeof(SingletonDependency), typeof(ServiceWithLazyImport), typeof(ServiceWithNormalImport));
+
+            // controlling the fail in Dependency constructor
+            var config = new Config { DependencyCtorThrows = true };
+            container.Use(config);
+
+            // dependency initialization failed (test passes)
+            var s1 = container.Resolve<ServiceWithLazyImport>();
+            Assert.Throws<InvalidOperationException>(() =>
+                s1.DoWork());
+
+            config.DependencyCtorThrows = false;
+
+            // Still failing because the singleton is saved in the singleton scope
+            Assert.Throws<InvalidOperationException>(() =>
+                container.Resolve<ServiceWithNormalImport>());
+
+            // Still failing because Lazy does not re-evaluate the Value
+            var s3 = container.Resolve<ServiceWithLazyImport>();
+            Assert.Throws<InvalidOperationException>(() =>
+                s3.DoWork());
+        }
+
+        [Test]
+        public void Resolve_second_time_Fails_for_Lazy_of_singleton_failed_the_first_time_WithoutEagerSingleton_WithoutUseInterpretation()
+        {
+            var container = new Container(
+                Rules.Default.WithoutEagerCachingSingletonForFasterAccess().WithoutUseInterpretation()
             ).WithMef();
 
             container.RegisterExports(typeof(SingletonDependency), typeof(ServiceWithLazyImport), typeof(ServiceWithNormalImport));
