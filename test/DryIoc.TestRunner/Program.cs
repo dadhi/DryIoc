@@ -9,7 +9,8 @@ public class Program
 {
     public static void Main()
     {
-        new GHIssue233_Add_RegisterDelegate_with_parameters_returning_object_for_the_requested_runtime_known_service_type().Run();
+        new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call().Run();
+        // new GHIssue233_Add_RegisterDelegate_with_parameters_returning_object_for_the_requested_runtime_known_service_type().Run();
         // new GHIssue191_Optional_IResolverContext_argument_in_Func_of_service().Run();
         // new ReuseInCurrentScopeTests().Run();
         // new GHIssue503_Compile_time_container().Run();

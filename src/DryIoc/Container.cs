@@ -361,7 +361,7 @@ public partial class Container : IContainer
 
             if (entry.Value is FactoryDelegateCompiler.Compiling compiling)
                 return Interpreter.TryInterpretAndUnwrapContainerException(this, compiling.Expression, out var result) ? result
-                        : compiling.Expression.CompileToFactoryDelegate(useInterpretation)(this);
+                    : compiling.Expression.CompileToFactoryDelegate(useInterpretation)(this);
         }
 
         return ResolveAndCache(serviceTypeHash, serviceType, ifUnresolved);
@@ -436,7 +436,26 @@ public partial class Container : IContainer
         if (factory.CanCache & requestCanCache)
             TryCacheDefaultFactoryDelegateOrExprOrResult(serviceTypeHash, serviceType, factoryDelegate);
 
-        return factoryDelegate(this);
+        // Factory delegate may throw an exception, and in case it was thrown for the scoped dependency,
+        // we need to be sure to re-throw it the next time the delegate is resolved.
+        // The same way as it is done for the  first resolution in `TryInterpretAndUnwrapContainerException`.
+        return TryInvokeFactoryDelegateAndStoreNonContainerExceptionInScope(this, factoryDelegate);
+    }
+
+    // A similar thing to the `Interpreter.TryInterpretAndUnwrapContainerException` but for the compiled delegate,
+    // It rethrows the Container exception right away, but stores the other User exceptions into the Scoped item entry, 
+    // to be re-thrown on the next resolution and to prevent the futile wait for the empty item entry.
+    internal static object TryInvokeFactoryDelegateAndStoreNonContainerExceptionInScope(IResolverContext r, Func<IResolverContext, object> factoryDelegate)
+    {
+        try
+        {
+            return factoryDelegate(r);
+        }
+        catch (Exception ex) when (ex is not ContainerException)
+        {
+            var exSet = Interpreter.TrySetScopedOrSingletonItemException(r, ex);
+            throw;
+        }
     }
 
     /// <inheritdoc />
@@ -3257,14 +3276,13 @@ public static class Interpreter
             // It is unlikely in the first place because the majority of cases the scope access is not concurrent.
             //
             var exSet = TrySetScopedOrSingletonItemException(r, ex);
-            Debug.Assert(!exSet, $"The exception was not set in the scope item entry, ex message: {ex.Message}");
 
             // todo: @improve should we try to `(ex as ContainerException)?.TryGetDetails(container)` here and include it into the cex message?
             throw ex.TryRethrowWithPreservedStackTrace();
         }
     }
 
-    private static bool TrySetScopedOrSingletonItemException(IResolverContext r, Exception ex)
+    internal static bool TrySetScopedOrSingletonItemException(IResolverContext r, Exception ex)
     {
         ScopedItemException sex = null;
         for (var s = r.CurrentScope; s != null; s = s.Parent)
@@ -13900,7 +13918,7 @@ internal sealed class ScopedItemException
 {
     public readonly Exception Ex;
     public ScopedItemException(Exception ex) => Ex = ex;
-    internal void ReThrow() => throw Ex.TryRethrowWithPreservedStackTrace();
+    internal object ReThrow() => throw Ex.TryRethrowWithPreservedStackTrace();
 }
 
 /// <summary>Lazy object storage that will create object with provided factory on first access,
@@ -14087,7 +14105,9 @@ public class Scope : IScope
     {
         var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(id);
         return itemRef != null
-            ? itemRef.Value != NoItem ? itemRef.Value : WaitForItemIsSet(itemRef)
+            ? itemRef.Value != NoItem
+                ? (itemRef.Value is ScopedItemException sex ? sex.ReThrow() : itemRef.Value)
+                : WaitForItemIsSet(itemRef)
             : TryGetOrAddViaFactoryDelegate(id, createValue, r);
     }
 
@@ -14097,7 +14117,9 @@ public class Scope : IScope
     {
         var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(id);
         return itemRef != null
-            ? itemRef.Value != NoItem ? itemRef.Value : WaitForItemIsSet(itemRef)
+            ? itemRef.Value != NoItem
+                ? (itemRef.Value is ScopedItemException sex ? sex.ReThrow() : itemRef.Value)
+                : WaitForItemIsSet(itemRef)
             : TryGetOrAddViaFactoryDelegate(id, createValue, r, disposalOrder);
     }
 

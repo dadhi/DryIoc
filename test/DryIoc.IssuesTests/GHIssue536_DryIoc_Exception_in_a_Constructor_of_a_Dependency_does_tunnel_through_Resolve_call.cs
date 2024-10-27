@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -8,10 +9,13 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
+            Test_dep_scoped_in_factory_delegate_should_rethrow_the_exception_WithoutUseInterpretation();
+            Test_dep_scoped_in_registered_delegate_should_rethrow_the_exception_WithoutUseInterpretation();
+            Test_dep_scoped_should_rethrow_the_exception_WithoutUseInterpretation();
             Test_root_singleton_should_rethrow_the_exception();
             Test_dep_singleton_should_rethrow_the_exception();
             Test_dep_scoped_should_rethrow_the_exception();
-            return 3;
+            return 6;
         }
 
         [Test]
@@ -49,6 +53,59 @@ namespace DryIoc.IssuesTests
             var container = new Container();
 
             container.Register<B>();
+            container.Register<IInterfaceA, ClassA>(Reuse.Scoped);
+
+            using var scope = container.OpenScope();
+
+            Assert.Throws<ArgumentException>(() =>
+                scope.Resolve<B>());
+
+            Assert.Throws<ArgumentException>(() =>
+                scope.Resolve<B>());
+        }
+
+        [Test]
+        public void Test_dep_scoped_should_rethrow_the_exception_WithoutUseInterpretation()
+        {
+            var container = new Container(Rules.Default.WithoutUseInterpretation());
+
+            container.Register<B>();
+            container.Register<IInterfaceA, ClassA>(Reuse.Scoped);
+
+            using var scope = container.OpenScope();
+
+            Assert.Throws<ArgumentException>(() =>
+                scope.Resolve<B>());
+
+            Assert.Throws<ArgumentException>(() =>
+                scope.Resolve<B>());
+        }
+
+        [Test]
+        public void Test_dep_scoped_in_registered_delegate_should_rethrow_the_exception_WithoutUseInterpretation()
+        {
+            var container = new Container(Rules.Default.WithoutUseInterpretation());
+
+            container.RegisterDelegate<IInterfaceA, B>(a => new B(a));
+
+            container.Register<IInterfaceA, ClassA>(Reuse.Scoped);
+
+            using var scope = container.OpenScope();
+
+            Assert.Throws<ArgumentException>(() =>
+                scope.Resolve<B>());
+
+            Assert.Throws<ArgumentException>(() =>
+                scope.Resolve<B>());
+        }
+
+        [Test]
+        public void Test_dep_scoped_in_factory_delegate_should_rethrow_the_exception_WithoutUseInterpretation()
+        {
+            var container = new Container(Rules.Default.WithoutUseInterpretation());
+
+            container.RegisterDelegate(ctx => new B(ctx.Resolve<IInterfaceA>()));
+
             container.Register<IInterfaceA, ClassA>(Reuse.Scoped);
 
             using var scope = container.OpenScope();
