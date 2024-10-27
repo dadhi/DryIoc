@@ -6,7 +6,7 @@
         <Product>DryIoc</Product>
 
         <VersionPrefix>6.0.0</VersionPrefix>
-        <VersionSuffix>preview-07</VersionSuffix>
+        <VersionSuffix>preview-08</VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
