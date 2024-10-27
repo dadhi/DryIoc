@@ -392,12 +392,14 @@ public partial class Container : IContainer
 
         var rules = Rules;
         bool requestCanCache;
+        object createdInstance = null; // evaluated singleton or similar
         Func<IResolverContext, object> factoryDelegate;
         if (rules.UseInterpretationForTheFirstResolution)
         {
             var expr = factory.GetExpressionOrDefault(request);
             requestCanCache = request.CanCache();
             request.ReturnToPool();
+
             if (expr == null)
                 return null;
 
@@ -425,13 +427,16 @@ public partial class Container : IContainer
         }
         else
         {
-            factoryDelegate = factory.GetDelegateOrDefault(request);
+            factoryDelegate = factory.GetDelegateOrDefault(request, out createdInstance);
             requestCanCache = request.CanCache();
             request.ReturnToPool();
 
-            if (factoryDelegate == null)
+            if (factoryDelegate == null & createdInstance == null)
                 return null;
         }
+
+        if (createdInstance != null)
+            return createdInstance;
 
         if (factory.CanCache & requestCanCache)
             TryCacheDefaultFactoryDelegateOrExprOrResult(serviceTypeHash, serviceType, factoryDelegate);
@@ -518,25 +523,28 @@ public partial class Container : IContainer
         }
 
         var rules = Rules;
+        bool requestCanCache;
+        object createdInstance = null;
         Func<IResolverContext, object> factoryDelegate;
         if (rules.UseInterpretationForTheFirstResolution)
         {
             var expr = factory.GetExpressionOrDefault(request);
-            // requestCanCache = request.CanCache(); // todo: @wip why I don't use this thing as I do in `ResolveAndCache`
+            requestCanCache = request.CanCache();
             request.ReturnToPool();
+
             if (expr == null)
                 return null;
 
             if (expr is ConstantExpression constExpr)
             {
                 var value = constExpr.Value;
-                if (cacheKey != null)
+                if (cacheKey != null & requestCanCache)
                     TryCacheKeyedFactoryDelegateOrExprOrResult(serviceTypeHash, serviceType, cacheKey, value.ToCachedResult());
                 return value;
             }
 
             // Important to cache expression first before tying to interpret, so that parallel resolutions may already use it
-            if (cacheKey != null)
+            if (cacheKey != null & requestCanCache)
                 TryCacheKeyedFactoryDelegateOrExprOrResult(serviceTypeHash, serviceType, cacheKey, expr);
 
             // 1) First try to interpret
@@ -548,15 +556,18 @@ public partial class Container : IContainer
         }
         else
         {
-            factoryDelegate = factory.GetDelegateOrDefault(request);
+            factoryDelegate = factory.GetDelegateOrDefault(request, out createdInstance);
+            requestCanCache = request.CanCache();
             request.ReturnToPool();
-            if (factoryDelegate == null)
+
+            if (factoryDelegate == null & createdInstance == null)
                 return null;
         }
 
-        // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
-        // Additionally disable caching when no services registered, not to cache an empty collection wrapper or alike.
-        if (cacheKey != null)
+        if (createdInstance != null)
+            return createdInstance;
+
+        if (cacheKey != null & requestCanCache)
             TryCacheKeyedFactoryDelegateOrExprOrResult(serviceTypeHash, serviceType, cacheKey, factoryDelegate);
 
         return this.TryInvokeFactoryDelegateAndStoreNonContainerExceptionInScope(factoryDelegate);
@@ -1148,7 +1159,7 @@ public partial class Container : IContainer
         {
             KV<object, Factory> singleMatchedFactory = null;
 
-            // todo: @wip split the MatchFactoryReuse and the FindFactoryWithTheMinReuseLifespanOrDefault checks, because first lead to the errors and second is not
+            // todo: @wip split the MatchFactoryReuse and the FindFactoryWithTheMinReuseLifespanOrDefault checks, because first leads to the errors and seconds does not
             var reuseMatchedFactories = factories.Match(request, static (r, x) => r.MatchFactoryReuse(x.Value));
             if (reuseMatchedFactories.Length == 1)
                 singleMatchedFactory = reuseMatchedFactories[0];
@@ -4337,11 +4348,9 @@ public static class FactoryDelegateCompiler
     /// then compiles lambda expression to actual `Func{IResolverContext, object}` used for service resolution.</summary>
     public static Func<IResolverContext, object> CompileToFactoryDelegate(this Expression expression, bool preferInterpretation)
     {
+        // todo: @dup code in the GetDelegateOrDefault, consider removing Constant handling here when it is covered by the call-site
         if (expression is ConstantExpression constExpr)
-        {
-            // todo: @wip @perf we might return the constant value as-is to the caller side, and then the caller should decide what to do with it
             return constExpr.Value.ToFactoryDelegate;
-        }
 
         // let's be on the safe side and convert value types to object if required
         expression = expression.NormalizeExpression();
@@ -4353,6 +4362,8 @@ public static class FactoryDelegateCompiler
             if (factoryDelegate != null)
                 return factoryDelegate;
         }
+
+        // todo: @wip @remove candidate for the removal, as DryIoc exclusively relies on FEC, and removing may surface the remaining FEC gaps
         // fallback to the platforms where FastExpressionCompiler is not able to compile the expression
         return new FactoryDelegateExpression(expression).ToLambdaExpression()
             .Compile(
@@ -5655,7 +5666,8 @@ public static class WrappersSupport
         var argCount = isAction ? argTypes.Length : argTypes.Length - 1;
         var serviceType = isAction ? typeof(void) : argTypes[argCount];
 
-        // special case for the Factory delegate of Func<IResolverContext, ?>, so we may avoid using the InputArgs and use the result expression directly
+        // special case for the Factory delegate of Func<IResolverContext, ?>, 
+        // so we may avoid using the InputArgs and use the result expression directly
         if (!isAction & argCount == 1 && argTypes[0] == typeof(IResolverContext))
         {
             serviceType = wrapperType == typeof(Func<IResolverContext, object>)
@@ -8851,6 +8863,9 @@ public static class Registrator
     /// Lifts the result to the factory delegate without allocations on capturing value in lambda closure
     public static object ToFactoryDelegate(this object result, IResolverContext _) => result;
 
+    internal static object WeakRefObjToFactoryDelegate(this object weakRefObj, IResolverContext _) =>
+        (weakRefObj as WeakReference)?.Target.WeakRefReuseWrapperGCed();
+
     /// <summary>Registers a factory delegate for creating an instance of <typeparamref name="TService"/>.
     /// Delegate can use resolver context parameter to resolve any required dependencies, e.g.:
     /// <code lang="cs"><![CDATA[container.RegisterDelegate<ICar>(r => new Car(r.Resolve<IEngine>()))]]></code></summary>
@@ -12019,9 +12034,22 @@ public abstract class Factory
             ? Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod, Property(TryConvertIntrinsic<WeakReference>(e), ReflectionTools.WeakReferenceValueProperty))
             : Field(TryConvertIntrinsic<HiddenDisposable>(e), HiddenDisposable.ValueField);
 
-    /// <summary>Creates factory delegate from service expression and returns it.</summary>
-    public virtual Func<IResolverContext, object> GetDelegateOrDefault(Request request) =>
-        GetExpressionOrDefault(request)?.CompileToFactoryDelegate(request.Rules.UseInterpretation); // todo: @wip split and expose possible evaluated constant value as output
+    /// <summary>Creates an instance of the service or the factory delegate to resolve the instance and returns either of them, or nulls.</summary>
+    public virtual Func<IResolverContext, object> GetDelegateOrDefault(Request request, out object createdInstance)
+    {
+        createdInstance = null;
+        var expr = GetExpressionOrDefault(request);
+        if (expr == null)
+            return null;
+
+        if (expr is ConstantExpression constExpr)
+        {
+            createdInstance = constExpr.Value;
+            return null;
+        }
+
+        return expr.CompileToFactoryDelegate(request.Rules.UseInterpretation);
+    }
 
     internal virtual bool ValidateAndNormalizeRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules, bool throwIfInvalid)
     {
@@ -13710,18 +13738,20 @@ public class InstanceFactory : Factory
         return CreateExpressionOrDefault(request);
     }
 
-    /// <summary>Used at resolution root too simplify getting the actual instance</summary>
-    public override Func<IResolverContext, object> GetDelegateOrDefault(Request request)
+    /// <summary>Used at the resolution root to simplify getting the actual instance</summary>
+    public override Func<IResolverContext, object> GetDelegateOrDefault(Request request, out object createdInstance)
     {
+        createdInstance = null;
         request = request.WithResolvedFactory(this);
-        return request.Container.GetDecoratorExpressionOrDefault(request) != null
-            ? base.GetDelegateOrDefault(request)
-            : Setup.WeaklyReferenced
-                ? (Func<IResolverContext, object>)UnpackWeakRefFactory
-                : (Func<IResolverContext, object>)Instance.ToFactoryDelegate;
-    }
+        if (request.Container.GetDecoratorExpressionOrDefault(request) != null)
+            return base.GetDelegateOrDefault(request, out createdInstance);
 
-    private object UnpackWeakRefFactory(IResolverContext _) => (Instance as WeakReference)?.Target.WeakRefReuseWrapperGCed();
+        if (Setup.WeaklyReferenced)
+            return Instance.WeakRefObjToFactoryDelegate;
+
+        createdInstance = Instance;
+        return null;
+    }
 }
 
 /// <summary>This factory is the thin wrapper for user provided delegate
@@ -13819,10 +13849,8 @@ public class DelegateFactory : Factory
     }
 
     /// <summary>If possible returns delegate directly, without creating expression trees, just wrapped in `Func{IResolverContext, object}`/>.
-    /// If decorator found for request then factory fall-backs to expression creation.</summary>
-    /// <param name="request">Request to resolve.</param>
-    /// <returns>Factory delegate directly calling wrapped delegate, or invoking expression if decorated.</returns>
-    public override Func<IResolverContext, object> GetDelegateOrDefault(Request request)
+    /// If decorator found for request then factory fall-backs to the expression creation.</summary>
+    public override Func<IResolverContext, object> GetDelegateOrDefault(Request request, out object createdInstance)
     {
         request = request.WithResolvedFactory(this);
 
@@ -13830,9 +13858,10 @@ public class DelegateFactory : Factory
         if (request.Reuse != DryIoc.Reuse.Transient ||
             FactoryType == FactoryType.Service &&
             request.Container.GetDecoratorExpressionOrDefault(request) != null)
-            return base.GetDelegateOrDefault(request);
+            return base.GetDelegateOrDefault(request, out createdInstance);
 
         // Otherwise just use delegate as-is
+        createdInstance = null;
         return _factoryDelegate;
     }
 }
