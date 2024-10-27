@@ -7,8 +7,12 @@
     <SkipDocGen>true</SkipDocGen>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(UseCompilationOnly)' == 'true'">
+    <DefineConstants>$(DefineConstants);USE_COMPILATION_ONLY</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
-     <Compile Include="..\DryIoc.TestRunner\DocsTests.cs" Link="DocsTests.cs" />
+    <Compile Include="..\DryIoc.TestRunner\DocsTests.cs" Link="DocsTests.cs" />
   </ItemGroup>
 
   <ItemGroup>

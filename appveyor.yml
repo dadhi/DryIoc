@@ -1,6 +1,7 @@
 image:
   - Visual Studio 2022
   - Ubuntu
+  - MacOS
 
 version: 6.0.0-preview-07-{build}
 
@@ -10,7 +11,8 @@ skip_commits:
   message: /noci .*/
 
 build_script:
-  - dotnet run -v:minimal -p:DevMode=false -f:net7.0 -c:Release --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+  - dotnet run -v:minimal -c:Release -p:DevMode=false -p:GeneratePackageOnBuild=false -f:net7.0 --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+  - dotnet run -v:minimal -c:Release -p:DevMode=false -p:GeneratePackageOnBuild=false -p:UseCompilationOnly=true -f:net7.0 --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
 
 for:
   - matrix:

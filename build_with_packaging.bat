@@ -21,16 +21,29 @@ echo:## Finished: Clean, Restore and Build
 echo:
 echo:## Starting: TestRunners for .NET 8.0 and .NET FRAMEWORK 4.7.2...
 echo:
-echo:### .NET 8.0
+echo:### .NET 8.0 - Default rules (interpretation, then compilation)
 
 dotnet run --no-build -f:net8.0 -c:Release --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
 
 echo:
-echo:### .NET FRAMEWORK 4.7.2
+echo:### .NET 8.0 - Compilation only
+
+dotnet run -f:net8.0 -c:Release -p:GeneratePackageOnBuild=false -p:UseCompilationOnly=true --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+
+echo:
+echo:
+echo:### .NET FRAMEWORK 4.7.2 - Default rules (interpretation, then compilation)
 
 dotnet run --no-build -c:Release --project test/DryIoc.TestRunner.net472/DryIoc.TestRunner.net472.csproj
 if %ERRORLEVEL% neq 0 goto :error
 
+echo:
+echo:### .NET FRAMEWORK 4.7.2 - Compilation only
+
+dotnet run -c:Release -p:GeneratePackageOnBuild=false -p:UseCompilationOnly=true --project test/DryIoc.TestRunner.net472/DryIoc.TestRunner.net472.csproj
+if %ERRORLEVEL% neq 0 goto :error
+
+echo:
 echo:
 echo:## Finished: TestRunners
 echo:
