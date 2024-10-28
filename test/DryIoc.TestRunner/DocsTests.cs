@@ -33,7 +33,7 @@ public class Decorators : ITest
         new Collection_wrapper_of_non_keyed_and_keyed_services().Example();
         new Decorator_of_wrapper().Example();
         new Decorator_as_initializer().Example();
-        new Reusing_the_scoped_service_from_the_parent_scope().Example();
+        new Reusing_a_scoped_service_from_the_parent_scope().Example();
         new Using_the_Decorator_directly_for_the_complex_initialization().Example();
         return 19;
     }

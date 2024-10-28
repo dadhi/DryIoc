@@ -353,7 +353,7 @@ public partial class Container : IContainer
                 // set to Compiling to notify other threads to use the interpretation until the service is compiled
                 if (Interlocked.CompareExchange(ref entry.Value, new FactoryDelegateCompiler.Compiling(cachedExpr), cachedExpr) == cachedExpr)
                 {
-                    var compiledFactory = cachedExpr.CompileToFactoryDelegate(useInterpretation);
+                    var compiledFactory = cachedExpr.CompileOrInterpretFactoryDelegate(useInterpretation);
                     entry.Value = compiledFactory; // todo: @unclear should we instead cache only after invoking the factory delegate, avoiding the failing delegate in cache
                     return compiledFactory(this);
                 }
@@ -361,7 +361,7 @@ public partial class Container : IContainer
 
             if (entry.Value is FactoryDelegateCompiler.Compiling compiling)
                 return Interpreter.TryInterpretAndUnwrapContainerException(this, compiling.Expression, out var result) ? result
-                    : compiling.Expression.CompileToFactoryDelegate(useInterpretation)(this);
+                    : compiling.Expression.CompileOrInterpretFactoryDelegate(useInterpretation)(this);
         }
 
         return ResolveAndCache(serviceTypeHash, serviceType, ifUnresolved);
@@ -423,7 +423,7 @@ public partial class Container : IContainer
             }
 
             // 2) Fallback to expression compilation
-            factoryDelegate = expr.CompileToFactoryDelegate(rules.UseInterpretation);
+            factoryDelegate = expr.CompileOrInterpretFactoryDelegate(rules.UseInterpretation);
         }
         else
         {
@@ -552,7 +552,7 @@ public partial class Container : IContainer
                 return instance;
 
             // 2) Fallback to expression compilation
-            factoryDelegate = expr.CompileToFactoryDelegate(rules.UseInterpretation);
+            factoryDelegate = expr.CompileOrInterpretFactoryDelegate(rules.UseInterpretation);
         }
         else
         {
@@ -583,7 +583,7 @@ public partial class Container : IContainer
             // set to Compiling to notify other threads to use the interpretation until the service is compiled
             if (Interlocked.CompareExchange(ref cacheEntry.Factory, new FactoryDelegateCompiler.Compiling(expr), expr) == expr)
             {
-                var factoryDelegate = expr.CompileToFactoryDelegate(useInterpretation);
+                var factoryDelegate = expr.CompileOrInterpretFactoryDelegate(useInterpretation);
                 // todo: @unclear should we instead cache only after invoking the factory delegate
                 cacheEntry.Factory = factoryDelegate;
                 result = factoryDelegate(r);
@@ -594,7 +594,7 @@ public partial class Container : IContainer
         if (cacheEntry.Factory is FactoryDelegateCompiler.Compiling compiling)
         {
             if (!Interpreter.TryInterpretAndUnwrapContainerException(r, compiling.Expression, out result))
-                result = compiling.Expression.CompileToFactoryDelegate(useInterpretation)(r);
+                result = compiling.Expression.CompileOrInterpretFactoryDelegate(useInterpretation)(r);
             return true;
         }
 
@@ -3283,7 +3283,7 @@ public static class Interpreter
         {
             return TryInterpret(r, expr, FactoryDelegateCompiler.FactoryDelegateParamExprs, r, null, out var singleton)
                 ? singleton
-                : expr.CompileToFactoryDelegate(r.Rules.UseInterpretation)(r);
+                : expr.CompileOrInterpretFactoryDelegate(r.Rules.UseInterpretation)(r);
         }
         catch (TargetInvocationException tex) when (tex.InnerException != null)
         {
@@ -3651,6 +3651,12 @@ public static class Interpreter
         if (paramExprs != null)
             parentArgs = new ParentLambdaArgs(parentArgs, paramExprs, paramValues);
 
+        // todo: @wip add specialization for the factory delegate Func<IResolverContext, object>
+        if (lambdaExpr.Type == typeof(Func<IResolverContext, object>))
+        {
+            Debug.WriteLine("foo bar");
+        }
+
         var bodyExpr = lambdaExpr.Body;
         var paramCount = lambdaExpr.ParameterCount;
         if (paramCount == 0)
@@ -3753,7 +3759,7 @@ public static class Interpreter
         return ts;
     }
 
-    private static object TryInterpretNestedLambdaBodyAndUnwrapException(IResolverContext r,
+    internal static object TryInterpretNestedLambdaBodyAndUnwrapException(IResolverContext r,
         Expression bodyExpr, IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
     {
         try
@@ -3767,6 +3773,10 @@ public static class Interpreter
             throw tex.InnerException.TryRethrowWithPreservedStackTrace();
         }
     }
+
+    internal static Func<IResolverContext, R> ConvertFactoryDelegate<R>(Func<IResolverContext, object> f) => r =>
+        (R)f(r);
+    internal static readonly MethodInfo ConvertFactoryDelegateMethod = typeof(Interpreter).GetMethod(nameof(ConvertFactoryDelegate), BindingFlags.NonPublic | BindingFlags.Static);
 
     internal static Func<R> ConvertFunc<R>(Func<object> f) => () => (R)f();
     private static readonly MethodInfo _convertFuncMethod = typeof(Interpreter).GetMethod(nameof(ConvertFunc), BindingFlags.NonPublic | BindingFlags.Static);
@@ -3887,7 +3897,7 @@ public static class Interpreter
                         {
                             if (TryInterpret(rc, e, paramExprs, paramValues, parentArgs, out var value))
                                 return value;
-                            return e.CompileToFactoryDelegate(rc.Rules.UseInterpretation)(rc);
+                            return e.CompileOrInterpretFactoryDelegate(rc.Rules.UseInterpretation)(rc);
                         });
                 }
                 return true;
@@ -3905,7 +3915,7 @@ public static class Interpreter
                         // todo: @perf @memory optimize closure away
                         (rc, e) => TryInterpret(rc, e, paramExprs, paramValues, parentArgs, out var value)
                             ? value
-                            : e.CompileToFactoryDelegate(rc.Rules.UseInterpretation)(rc),
+                            : e.CompileOrInterpretFactoryDelegate(rc.Rules.UseInterpretation)(rc),
                         TryGetIntConstantValue(args.Argument3));
                 }
                 return true;
@@ -4129,7 +4139,7 @@ public static class Interpreter
         if (serviceExpr is InvokeFactoryDelegateExpression invokeExpr)
             result = invokeExpr.FactoryDelegate(r);
         else if (!TryInterpret(r, serviceExpr, paramExprs, paramValues, parentArgs, out result))
-            result = serviceExpr.CompileToFactoryDelegate(r.Rules.UseInterpretation)(r);
+            result = serviceExpr.CompileOrInterpretFactoryDelegate(r.Rules.UseInterpretation)(r);
 
         itemRef.Value = result;
         if (result is IDisposable disp && !ReferenceEquals(disp, scope))
@@ -4189,7 +4199,7 @@ public static class Interpreter
         if (serviceExpr is InvokeFactoryDelegateExpression invokeExpr)
             result = invokeExpr.FactoryDelegate(r);
         else if (!TryInterpret(r, serviceExpr, paramExprs, paramValues, parentArgs, out result))
-            result = serviceExpr.CompileToFactoryDelegate(r.Rules.UseInterpretation)(r);
+            result = serviceExpr.CompileOrInterpretFactoryDelegate(r.Rules.UseInterpretation)(r);
 
         itemRef.Value = result;
         if (result is IDisposable disp && !ReferenceEquals(disp, scope))
@@ -4242,7 +4252,7 @@ public static class Interpreter
         if (lambda is ConstantExpression lambdaConstExpr)
             result = ((Func<IResolverContext, object>)lambdaConstExpr.Value)(r);
         else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
-            result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(r.Rules.UseInterpretation)(r);
+            result = ((LambdaExpression)lambda).Body.CompileOrInterpretFactoryDelegate(r.Rules.UseInterpretation)(r);
 
         itemRef.Value = result;
         if (result is IDisposable disp)
@@ -4344,14 +4354,10 @@ public static class FactoryDelegateCompiler
 
     private static Type[] _factoryDelegateAndClosureParams = new[] { typeof(ExpressionCompiler.ArrayClosure), typeof(IResolverContext) };
 
-    /// <summary>First wraps the input service expression into lambda expression and
-    /// then compiles lambda expression to actual `Func{IResolverContext, object}` used for service resolution.</summary>
-    public static Func<IResolverContext, object> CompileToFactoryDelegate(this Expression expression, bool preferInterpretation)
+    /// <summary>Compiles or interprets the passed expression based on the second parameter `preferInterpretation`.
+    /// If the passed expression is already a constant with the result, it should be handled by the calling side.</summary>
+    public static Func<IResolverContext, object> CompileOrInterpretFactoryDelegate(this Expression expression, bool preferInterpretation)
     {
-        // todo: @dup code in the GetDelegateOrDefault, consider removing Constant handling here when it is covered by the call-site
-        if (expression is ConstantExpression constExpr)
-            return constExpr.Value.ToFactoryDelegate;
-
         // let's be on the safe side and convert value types to object if required
         expression = expression.NormalizeExpression();
         if (!preferInterpretation)
@@ -4363,8 +4369,8 @@ public static class FactoryDelegateCompiler
                 return factoryDelegate;
         }
 
-        // todo: @wip @remove candidate for the removal, as DryIoc exclusively relies on FEC, and removing may surface the remaining FEC gaps
-        // fallback to the platforms where FastExpressionCompiler is not able to compile the expression
+        // It is required for the expression based Made.Of (sigh...) and ExpressionFactory with an arbitrary expressions, not covered by the own DryIoc Interpreter (sigh...).
+        // Or as a fallback to the platforms where FastExpressionCompiler is not able to compile the expression.
         return new FactoryDelegateExpression(expression).ToLambdaExpression()
             .Compile(
 #if SUPPORTS_EXPRESSION_COMPILE_WITH_PREFER_INTERPRETATION_PARAM
@@ -4373,25 +4379,16 @@ public static class FactoryDelegateCompiler
             );
     }
 
-    /// <summary>Compiles lambda expression to actual `Func{IResolverContext, object}` wrapper.</summary>
-    public static object CompileToFactoryDelegateWithSpecificResultType(
-        this Expression expression, Type factoryDelegateType, Type resultType, bool preferInterpretation)
+    /// <summary>Compiles the passed expression into the Func{IResolverContext, ResultType}.</summary>
+    public static object CompileTypedResultFactoryDelegate(
+        this Expression expression, Type factoryDelegateType, Type resultType)
     {
-        if (!preferInterpretation)
-        {
-            var customFactoryDelegate = ExpressionCompiler.TryCompileBoundToFirstClosureParam(
-                factoryDelegateType, expression, FactoryDelegateParamExprs, _factoryDelegateAndClosureParams, resultType,
-                CompilerFlags.NoInvocationLambdaInlining);
-            if (customFactoryDelegate != null)
-                return customFactoryDelegate;
-        }
-        // fallback for the platforms where FastExpressionCompiler does not support the expression
-        return Lambda(factoryDelegateType, expression, ResolverContextParamExpr, resultType).ToLambdaExpression()
-            .Compile(
-#if SUPPORTS_EXPRESSION_COMPILE_WITH_PREFER_INTERPRETATION_PARAM
-                preferInterpretation
-#endif
-            );
+        var customFactoryDelegate = ExpressionCompiler.TryCompileBoundToFirstClosureParam(
+            factoryDelegateType, expression, FactoryDelegateParamExprs, _factoryDelegateAndClosureParams, resultType,
+            CompilerFlags.NoInvocationLambdaInlining);
+        if (customFactoryDelegate != null)
+            return customFactoryDelegate;
+        return Lambda(factoryDelegateType, expression, ResolverContextParamExpr, resultType).ToLambdaExpression().Compile();
     }
 }
 
@@ -5666,7 +5663,9 @@ public static class WrappersSupport
         var argCount = isAction ? argTypes.Length : argTypes.Length - 1;
         var serviceType = isAction ? typeof(void) : argTypes[argCount];
 
-        // special case for the Factory delegate of Func<IResolverContext, ?>, 
+        var container = request.Container;
+
+        // Special case for the Factory delegate of Func<IResolverContext, ?>, 
         // so we may avoid using the InputArgs and use the result expression directly
         if (!isAction & argCount == 1 && argTypes[0] == typeof(IResolverContext))
         {
@@ -5676,10 +5675,31 @@ public static class WrappersSupport
 
             request = request.PushServiceType(serviceType);
             var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
-            return expr == null ? null :
-                wrapperType == typeof(Func<IResolverContext, object>)
-                ? ConstantOf(expr.CompileToFactoryDelegate(request.Container.Rules.UseInterpretation))
-                : Constant(expr.CompileToFactoryDelegateWithSpecificResultType(wrapperType, serviceType, request.Container.Rules.UseInterpretation), wrapperType);
+            if (expr == null)
+                return null;
+
+            var useInterpretation = request.Container.Rules.UseInterpretation;
+            if (wrapperType == typeof(Func<IResolverContext, object>))
+            {
+                if (useInterpretation)
+                {
+                    Func<IResolverContext, object> fac = r =>
+                        Interpreter.TryInterpretNestedLambdaBodyAndUnwrapException(r, expr, FactoryDelegateCompiler.FactoryDelegateParamExprs, r, null);
+                    return new ValueConstantExpression<Func<IResolverContext, object>>(fac);
+                }
+
+                return new ValueConstantExpression<Func<IResolverContext, object>>(expr.CompileOrInterpretFactoryDelegate(false));
+            }
+
+            if (useInterpretation)
+            {
+                Func<IResolverContext, object> fac = r =>
+                    Interpreter.TryInterpretNestedLambdaBodyAndUnwrapException(r, expr, FactoryDelegateCompiler.FactoryDelegateParamExprs, r, null);
+                var typedFacObj = Interpreter.ConvertFactoryDelegateMethod.MakeGenericMethod(serviceType).Invoke(null, new[] { fac });
+                return new ValueConstantExpression(typedFacObj);
+            }
+
+            return new ValueConstantExpression(expr.CompileTypedResultFactoryDelegate(wrapperType, serviceType));
         }
 
         var argExprs = Empty<ParameterExpression>();
@@ -5695,7 +5715,6 @@ public static class WrappersSupport
         var serviceRequest = request.PushServiceType(serviceType,
             RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc);
 
-        var container = request.Container;
         Expression serviceExpr;
         if (!isAction && container.Rules.FuncAndLazyWithoutRegistration)
             serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, stopRecursiveDependencyCheck: true);
@@ -12048,7 +12067,7 @@ public abstract class Factory
             return null;
         }
 
-        return expr.CompileToFactoryDelegate(request.Rules.UseInterpretation);
+        return expr.CompileOrInterpretFactoryDelegate(request.Rules.UseInterpretation);
     }
 
     internal virtual bool ValidateAndNormalizeRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules, bool throwIfInvalid)

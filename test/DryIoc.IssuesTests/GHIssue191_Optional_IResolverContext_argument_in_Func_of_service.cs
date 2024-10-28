@@ -9,9 +9,9 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
+            Can_resolve_as_FactoryDelegate();
             ResolverContext_is_ignored_in_resolved_Func_WithoutUseInterpretation();
             Can_resolve_as_FactoryDelegate_WithoutUseInterpretation();
-            Can_resolve_as_FactoryDelegate();
             Main_test();
             Main_test_with_strongly_typed_FactoryDelegate();
             Main_test_with_RegisterDelegate_and_strongly_typed_FactoryDelegate();

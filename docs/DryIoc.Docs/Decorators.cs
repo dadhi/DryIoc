@@ -651,9 +651,9 @@ Moreover, to complement the `RegisterInitializer` there is also a [`RegisterDisp
 [Explained here](Interception.md#decorator-with-castle-dynamicproxy)
 
 
-## Doing the interesting things with decorators
+## Doing interesting things with decorators
 
-### Reusing the scoped service from the parent scope
+### Reusing a scoped service from the parent scope
 
 Originated from the issue [#333](https://github.com/dadhi/DryIoc/issues/333).
 
@@ -661,7 +661,7 @@ Let's imagine that we have a scoped service and number of the nested scopes,
 and we want the already created service from the parent scope instead of creating the new one in the child scope:
 
 ```cs md*/
-public class Reusing_the_scoped_service_from_the_parent_scope
+public class Reusing_a_scoped_service_from_the_parent_scope
 {
     [Test]
     public void Example()
@@ -759,7 +759,7 @@ public class Using_the_Decorator_directly_for_the_complex_initialization
         Assert.IsFalse(initializer.Initialized);
 
         Assert.IsTrue(ctx0.Value.Migrated);
-        Assert.IsTrue(initializer.Initialized); 
+        Assert.IsTrue(initializer.Initialized);
 
         Assert.AreNotSame(ctx0.Value, ctx1.Value);
     }
