@@ -226,15 +226,15 @@ public partial class Container : IContainer
 
     /// <inheritdoc />
     public IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations() =>
-            Registry.GetServiceRegistrations(_registry.Value);
+        Registry.GetServiceRegistrations(_registry.Value);
 
     /// <inheritdoc />
     public IEnumerable<R> GetServiceRegistrations<S, R>(S state, MatchOp<S, ServiceRegistrationInfo, R> match) =>
-            Registry.GetServiceRegistrations(_registry.Value, state, match);
+        Registry.GetServiceRegistrations(_registry.Value, state, match);
 
     /// <inheritdoc />
     public IEnumerable<DecoratorRegistrationInfo> GetDecoratorRegistrations() =>
-            Registry.GetDecoratorRegistrations(_registry.Value);
+        Registry.GetDecoratorRegistrations(_registry.Value);
 
     // todo: @api Make `serviceKey` and `factoryType` optional
     /// <summary>Searches for registered factories by type, and key (if specified),
@@ -14012,6 +14012,10 @@ public interface IScope : IEnumerable<IScope>, IDisposable
     /// <summary>The method will clone the scope factories and already created services,
     /// but may or may not drop the disposables thus ensuring that only the new disposables added in clone will be disposed</summary>
     IScope Clone(bool withDisposables);
+
+    /// <summary>Gets a copy of resolved objects stored in scope with their respective factory ID.
+    /// Then the factory IDs may be used to find the corresponding container registrations.</summary>
+    KeyValuePair<int, object>[] GetSnapshotOfServicesWithFactoryIDs();
 }
 
 /// <summary>Extension methods for scope</summary>
@@ -14087,6 +14091,7 @@ public class Scope : IScope
     // Creates a single entry with an empty list of unordered disposables (the key 0 is reserved for the unordered disposables)
     private static ImHashMap<int, ImList<IDisposable>> CreateEmptyDisposables() => ImHashMap.Entry(0, ImList<IDisposable>.Empty);
 
+    [MethodImpl((MethodImplOptions)256)]
     internal ImHashMap<int, object>[] CloneMaps() => _maps.CopyNonEmpty();
 
     ///<summary>Creating</summary>
@@ -14429,6 +14434,19 @@ public class Scope : IScope
             + (Name != null ? "Name=" + Name : "Name=null")
             + (Parent != null ? ", Parent=" + Parent : "")
             + "}";
+
+    /// <inheritdoc/>
+    public KeyValuePair<int, object>[] GetSnapshotOfServicesWithFactoryIDs()
+    {
+        var maps = _maps.CopyNonEmpty();
+        var items = maps.ForEach(new List<KeyValuePair<int, object>>(),
+            static (entry, _, it) =>
+            {
+                if (entry.Value != NoItem)
+                    it.Add(entry.Key.Pair(entry.Value));
+            });
+        return items.ToArray();
+    }
 }
 
 /// <summary>Delegate to get new scope from old/existing current scope.</summary>
@@ -15204,10 +15222,10 @@ public struct ServiceRegistrationInfo : IComparable<ServiceRegistrationInfo>
     /// <summary>Pretty-prints info into the string.</summary>
     public override string ToString()
     {
-        var sb = new StringBuilder("ServiceType=`").Print(ServiceType).Append('`');
+        var sb = new StringBuilder("ServiceType=").Print(ServiceType);
         if (OptionalServiceKey != null)
-            sb.Append(" with ServiceKey=`").Print(OptionalServiceKey).Append('`');
-        return sb.Append(" with Factory=`").Append(Factory).Append('`').ToString();
+            sb.Append(" with ServiceKey='").Print(OptionalServiceKey).Append('\'');
+        return sb.Append(" with Factory=").Append(Factory).ToString();
     }
 }
 

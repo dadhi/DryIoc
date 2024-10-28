@@ -15,9 +15,14 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\FastExpressionCompiler.ILDecoder\FastExpressionCompiler.ILDecoder.csproj" />
         <ProjectReference Include="..\..\src\DryIoc.Microsoft.DependencyInjection\DryIoc.Microsoft.DependencyInjection.csproj" />
         <ProjectReference Include="..\..\src\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj" />
         <ProjectReference Include="..\..\test_sut\DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="..\DryIoc.UnitTests\TestTools.cs" Link="TestTools.cs"/>
     </ItemGroup>
 
 </Project>

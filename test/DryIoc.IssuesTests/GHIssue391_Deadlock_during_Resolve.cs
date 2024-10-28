@@ -43,7 +43,8 @@ namespace DryIoc.IssuesTests
             Assert.AreSame(Error.NameOf(Error.WaitForScopedServiceIsCreatedTimeoutExpired), ex.ErrorName);
 
             var m = ex.TryGetDetails(container);
-            StringAssert.Contains("A`", m);
+            StringAssert.Contains("A,", m);
+            StringAssert.DoesNotContain("IA,", m);
         }
 
         [Test]
@@ -80,7 +81,7 @@ namespace DryIoc.IssuesTests
             var m = ex.TryGetDetails(container);
             StringAssert.Contains("DecoratorType=", m);
             StringAssert.Contains("ServiceType=", m);
-            StringAssert.Contains("IA`", m);
+            StringAssert.Contains("IA", m);
         }
 
         [Test]

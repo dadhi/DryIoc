@@ -7083,25 +7083,25 @@ public static class ImHashMap
     /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
     /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
     public static void ForEach<V>(this ImHashMap<int, V> map, Action<VEntry<V>, int> handler, MapParentStack parents = null) =>
-        map.ForEach(handler, (e, i, r) => r(e, i), parents);
+        map.ForEach(handler, static (e, i, r) => r(e, i), parents);
 
     /// <summary>Do something for each entry.
     /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
     /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
     public static void ForEach<K, V>(this ImHashMap<K, V> map, Action<ImHashMapEntry<K, V>, int> handler, MapParentStack parents = null) =>
-        map.ForEach(handler, (e, i, r) => r(e, i), parents);
+        map.ForEach(handler, static (e, i, r) => r(e, i), parents);
 
     /// <summary>Collect something for each entry.
     /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
     /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
     public static S Fold<V, S>(this ImHashMap<int, V> map, S state, Func<VEntry<V>, int, S, S> handler, MapParentStack parents = null) =>
-        map.ForEach(St.Rent(state, handler), (e, i, s) => s.a = s.b(e, i, s.a), parents).ResetButGetA();
+        map.ForEach(St.Rent(state, handler), static (e, i, s) => s.a = s.b(e, i, s.a), parents).ResetButGetA();
 
     /// <summary>Collect something for each entry.
     /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
     /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
     public static S Fold<K, V, S>(this ImHashMap<K, V> map, S state, Func<ImHashMapEntry<K, V>, int, S, S> handler, MapParentStack parents = null) =>
-        map.ForEach(St.Rent(state, handler), (e, i, s) => s.a = s.b(e, i, s.a), parents).ResetButGetA();
+        map.ForEach(St.Rent(state, handler), static (e, i, s) => s.a = s.b(e, i, s.a), parents).ResetButGetA();
 
     /// <summary>Converts the map to an array with the minimum allocations</summary>
     public static S[] ToArray<V, S>(this ImHashMap<int, V> map, Func<VEntry<V>, S> selector) =>
@@ -7118,25 +7118,25 @@ public static class ImHashMap
     public static VEntry<V>[] ToArray<V>(this ImHashMap<int, V> map) =>
         map == ImHashMap<int, V>.Empty
             ? ArrayTools.Empty<VEntry<V>>()
-            : map.ForEach(new VEntry<V>[map.Count()], (e, i, a) => a[i] = e);
+            : map.ForEach(new VEntry<V>[map.Count()], static (e, i, a) => a[i] = e);
 
     /// <summary>Converts the map to an array with the minimum allocations</summary>
     public static ImHashMapEntry<K, V>[] ToArray<K, V>(this ImHashMap<K, V> map) =>
         map == ImHashMap<K, V>.Empty
             ? ArrayTools.Empty<ImHashMapEntry<K, V>>()
-            : map.ForEach(new ImHashMapEntry<K, V>[map.Count()], (e, i, a) => a[i] = e);
+            : map.ForEach(new ImHashMapEntry<K, V>[map.Count()], static (e, i, a) => a[i] = e);
 
     /// <summary>Converts the map to the dictionary</summary>
     public static Dictionary<K, V> ToDictionary<K, V>(this ImHashMap<K, V> map) =>
         map == ImHashMap<K, V>.Empty
             ? new Dictionary<K, V>(0)
-            : map.ForEach(new Dictionary<K, V>(), (e, _, d) => d.Add(e.Key, e.Value));
+            : map.ForEach(new Dictionary<K, V>(), static (e, _, d) => d.Add(e.Key, e.Value));
 
     /// <summary>Converts the map to the dictionary</summary>
     public static Dictionary<int, V> ToDictionary<V>(this ImHashMap<int, V> map) =>
         map == ImHashMap<int, V>.Empty
             ? new Dictionary<int, V>(0)
-            : map.ForEach(new Dictionary<int, V>(), (e, _, d) => d.Add(e.Key, e.Value));
+            : map.ForEach(new Dictionary<int, V>(), static (e, _, d) => d.Add(e.Key, e.Value));
 
     /// <summary>Returns <see langword="true"/> if map contains the hash, otherwise returns <see langword="false"/></summary>
     [MethodImpl((MethodImplOptions)256)]

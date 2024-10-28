@@ -8591,6 +8591,10 @@ namespace DryIoc.FastExpressionCompiler
             return printType?.Invoke(arrayType ?? type, s.ToString()) ?? s.ToString();
         }
 
+        /// <summary>A strategy :) for the printType parameter in `Type.ToCode(Func{Type, string, string} printType)`,
+        /// which strips the outer type names for the nested types if any</summary>
+        public static string StripOuterTypes(Type inputType, string output) => output.Substring(output.LastIndexOf('.') + 1);
+
         /// <summary>Prints valid C# Boolean</summary>
         public static string ToCode(this bool x) => x ? "true" : "false";
 

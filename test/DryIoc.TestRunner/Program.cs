@@ -9,6 +9,7 @@ public class Program
 {
     public static void Main()
     {
+        new GHIssue659_Can_I_inspect_a_scope_for_all_the_dependencies_resolved_in_the_scope().Run();
         // new GHIssue191_Optional_IResolverContext_argument_in_Func_of_service().Run();
         // new GHIssue619_FaultySingletonDependency().Run();
         // new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call().Run();
