@@ -6,13 +6,6 @@ using DryIoc.FastExpressionCompiler.LightExpression;
 using System.Linq;
 using System.Diagnostics;
 
-// #if !NET5_0_OR_GREATER
-// namespace System.Runtime.CompilerServices
-// {
-//     internal static class IsExternalInit { }
-// }
-// #endif
-
 namespace DryIoc.IssuesTests;
 
 [TestFixture]
@@ -21,7 +14,6 @@ public class GHIssue659_Can_I_inspect_a_scope_for_all_the_dependencies_resolved_
     public int Run()
     {
         Enumerate_services_stored_in_scope_at_some_point_of_time();
-
         return 1;
     }
 
@@ -50,10 +42,8 @@ public class GHIssue659_Can_I_inspect_a_scope_for_all_the_dependencies_resolved_
         fooExpr.ToCSharpString(sb,
             lineIdent: 0,
             stripNamespace: true,
-            printType: StripOuterTypes,
+            printType: CodePrinter.PrintTypeStripOuterClasses,
             identSpaces: 4);
-
-        static string StripOuterTypes(Type inputType, string repr) => repr.Substring(repr.LastIndexOf('.') + 1);
 
         sb.Append(';');
         Debug.WriteLine(sb.ToString());
