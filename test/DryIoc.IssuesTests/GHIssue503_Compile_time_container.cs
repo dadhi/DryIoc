@@ -64,7 +64,7 @@ public sealed class GHIssue503_Compile_time_container : ITest
                 RequiredServiceTypeCode = Code(r.Key.Details.RequiredServiceType),
                 ExpressionCode = Code(r.Value.Body, getServiceBodyLineIdent),
                 CreateMethodName = "Get_" + GetTypeNameOnly(r.Key.ServiceType.Name) + "_" + i
-            });
+            }).ToArray();
 
         var depCodes = result.ResolveDependencies.Select((r, i) =>
             new
@@ -79,8 +79,7 @@ public sealed class GHIssue503_Compile_time_container : ITest
                 PreResolveParent = Code(r.Key.Parent, getServiceBodyLineIdent + 8),
                 PreResolveParentObject = r.Key.Parent,
                 CreateMethodName = "GetDependency_" + GetTypeNameOnly(r.Key.ServiceType.Name) + "_" + i
-            })
-            .ToList();
+            }).ToArray();
 
         var includeVariants = container.Rules.VariantGenericTypesInResolvedCollection;
 
@@ -119,52 +118,75 @@ public sealed class GHIssue503_Compile_time_container : ITest
         var errCount = result.Errors.Count;
         if (errCount != 0)
         {
-            s.Append($"There are {errCount} generation ERRORS:\n\n");
+            s.Append(
+                $"""
+
+                There are {errCount} generation ERRORS:
+                
+                
+                """);
 
             var eNum = 0;
             foreach (var e in result.Errors)
-                s.Append($"{++eNum}. {e.Key}\n- {e.Value.Message}\n\n");
+                s.Append(
+                    $"""
+
+                    {++eNum}. {e.Key}:
+                    {e.Value.Message}
+
+
+                    """);
         }
 
-        var hasNotResolvedDeps = false;
+        var notResolvedDeps = 0;
         foreach (var dc in depCodes)
             if (dc.ExpressionObject == null)
             {
-                if (!hasNotResolvedDeps)
-                {
-                    hasNotResolvedDeps = true;
-                    s.Append("\nWARNINGS: Some dependencies are missing. Register them at runtime or add to the compile-time registrations.\n\n");
-                }
+                if (notResolvedDeps++ == 0)
+                    s.Append(
+                        """
+
+                        WARNINGS: Some dependencies are missing. Register them at runtime or add to the compile-time registrations.
+
+
+                        """);
 
                 // todo: @wip remove unnecessary info from the output
-                var serviceKey = dc.ServiceKeyObject == null ? "" : "with key " + dc.ServiceKey + " ";
-                s.Append($"- `{dc.ServiceTypeOnly}` {serviceKey}in {dc.PreResolveParentObject}\n");
+                s.Append(
+                    $"""
+
+                    `{dc.ServiceTypeOnly}` {(dc.ServiceKeyObject == null ? "" : $"with key {dc.ServiceKey} ")}in {dc.PreResolveParentObject}
+                    
+                    """);
             }
 
-        if (hasNotResolvedDeps)
-            depCodes = depCodes.Where(d => d.ExpressionObject != null).ToList();
+        if (notResolvedDeps > 0)
+            depCodes = depCodes.Match(static d => d.ExpressionObject != null);
 
         s.Append(
             """
             --------------------------------------------------------------------------------------------------------
             */
 
+            namespace DryIoc; // todo: @wip can we use User namespace here?
+
             using System;
             using System.Collections.Generic;
             using System.Threading;
             using DryIoc.ImTools;
 
-            // Usings set in `NamespaceUsings`:
-            """
-        );
+            // Usings set in the `NamespaceUsings`:
+            """);
 
         foreach (var ns in MyCompileTimeDI.NamespaceUsings)
-            s.Append($"using {ns};\n");
+            s.Append(
+                $"""
 
+                using {ns};
+                
+                """);
         s.Append(
             """
-
-            namespace DryIoc; // todo: @wip can we use User namespace here?
 
             // todo: @wip customize the container class name
             ///<summary>The container provides access to the object graph generated using the DryIoc own tools at compile-time</summary>
@@ -182,7 +204,26 @@ public sealed class GHIssue503_Compile_time_container : ITest
                 /// <inheritdoc/>
                 public bool TryResolve(out object service, IResolverContext r, Type serviceType)
                 {
+            """);
+        var i = 0;
+        foreach (var root in rootCodes.Where(f => f.ServiceKeyCode == "null"))
+            s.Append(
+                $$"""
+
+                        {{(i++ > 0 ? "else " : "")}}if (serviceType == {{root.ServiceTypeCode}})
+                        {
+                            service = {{root.CreateMethodName}} (r);
+                            return true;
+                        }
+                """);
+        s.Append(
             """
-        );
+                    service = null;
+                    return false;
+                }
+            """);
+
+        var @cs = s.ToString();
+        StringAssert.Contains("serviceType == ", @cs);
     }
 }

@@ -9,13 +9,13 @@ public class Program
 {
     public static void Main()
     {
-        new GHIssue659_Can_I_inspect_a_scope_for_all_the_dependencies_resolved_in_the_scope().Run();
+        new GHIssue503_Compile_time_container().Run();
+        // new GHIssue659_Can_I_inspect_a_scope_for_all_the_dependencies_resolved_in_the_scope().Run();
         // new GHIssue191_Optional_IResolverContext_argument_in_Func_of_service().Run();
         // new GHIssue619_FaultySingletonDependency().Run();
         // new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call().Run();
         // new GHIssue233_Add_RegisterDelegate_with_parameters_returning_object_for_the_requested_runtime_known_service_type().Run();
         // new ReuseInCurrentScopeTests().Run();
-        // new GHIssue503_Compile_time_container().Run();
         // new DecoratorTests().Run();
         // new GHIssue653_KeyValuePair_exposes_internal_DryIoc_structures().Run();
         // new GHIssue643_WithConcreteTypeDynamicRegistrations_results_in_unintended_instantiation().Run();
