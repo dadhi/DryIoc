@@ -37,20 +37,18 @@ public sealed class GHIssue503_Compile_time_container : ITest
             return source;
         }
 
-        // todo: @wip convert to the static methods
         string Code(object x, int lineIdent = 0) =>
             x == null ? "null" :
             x is Expression e ? TrimUsings(e.ToCSharpString(new StringBuilder(), lineIdent).ToString()) :
             x is Request r ? Code(container.GetRequestExpression(r), lineIdent) :
             Code(container.GetConstantExpression(x, x.GetType(), true), lineIdent);
 
-        // without `typeof`
+        // trim `typeof` and namespaces included in usings
         string TypeOnlyCode(Type type) => TrimUsings(type.ToCode(printGenericTypeArgs: true));
 
         string GetTypeNameOnly(string typeName) => typeName.Split('`').First().Split('.').Last();
 
-        // todo: @wip use it
-        // string CommaOptArg(string arg) => arg == "null" ? "" : ", " + arg;
+        string CommaOptArg(string arg) => arg == "null" ? "" : ", " + arg;
 
         var getServiceBodyLineIdent = 16;
 
@@ -65,6 +63,8 @@ public sealed class GHIssue503_Compile_time_container : ITest
                 ExpressionCode = Code(r.Value.Body, getServiceBodyLineIdent),
                 CreateMethodName = "Get_" + GetTypeNameOnly(r.Key.ServiceType.Name) + "_" + i
             }).ToArray();
+
+        var defaultRoots = rootCodes.Match(f => f.ServiceKeyCode == "null");
 
         var depCodes = result.ResolveDependencies.Select((r, i) =>
             new
@@ -205,14 +205,13 @@ public sealed class GHIssue503_Compile_time_container : ITest
                 public bool TryResolve(out object service, IResolverContext r, Type serviceType)
                 {
             """);
-        var i = 0;
-        foreach (var root in rootCodes.Where(f => f.ServiceKeyCode == "null"))
+        for (var i = 0; i < defaultRoots.Length; ++i)
             s.Append(
                 $$"""
 
-                        {{(i++ > 0 ? "else " : "")}}if (serviceType == {{root.ServiceTypeCode}})
+                        {{(i > 0 ? "else " : "")}}if (serviceType == {{defaultRoots[i].ServiceTypeCode}})
                         {
-                            service = {{root.CreateMethodName}} (r);
+                            service = {{defaultRoots[i].CreateMethodName}} (r);
                             return true;
                         }
                 """);
@@ -221,6 +220,78 @@ public sealed class GHIssue503_Compile_time_container : ITest
                     service = null;
                     return false;
                 }
+
+            """);
+
+        s.Append(
+            """
+
+                /// <inheritdoc/>
+                public IEnumerable<ResolveManyResult> ResolveMany(IResolverContext _, Type serviceType)
+            """);
+
+        if (rootCodes.Length == 0)
+            s.Append(" => ArrayTools.Empty<ResolveManyResult>();");
+        else
+        {
+            s.Append(
+                """
+
+                    {
+                """);
+            foreach (var serviceTypeGroup in rootCodes.GroupBy(x => x.ServiceType))
+            {
+                s.Append(
+                    $$"""
+
+                            if (serviceType == {{serviceTypeGroup.First().ServiceTypeCode}})
+                            {
+                    """);
+                foreach (var reg in serviceTypeGroup)
+                    s.Append(
+                        $"""
+
+                                    yield return ResolveManyResult.Of(r => {reg.CreateMethodName}(r){CommaOptArg(reg.ServiceKeyCode)}{CommaOptArg(reg.RequiredServiceTypeCode)});
+                        """);
+
+                if (includeVariants && serviceTypeGroup.Key.IsGenericType)
+                {
+                    var sourceType = serviceTypeGroup.Key;
+                    var variants = rootCodes
+                        .Where(x => x.ServiceType.IsGenericType &&
+                            x.ServiceType.GetGenericTypeDefinition() == sourceType.GetGenericTypeDefinition() &&
+                            x.ServiceType != sourceType && x.ServiceType.IsAssignableTo(sourceType));
+                    foreach (var variant in variants)
+                    {
+                        s.Append(
+                            $"""
+
+                                        yield return ResolveManyResult.Of(r => {variant.CreateMethodName}(r){CommaOptArg(variant.ServiceKeyCode)}{CommaOptArg(variant.RequiredServiceTypeCode)});
+                            """);
+                    }
+                }
+
+                s.Append(
+                    """
+
+                            }
+                    """);
+            }
+            s.Append(
+                """
+
+                    }
+
+                """);
+        }
+
+        // todo: @wip tbd
+
+        s.Append(
+            """
+
+            }
+
             """);
 
         var @cs = s.ToString();
