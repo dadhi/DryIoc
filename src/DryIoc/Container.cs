@@ -5654,9 +5654,9 @@ public static class WrappersSupport
         if (!isAction)
         {
             var openGenericWrapperType = wrapperType.GetGenericDefinitionOrNull(); // cannot be null
-            if (FuncTypes.IndexOfReference(openGenericWrapperType) == -1)
+            if (FuncTypes.IndexOf(openGenericWrapperType, default(RefEq<Type>)) == -1)
             {
-                isAction = ActionTypes.IndexOfReference(openGenericWrapperType) != -1;
+                isAction = ActionTypes.IndexOf(openGenericWrapperType, default(RefEq<Type>)) != -1;
                 Throw.If(!isAction); // todo: @feature add distinct error message
             }
         }
@@ -8705,7 +8705,7 @@ public static class Registrator
     /// generic definition.</summary>
     public static Type[] GetRegisterManyImplementedServiceTypes(this Type type, bool nonPublicServiceTypes = false) =>
         GetImplementedServiceTypes(type, nonPublicServiceTypes)
-            .Match(t => !t.IsGenericTypeDefinition || WrappersSupport.SupportedCollectionTypes.IndexOfReference(t) == -1);
+            .Match(t => !t.IsGenericTypeDefinition || WrappersSupport.SupportedCollectionTypes.IndexOf(t, default(RefEq<Type>)) == -1);
 
     /// <summary>Returns the types suitable to be an implementation types for <see cref="ReflectionFactory"/>:
     /// actually a non abstract and not compiler generated classes.</summary>

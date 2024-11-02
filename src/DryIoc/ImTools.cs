@@ -423,11 +423,12 @@ public static class ArrayTools
     }
 
     /// <summary>The same as `IndexOf` but searching for the item by reference</summary>
-    public static int IndexOfReference<T>(this T[] source, T reference) where T : class
+    public static int IndexOf<T, TEq>(this T[] source, T reference, TEq eq)
+        where TEq : struct, IEq<T>
     {
         if (source != null && source.Length != 0)
             for (var i = 0; i < source.Length; ++i)
-                if (ReferenceEquals(source[i], reference))
+                if (eq.Equals(source[i], reference))
                     return i;
         return -1;
     }
