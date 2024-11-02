@@ -2,7 +2,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2013-2023 Maksim Volkau
+Copyright (c) 2013-2024 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -59,6 +59,8 @@ using static ImTools.ArrayTools;
 using FastExpressionCompiler.LightExpression;
 using static FastExpressionCompiler.LightExpression.Expression;
 using static FastExpressionCompiler.LightExpression.ExpressionCompiler;
+
+#nullable disable
 
 /// <summary>Inversion of control container</summary>
 public partial class Container : IContainer
@@ -16794,3 +16796,4 @@ public interface ITest
     /// <summary>Runs the tests and should return the number of running tests</summary>
     int Run();
 }
+#nullable restore

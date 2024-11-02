@@ -2,7 +2,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2016-2023 Maksim Volkau
+Copyright (c) 2016-2024 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -40,6 +40,8 @@ using System.Runtime.InteropServices;
 #endif
 
 using static SmallMap4;
+
+#nullable disable
 
 /// <summary>General purpose Match operator</summary>
 public delegate bool MatchOp<S, T, R>(ref S state, ref T it, out R result);
@@ -8105,3 +8107,5 @@ public static class PartitionedHashMap
         return state;
     }
 }
+
+#nullable restore
