@@ -19,19 +19,19 @@ builder.Services.AddSingleton<SingletonAutomaticallyResolved>();
 
 var app = builder.Build();
 
-app.MapGet("/", (Foo foo) => $"Hello world with `{foo}`");
+app.MapGet("/", (Foo foo) => $"Hello world with `{foo}`, try /bar to get bar.");
 app.MapGet("/bar", (Foo foo, Bar bar) => $"Hello world with `{foo}` and `{bar}`");
 
 app.Run();
 
 public class Foo
 {
-    public Foo(Bar bar = null) {}
+    public Foo(Bar bar = null) { }
 }
 
-public class Bar {}
+public class Bar { }
 
-public class ScopedAutomaticallyResolved 
+public class ScopedAutomaticallyResolved
 {
     public readonly SingletonAutomaticallyResolved Singleton;
     public ScopedAutomaticallyResolved(SingletonAutomaticallyResolved singleton)
@@ -41,7 +41,7 @@ public class ScopedAutomaticallyResolved
     }
 }
 
-public class SingletonAutomaticallyResolved 
+public class SingletonAutomaticallyResolved
 {
     public SingletonAutomaticallyResolved()
     {
@@ -51,9 +51,9 @@ public class SingletonAutomaticallyResolved
 
 public sealed class MyContainer : Container
 {
-    public MyContainer(Rules rules) : base(rules) {}
+    public MyContainer(Rules rules) : base(rules) { }
 
-    public override IContainer WithNewOpenScope() 
+    public override IContainer WithNewOpenScope()
     {
         var scope = base.WithNewOpenScope();
         scope.Resolve<ScopedAutomaticallyResolved>();
@@ -63,7 +63,7 @@ public sealed class MyContainer : Container
 
 public class MyDryIocServiceProviderFactory : DryIocServiceProviderFactory
 {
-    public MyDryIocServiceProviderFactory(IContainer container) : base(container) {}
+    public MyDryIocServiceProviderFactory(IContainer container) : base(container) { }
 
     public override IServiceProvider CreateServiceProvider(DryIocServiceProvider provider)
     {
