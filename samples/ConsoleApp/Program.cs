@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using DryIoc;
 using DryIoc.Microsoft.DependencyInjection;
-using static System.Console;
 
 HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddTransient<TransientDisposable>();
@@ -29,7 +28,6 @@ using IHost host = builder.Build();
 // Resolve the actual DryIoc.IContainer from the services.
 var container = host.Services.GetRequiredService<IContainer>();
 var serviceProvider = container.Resolve<IServiceProvider>();
-
 Console.WriteLine($"The actual container is {container.GetType().FullName}, and the service provider is {serviceProvider.GetType().FullName}");
 
 ExemplifyDisposableScoping(host.Services, "Scope 1");
