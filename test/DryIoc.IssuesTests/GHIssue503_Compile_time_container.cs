@@ -37,11 +37,11 @@ public sealed class GHIssue503_Compile_time_container : ITest
             return source;
         }
 
-        string Code(object x, int lineIdent = 0) =>
+        string Code(object x, int lineIndent = 0) =>
             x == null ? "null" :
-            x is Expression e ? TrimUsings(e.ToCSharpString(new StringBuilder(), lineIdent).ToString()) :
-            x is Request r ? Code(container.GetRequestExpression(r), lineIdent) :
-            Code(container.GetConstantExpression(x, x.GetType(), true), lineIdent);
+            x is Expression e ? TrimUsings(e.ToCSharpString(new StringBuilder(), lineIndent).ToString()) :
+            x is Request r ? Code(container.GetRequestExpression(r), lineIndent) :
+            Code(container.GetConstantExpression(x, x.GetType(), true), lineIndent);
 
         // trim `typeof` and namespaces included in usings
         string TypeOnlyCode(Type type) => TrimUsings(type.ToCode(printGenericTypeArgs: true));

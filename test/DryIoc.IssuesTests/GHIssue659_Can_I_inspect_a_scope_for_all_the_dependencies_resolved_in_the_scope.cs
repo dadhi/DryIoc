@@ -40,10 +40,10 @@ public class GHIssue659_Can_I_inspect_a_scope_for_all_the_dependencies_resolved_
         var sb = new StringBuilder().Append("var @cs = ");
 
         fooExpr.ToCSharpString(sb,
-            lineIdent: 0,
+            lineIndent: 0,
             stripNamespace: true,
             printType: CodePrinter.PrintTypeStripOuterClasses,
-            identSpaces: 4);
+            indentSpaces: 4);
 
         sb.Append(';');
         Debug.WriteLine(sb.ToString());
