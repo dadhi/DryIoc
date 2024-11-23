@@ -9,8 +9,10 @@ public class Program
 {
     public static void Main()
     {
-        new GHIssue667_Resolve_with_serviceKey_does_not_invoke_factory_selector().Run();
-        // new GHIssue503_Compile_time_container().Run();
+        new GHIssue503_Compile_time_container().Run();
+        
+        // new GHIssue667_Resolve_with_serviceKey_does_not_invoke_factory_selector().Run();
+        
         // new GHIssue659_Can_I_inspect_a_scope_for_all_the_dependencies_resolved_in_the_scope().Run();
         // new GHIssue191_Optional_IResolverContext_argument_in_Func_of_service().Run();
         // new GHIssue619_FaultySingletonDependency().Run();

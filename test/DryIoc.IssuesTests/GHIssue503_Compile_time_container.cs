@@ -285,7 +285,27 @@ public sealed class GHIssue503_Compile_time_container : ITest
                 """);
         }
 
-        // todo: @wip tbd
+        foreach (var root in rootCodes)
+        {
+            s.Append(
+                $"""
+
+                    internal static {root.ServiceTypeOnlyCode} {root.CreateMethodName}(IResolverContext r) =>
+                        {root.ExpressionCode};
+
+                """);
+        }
+
+        foreach (var dep in depCodes)
+        {
+            s.Append(
+                $"""
+
+                    internal static {dep.ServiceTypeOnly} {dep.CreateMethodName}(IResolverContext r) =>
+                        {dep.Expression};
+
+                """);
+        }
 
         s.Append(
             """
