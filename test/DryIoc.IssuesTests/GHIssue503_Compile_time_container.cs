@@ -69,15 +69,15 @@ public sealed class GHIssue503_Compile_time_container : ITest
         var depCodes = result.ResolveDependencies.Select((r, i) =>
             new
             {
-                ServiceType = Code(r.Key.ServiceType),
-                ServiceTypeOnly = TypeOnlyCode(r.Key.ServiceType),
-                ServiceKey = Code(r.Key.ServiceKey),
-                ServiceKeyObject = r.Key.ServiceKey,
-                Expression = Code(r.Value, getServiceBodyLineIdent),
-                ExpressionObject = r.Value,
-                RequiredServiceType = Code(r.Key.RequiredServiceType),
-                PreResolveParent = Code(r.Key.Parent, getServiceBodyLineIdent + 8),
-                PreResolveParentObject = r.Key.Parent,
+                ServiceTypeCode = Code(r.Key.ServiceType),
+                ServiceTypeOnlyCode = TypeOnlyCode(r.Key.ServiceType),
+                ServiceKeyCode = Code(r.Key.ServiceKey),
+                ServiceKey = r.Key.ServiceKey,
+                ExpressionCode = Code(r.Value, getServiceBodyLineIdent),
+                Expression = r.Value,
+                RequiredServiceTypeCode = Code(r.Key.RequiredServiceType),
+                PreResolveParentCode = Code(r.Key.Parent, getServiceBodyLineIdent + 8),
+                PreResolveParent = r.Key.Parent,
                 CreateMethodName = "GetDependency_" + GetTypeNameOnly(r.Key.ServiceType.Name) + "_" + i
             }).ToArray();
 
@@ -140,7 +140,7 @@ public sealed class GHIssue503_Compile_time_container : ITest
 
         var notResolvedDeps = 0;
         foreach (var dc in depCodes)
-            if (dc.ExpressionObject == null)
+            if (dc.Expression == null)
             {
                 if (notResolvedDeps++ == 0)
                     s.Append(
@@ -155,13 +155,13 @@ public sealed class GHIssue503_Compile_time_container : ITest
                 s.Append(
                     $"""
 
-                    `{dc.ServiceTypeOnly}` {(dc.ServiceKeyObject == null ? "" : $"with key {dc.ServiceKey} ")}in {dc.PreResolveParentObject}
+                    `{dc.ServiceTypeOnlyCode}` {(dc.ServiceKey == null ? "" : $"with key {dc.ServiceKeyCode} ")}in {dc.PreResolveParent}
                     
                     """);
             }
 
         if (notResolvedDeps > 0)
-            depCodes = depCodes.Match(static d => d.ExpressionObject != null);
+            depCodes = depCodes.Match(static d => d.Expression != null);
 
         s.Append(
             """
@@ -211,7 +211,7 @@ public sealed class GHIssue503_Compile_time_container : ITest
 
                         {{(i > 0 ? "else " : "")}}if (serviceType == {{defaultRoots[i].ServiceTypeCode}})
                         {
-                            service = {{defaultRoots[i].CreateMethodName}} (r);
+                            service = {{defaultRoots[i].CreateMethodName}}(r);
                             return true;
                         }
                 """);
@@ -301,8 +301,8 @@ public sealed class GHIssue503_Compile_time_container : ITest
             s.Append(
                 $"""
 
-                    internal static {dep.ServiceTypeOnly} {dep.CreateMethodName}(IResolverContext r) =>
-                        {dep.Expression};
+                    internal static {dep.ServiceTypeOnlyCode} {dep.CreateMethodName}(IResolverContext r) =>
+                        {dep.ExpressionCode};
 
                 """);
         }
