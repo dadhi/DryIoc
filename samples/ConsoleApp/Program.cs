@@ -2,16 +2,27 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
 using DryIoc;
+using DryIoc.MefAttributedModel;
 using DryIoc.Microsoft.DependencyInjection;
 
-HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
+var builder = Host.CreateApplicationBuilder(args);
+
+builder.Logging
+    .EnableEnrichment()
+    .EnableRedaction();
+
 builder.Services.AddTransient<TransientDisposable>();
 builder.Services.AddScoped<ScopedDisposable>();
 builder.Services.AddSingleton<SingletonDisposable>();
 
 // Integrate DryIoc
-builder.ConfigureContainer(new DryIocServiceProviderFactory(),
+builder.ConfigureContainer(
+    new DryIocServiceProviderFactory(),
+    // todo: @fixme #669
+    // new DryIocServiceProviderFactory(new Container(Rules.Default.WithMefAttributedModel())),
     // optional configuration action
     serviceProvider =>
     {
@@ -23,7 +34,7 @@ builder.ConfigureContainer(new DryIocServiceProviderFactory(),
     });
 
 
-using IHost host = builder.Build();
+using var host = builder.Build();
 
 // Resolve the actual DryIoc.IContainer from the services.
 var container = host.Services.GetRequiredService<IContainer>();

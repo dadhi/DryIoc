@@ -5,17 +5,17 @@
 
         <Product>DryIoc.MefAttributedModel</Product>
         <VersionPrefix>8.0.0</VersionPrefix>
-        <VersionSuffix></VersionSuffix>
+        <VersionSuffix>preview-01</VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
-        
+
         <PackageId>$(Product).dll</PackageId>
         <Title>$(Product).dll</Title>
         <Description>DryIoc.MefAttributedModel is DryIoc extension to support Microsoft Managed Extensibility Framework for DryIoc container</Description>
         <PackageTags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</PackageTags>
         <PackageReleaseNotes>
-<![CDATA[
+            <![CDATA[
 ## v8.0.0
 
 Features:
