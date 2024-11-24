@@ -69,6 +69,7 @@ public sealed class GHIssue503_Compile_time_container : ITest
         var depCodes = result.ResolveDependencies.Select((r, i) =>
             new
             {
+                ServiceType = r.Key.ServiceType,
                 ServiceTypeCode = Code(r.Key.ServiceType),
                 ServiceTypeOnlyCode = TypeOnlyCode(r.Key.ServiceType),
                 ServiceKeyCode = Code(r.Key.ServiceKey),
@@ -225,6 +226,94 @@ public sealed class GHIssue503_Compile_time_container : ITest
 
             """);
 
+
+        sb.Append(
+            """
+
+                /// <inheritdoc/>
+                public bool TryResolve(out object service, IResolverContext r,
+                    Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args)
+                {
+
+            """);
+
+        var index = 0;
+        foreach (var rootGroup in rootCodes.Where(x => x.ServiceKeyCode != "null").GroupBy(x => x.ServiceType))
+        {
+            sb.Append(
+                $$"""
+
+                        {{(index > 0 ? "else " : "")}}if (serviceType == {{rootGroup.Key}})
+                        {
+
+                """);
+            var innerIndex = 0;
+            foreach (var root in rootGroup)
+            {
+                sb.Append(
+                    $$"""
+                                {{(innerIndex > 0 ? "else " : "")}}if ({{root.ServiceKeyCode}}.Equals(serviceKey))
+                                {
+                                    service = {{root.CreateMethodName}}(r);
+                                    return true;
+                                }
+                    """);
+            }
+            sb.Append(
+                """
+                
+                        }
+                """);
+        }
+
+        sb.Append(
+            """
+
+
+                    service = null;
+                    return false;
+                }
+
+            """);
+
+
+        // <#
+        //         foreach (var depGroup in depCodes.GroupBy(x => x.ServiceType))
+        //         {
+        //             if (index++ > 0) WriteLine(@"
+        //             else");
+        // #>
+        //             if (serviceType == <#=depGroup.Key#>)
+        //             {
+        // <#
+        //             var innerIndex = 0;
+        //             foreach (var dep in depGroup)
+        //             {
+        //                 if (innerIndex++ > 0) WriteLine(@"
+        //                 else");
+        // #>
+        //                 if (<#=dep.ServiceKeyObject == null ? "serviceKey == null"
+        //                      : dep.ServiceKeyObject is DefaultKey ? "(serviceKey == null || " + dep.ServiceKey + ".Equals(serviceKey))"
+        //                      : dep.ServiceKey + ".Equals(serviceKey)"#> &&
+        //                     requiredServiceType == <#= dep.RequiredServiceType #> &&
+        //                     Equals(preRequestParent, <#= dep.PreResolveParent #>))
+        //                 {
+        //                     service = <#=dep.CreateMethodName#>(r);
+        //                     return true;
+        //                 }
+        // <#
+        //             }
+        // #>
+        //             }
+        // <#
+        //         }
+        // #>
+        //             service = null;
+        //             return false;
+        //         }
+
+
+
         sb.Append(
             """
 
@@ -290,7 +379,7 @@ public sealed class GHIssue503_Compile_time_container : ITest
         sb.Append(
             """
 
-            // Resolution roots supposed to be Resolved by the clients:
+                // Resolution roots supposed to be Resolved by the clients:
 
             """);
 
@@ -308,7 +397,7 @@ public sealed class GHIssue503_Compile_time_container : ITest
         sb.Append(
             """
 
-            // Dependencies injected through the Resolve call, e.g. Bar in `r => new Foo(r.Resolve<Bar>())`:
+                // Dependencies injected through the Resolve call, e.g. Bar in `r => new Foo(r.Resolve<Bar>())`:
 
             """);
 
