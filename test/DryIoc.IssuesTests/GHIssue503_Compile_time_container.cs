@@ -55,7 +55,7 @@ public sealed class GHIssue503_Compile_time_container : ITest
         var rootCodes = result.Roots.Select((r, i) =>
             new
             {
-                ServiceType = r.Key.ServiceType,
+                r.Key.ServiceType,
                 ServiceTypeCode = Code(r.Key.ServiceType),
                 ServiceTypeOnlyCode = TypeOnlyCode(r.Key.ServiceType),
                 ServiceKeyCode = Code(r.Key.ServiceKey),
@@ -69,11 +69,11 @@ public sealed class GHIssue503_Compile_time_container : ITest
         var depCodes = result.ResolveDependencies.Select((r, i) =>
             new
             {
-                ServiceType = r.Key.ServiceType,
+                r.Key.ServiceType,
                 ServiceTypeCode = Code(r.Key.ServiceType),
                 ServiceTypeOnlyCode = TypeOnlyCode(r.Key.ServiceType),
                 ServiceKeyCode = Code(r.Key.ServiceKey),
-                ServiceKey = r.Key.ServiceKey,
+                r.Key.ServiceKey,
                 ExpressionCode = Code(r.Value, methodsBodyLineIdent),
                 Expression = r.Value,
                 RequiredServiceTypeCode = Code(r.Key.RequiredServiceType),
@@ -219,7 +219,6 @@ public sealed class GHIssue503_Compile_time_container : ITest
         sb.Append(
             """
 
-
                     service = null;
                     return false;
                 }
@@ -234,7 +233,6 @@ public sealed class GHIssue503_Compile_time_container : ITest
                 public bool TryResolve(out object service, IResolverContext r,
                     Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args)
                 {
-
             """);
 
         var index = 0;
@@ -243,16 +241,16 @@ public sealed class GHIssue503_Compile_time_container : ITest
             sb.Append(
                 $$"""
 
-                        {{(index > 0 ? "else " : "")}}if (serviceType == {{rootGroup.Key}})
+                        {{(index++ > 0 ? "else " : "")}}if (serviceType == {{rootGroup.Key}})
                         {
-
                 """);
             var innerIndex = 0;
             foreach (var root in rootGroup)
             {
                 sb.Append(
                     $$"""
-                                {{(innerIndex > 0 ? "else " : "")}}if ({{root.ServiceKeyCode}}.Equals(serviceKey))
+
+                                {{(innerIndex++ > 0 ? "else " : "")}}if ({{root.ServiceKeyCode}}.Equals(serviceKey))
                                 {
                                     service = {{root.CreateMethodName}}(r);
                                     return true;
@@ -261,7 +259,42 @@ public sealed class GHIssue503_Compile_time_container : ITest
             }
             sb.Append(
                 """
-                
+
+                        }
+                """);
+        }
+
+        index = 0;
+        foreach (var depGroup in depCodes.GroupBy(x => x.ServiceType))
+        {
+            sb.Append(
+                $$"""
+
+                        {{(index++ > 0 ? "else " : "")}}if (serviceType == {{depGroup.Key}})
+                        {
+                """);
+
+
+            var innerIndex = 0;
+            foreach (var dep in depGroup)
+            {
+                sb.Append(
+                    $$"""
+
+                                {{(innerIndex++ > 0 ? "else " : "")}}if ({{(dep.ServiceKey == null ? "serviceKey == null" :
+                                        dep.ServiceKey is DefaultKey ? "(serviceKey == null || " + dep.ServiceKeyCode + ".Equals(serviceKey))" :
+                                        dep.ServiceKeyCode + ".Equals(serviceKey)")}} &&
+                                    requiredServiceType == {{dep.RequiredServiceTypeCode}} &&
+                                    Equals(preRequestParent, {{dep.PreResolveParentCode}}))
+                                {
+                                    service = {{dep.CreateMethodName}}(r);
+                                    return true;
+                                }
+                    """);
+            }
+            sb.Append(
+                """
+
                         }
                 """);
         }
@@ -269,50 +302,11 @@ public sealed class GHIssue503_Compile_time_container : ITest
         sb.Append(
             """
 
-
                     service = null;
                     return false;
                 }
 
             """);
-
-
-        // <#
-        //         foreach (var depGroup in depCodes.GroupBy(x => x.ServiceType))
-        //         {
-        //             if (index++ > 0) WriteLine(@"
-        //             else");
-        // #>
-        //             if (serviceType == <#=depGroup.Key#>)
-        //             {
-        // <#
-        //             var innerIndex = 0;
-        //             foreach (var dep in depGroup)
-        //             {
-        //                 if (innerIndex++ > 0) WriteLine(@"
-        //                 else");
-        // #>
-        //                 if (<#=dep.ServiceKeyObject == null ? "serviceKey == null"
-        //                      : dep.ServiceKeyObject is DefaultKey ? "(serviceKey == null || " + dep.ServiceKey + ".Equals(serviceKey))"
-        //                      : dep.ServiceKey + ".Equals(serviceKey)"#> &&
-        //                     requiredServiceType == <#= dep.RequiredServiceType #> &&
-        //                     Equals(preRequestParent, <#= dep.PreResolveParent #>))
-        //                 {
-        //                     service = <#=dep.CreateMethodName#>(r);
-        //                     return true;
-        //                 }
-        // <#
-        //             }
-        // #>
-        //             }
-        // <#
-        //         }
-        // #>
-        //             service = null;
-        //             return false;
-        //         }
-
-
 
         sb.Append(
             """
