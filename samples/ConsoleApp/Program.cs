@@ -3,6 +3,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Compliance.Redaction;
 
 using DryIoc;
 using DryIoc.MefAttributedModel;
@@ -20,10 +21,12 @@ builder.Services.AddSingleton<SingletonDisposable>();
 
 // Integrate DryIoc
 builder.ConfigureContainer(
-    new DryIocServiceProviderFactory(),
-    // todo: @fixme #669
-    // new DryIocServiceProviderFactory(new Container(Rules.Default.WithMefAttributedModel())),
-    // optional configuration action
+    new DryIocServiceProviderFactory(
+        // optional container pre-configured with your additional rules,
+        // e.g. here using MefAttributedModel
+        new Container(Rules.Default.WithMefAttributedModel())
+    ),
+    // optional configuration action:
     serviceProvider =>
     {
         // Factory returns the DryIocServiceProvider, but you may access the DryIoc container via the Container field.

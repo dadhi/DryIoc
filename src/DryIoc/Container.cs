@@ -9858,7 +9858,9 @@ public static class ServiceInfoTools
     /// <summary>Combines service info with details. The main goal is to combine service and required service type.</summary>
     public static T WithDetails<T>(this T serviceInfo, ServiceDetails details) where T : ServiceInfo
     {
-        details ??= ServiceDetails.Default;
+        if (details == null)
+            return serviceInfo; // fixes #669
+
         var oldDetails = serviceInfo.Details;
         if (!details.HasCustomValue &&
             oldDetails != ServiceDetails.Default &&
@@ -13114,7 +13116,7 @@ public class ReflectionFactory : Factory
                 paramDetails.DefaultValue != null && injectedExpr.NodeType == ExprType.NewArrayInit && ((NewArrayExpression)injectedExpr).ArgumentCount == 0)
             {
                 // Check if parameter dependency itself (without propagated parent details)
-                // does not allow default, then stop checking the rest of parameters.
+                // does not allow default, then stop checking the rest of the parameters.
                 if (paramDetails.IfUnresolved == IfUnresolved.Throw)
                     return null;
                 injectedExpr = paramDetails.DefaultValue != null

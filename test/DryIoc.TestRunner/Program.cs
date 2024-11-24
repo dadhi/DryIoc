@@ -10,33 +10,10 @@ public class Program
     public static void Main()
     {
         new GHIssue503_Compile_time_container().Run();
-        
+
         // new GHIssue667_Resolve_with_serviceKey_does_not_invoke_factory_selector().Run();
-        
-        // new GHIssue659_Can_I_inspect_a_scope_for_all_the_dependencies_resolved_in_the_scope().Run();
-        // new GHIssue191_Optional_IResolverContext_argument_in_Func_of_service().Run();
-        // new GHIssue619_FaultySingletonDependency().Run();
-        // new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call().Run();
-        // new GHIssue233_Add_RegisterDelegate_with_parameters_returning_object_for_the_requested_runtime_known_service_type().Run();
-        // new ReuseInCurrentScopeTests().Run();
-        // new DecoratorTests().Run();
-        // new GHIssue653_KeyValuePair_exposes_internal_DryIoc_structures().Run();
-        // new GHIssue643_WithConcreteTypeDynamicRegistrations_results_in_unintended_instantiation().Run();
-        // new GHIssue623_Scoped_service_decorator().Run();
-        // new InitializerTests().Run();
-        // new GHIssue636_ServiceKey_in_RegisterDelegate_parameters().Run();
-        // new GHIssue631_Conditional_registrations().Run();
 
         RunAllTests();
-
-        // new GHIssue228_Updated_DryIoc_from_4_to_4_1_in_Unity_Engine_project_keyed_register_resolve_wont_work_anymore().Run();
-        // new Issue397_ActionExportsTypeConversion().Run();
-        // new GHIssue580_Scope_is_lost_in_IResolver_inside_scope_because_of_singleton().Run();
-        // new GHIssue574_Cannot_register_multiple_impls_in_child_container_with_default_service_key().Run();
-        // new GHIssue623_Scoped_service_decorator().Run();
-        // new GHIssue619_FaultySingletonDependency().Run();
-        // new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call().Run();
-        // ObjectLayoutInspector.TypeLayout.PrintLayout<Request>();
     }
 
     public static void RunAllTests()
@@ -446,6 +423,8 @@ public class Program
             new GHIssue619_FaultySingletonDependency(),
             new GHIssue623_Scoped_service_decorator(),
             new GHIssue653_KeyValuePair_exposes_internal_DryIoc_structures(),
+            new GHIssue659_Can_I_inspect_a_scope_for_all_the_dependencies_resolved_in_the_scope(),
+            new GHIssue669_Unable_to_resolve_type_with_optional_arguments_with_both_MefAttributedModel_and_MS_DI(),
         };
 
         var totalPassed = 0;

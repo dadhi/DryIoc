@@ -426,6 +426,8 @@ public class Program
             new GHIssue619_FaultySingletonDependency(),
             new GHIssue623_Scoped_service_decorator(),
             new GHIssue653_KeyValuePair_exposes_internal_DryIoc_structures(),
+            new GHIssue659_Can_I_inspect_a_scope_for_all_the_dependencies_resolved_in_the_scope(),
+            new GHIssue669_Unable_to_resolve_type_with_optional_arguments_with_both_MefAttributedModel_and_MS_DI(),
         };
 
         var totalPassed = 0;

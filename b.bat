@@ -19,17 +19,6 @@ dotnet run -v:minimal -c:Release -p:GeneratePackageOnBuild=false --project test/
 
 if %ERRORLEVEL% neq 0 goto :error
 
-echo:
-echo:# COMPILE ONLY: Build and Run TestRunners for %LatestSupportedNet% and .NET FRAMEWORK 4.7.2
-echo:
-echo:## %LatestSupportedNet%
-dotnet run -v:minimal -f:net8.0 -c:Release -p:GeneratePackageOnBuild=false -p:UseCompilationOnly=true --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
-echo:
-echo:## .NET FRAMEWORK 4.7.2
-dotnet run -v:minimal -c:Release -p:GeneratePackageOnBuild=false -p:UseCompilationOnly=true --project test/DryIoc.TestRunner.net472/DryIoc.TestRunner.net472.csproj
-
-if %ERRORLEVEL% neq 0 goto :error
-
 rem Calculate elapsed time
 set finished_at=%time%
 set /a finished_at_ms=%finished_at:~0,2%*24*60*100+%finished_at:~3,2%*60*100+%finished_at:~6,2%*100+%finished_at:~9,2%

@@ -1,25 +1,25 @@
 <Project Sdk="Microsoft.NET.Sdk">
-    <PropertyGroup>
-        <TargetFrameworks Condition="'$(DevMode)' == 'true'">net45;netstandard2.0;netstandard2.1;net6.0;net7.0;net8.0</TargetFrameworks>
-        <TargetFrameworks Condition="'$(DevMode)' != 'true'">net45;netstandard2.0;netstandard2.1;net6.0;net7.0</TargetFrameworks>
+  <PropertyGroup>
+    <TargetFrameworks Condition="'$(DevMode)' == 'true'">net45;netstandard2.0;netstandard2.1;net6.0;net7.0;net8.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(DevMode)' != 'true'">net45;netstandard2.0;netstandard2.1;net6.0;net7.0</TargetFrameworks>
 
-        <Product>DryIoc</Product>
+    <Product>DryIoc</Product>
 
-        <VersionPrefix>6.0.0</VersionPrefix>
-        <VersionSuffix>preview-08</VersionSuffix>
+    <VersionPrefix>6.0.0</VersionPrefix>
+    <VersionSuffix>preview-09</VersionSuffix>
 
-        <AssemblyName>$(Product)</AssemblyName>
-        <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
+    <AssemblyName>$(Product)</AssemblyName>
+    <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
 
-        <PackageId>$(Product).dll</PackageId>
-        <Title>$(Product).dll</Title>
+    <PackageId>$(Product).dll</PackageId>
+    <Title>$(Product).dll</Title>
 
-        <PackageReadmeFile>readme.md</PackageReadmeFile>
+    <PackageReadmeFile>readme.md</PackageReadmeFile>
 
-        <Description>DryIoc is fast, small, full-featured IoC Container for .NET</Description>
-        <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
-        <PackageReleaseNotes>
-<![CDATA[
+    <Description>DryIoc is fast, small, full-featured IoC Container for .NET</Description>
+    <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
+    <PackageReleaseNotes>
+      <![CDATA[
 ## v6.0.0 Major feature release
 
 - Decrease memory footprint
@@ -28,54 +28,52 @@
 
 ]]>
     </PackageReleaseNotes>
-    </PropertyGroup>
+  </PropertyGroup>
 
-    <ItemGroup Label="Packaging build and content files">
-        <None Include="..\..\nuspecs\DryIoc\readme.md"                Pack="true" PackagePath="\"/>
-        <None Include="..\..\nuspecs\DryIoc\build\DryIoc.dll.targets" Pack="true" PackagePath="build" />
-        <None Include=".config\dotnet-tools.json"                     Pack="true" PackagePath="tools" />
-        <None Include="CompileTimeDI\**\*"                            Pack="true" PackagePath="CompileTimeDI" />
-    </ItemGroup>
+  <ItemGroup Label="Packaging build and content files">
+    <None Include="..\..\nuspecs\DryIoc\readme.md" Pack="true" PackagePath="\"/>
+    <None Include="..\..\nuspecs\DryIoc\build\DryIoc.dll.targets" Pack="true" PackagePath="build" />
+    <None Include=".config\dotnet-tools.json" Pack="true" PackagePath="tools" />
+    <None Include="CompileTimeDI\**\*" Pack="true" PackagePath="CompileTimeDI" />
+  </ItemGroup>
 
-    <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
-        <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.7.0" />
-    </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.7.0" />
+  </ItemGroup>
 
-    <Target Name="BeforeCompile">
-        <Message Importance="high" Text="MSBuildNodeCount: $(MSBuildNodeCount)"/>
-    </Target>
+  <Target Name="BeforeCompile">
+    <Message Importance="high" Text="MSBuildNodeCount: $(MSBuildNodeCount)"/>
+  </Target>
 
-    <!-- Run compile-time generation only in debug configuration, 
+  <!-- Run compile-time generation only in debug configuration, 
       for the one of target frameworks (highest), 
       when the DryIoc was already build (TargetPath exists) in order to consume its types -->
-    <Target Name="CompileTimeGenerate" 
-        BeforeTargets="PrepareForBuild"
-        Condition="'$(TargetFramework)' == 'net8.0' AND '$(SkipCompTimeGen)' != 'true' AND '$(Configuration)' == 'Debug' AND Exists('$(ProjectDir)CompileTimeDI') AND Exists('$(TargetPath)')">
+  <Target Name="CompileTimeGenerate" BeforeTargets="PrepareForBuild" Condition="'$(TargetFramework)' == 'net8.0' AND '$(SkipCompTimeGen)' != 'true' AND '$(Configuration)' == 'Debug' AND Exists('$(ProjectDir)CompileTimeDI') AND Exists('$(TargetPath)')">
 
-        <Message Text="Generating the object graphs from the compile-time registrations for $(TargetFramework)..." Importance="high"/>
-        <Message Text="Env:"                       Importance="high"/>
-        <Message Text="TargetDir='$(TargetDir)'"   Importance="high"/>
-        <Message Text="TargetPath='$(TargetPath)'" Importance="high"/>
-        <Message Text="ProjectDir='$(ProjectDir)'" Importance="high"/>
+    <Message Text="Generating the object graphs from the compile-time registrations for $(TargetFramework)..." Importance="high"/>
+    <Message Text="Env:" Importance="high"/>
+    <Message Text="TargetDir='$(TargetDir)'" Importance="high"/>
+    <Message Text="TargetPath='$(TargetPath)'" Importance="high"/>
+    <Message Text="ProjectDir='$(ProjectDir)'" Importance="high"/>
 
-        <Exec WorkingDirectory="$(ProjectDir)" Command='dotnet tool restore --ignore-failed-sources --tool-manifest "$(ProjectDir)\.config\dotnet-tools.json"' />
-        <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet t4 -P=$(TargetDir) -r=$(TargetPath) -o=CompileTimeDI\Container.Generated.cs CompileTimeDI\Container.Generated.tt" />
-        <Message Text="Generated source file is '$(ProjectDir)CompileTimeDI\Container.Generated.cs'" Importance="high"/>
-    </Target>
+    <Exec WorkingDirectory="$(ProjectDir)" Command='dotnet tool restore --ignore-failed-sources --tool-manifest "$(ProjectDir)\.config\dotnet-tools.json"' />
+    <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet t4 -P=$(TargetDir) -r=$(TargetPath) -o=CompileTimeDI\Container.Generated.cs CompileTimeDI\Container.Generated.tt" />
+    <Message Text="Generated source file is '$(ProjectDir)CompileTimeDI\Container.Generated.cs'" Importance="high"/>
+  </Target>
 
-    <ItemGroup>
-      <None Update="CompileTimeDI\Container.Generated.tt">
-        <Generator>TextTemplatingFileGenerator</Generator>
-        <LastGenOutput>CompileTimeDI\Container.Generated.cs</LastGenOutput>
-      </None>
-    </ItemGroup>
+  <ItemGroup>
+    <None Update="CompileTimeDI\Container.Generated.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>CompileTimeDI\Container.Generated.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
 
-    <ItemGroup>
-      <Compile Update="CompileTimeDI\Container.Generated.cs">
-        <DesignTime>True</DesignTime>
-        <AutoGen>True</AutoGen>
-        <DependentUpon>CompileTimeDI\Container.Generated.tt</DependentUpon>
-      </Compile>
-    </ItemGroup>
+  <ItemGroup>
+    <Compile Update="CompileTimeDI\Container.Generated.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>CompileTimeDI\Container.Generated.tt</DependentUpon>
+    </Compile>
+  </ItemGroup>
 
 </Project>
