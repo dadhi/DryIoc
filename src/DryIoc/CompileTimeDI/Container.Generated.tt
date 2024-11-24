@@ -59,7 +59,7 @@ string GetTypeNameOnly(string typeName) => typeName.Split('`').First().Split('.'
 
 string CommaOptArg(string arg) => arg == "null" ? "" : ", " + arg;
 
-int getServiceBodyLineIdent = 16;
+int getServiceBodyLineIdent = 12;
 
 var rootCodes = result.Roots.Select((r, i) =>
     new { ServiceType = r.Key.ServiceType,
