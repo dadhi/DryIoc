@@ -7501,7 +7501,7 @@ namespace DryIoc.FastExpressionCompiler
                         var args = x.Arguments;
                         if (args.Count == 1)
                             args[0].ToCSharpString(sb, EnclosedIn.ParensByDefault, ref named,
-                                lineIndent, // don't increast indent the chain of single arguments inline, e.g. for `new A(new B(\n....a,\n....b))` we still want padding to be 4, not 8
+                                lineIndent, // don't increase indent the chain of single arguments inline, e.g. for `new A(new B(\n....a,\n....b))` we still want padding to be 4, not 8
                                 stripNamespace, printType, indentSpaces, notRecognizedToCode);
                         else if (args.Count > 1)
                             for (var i = 0; i < args.Count; i++)
@@ -7601,7 +7601,7 @@ namespace DryIoc.FastExpressionCompiler
                 case ExpressionType.NewArrayInit:
                     {
                         var x = (NewArrayExpression)e;
-                        lineIndent = GetRealLineIndent(sb, lineIndent);
+                        lineIndent = sb.GetRealLineIndent(lineIndent);
                         var nextIndent = lineIndent + indentSpaces;
 
                         sb.Append("new ").Append(e.Type.GetElementType().ToCode(stripNamespace, printType));
@@ -7636,7 +7636,7 @@ namespace DryIoc.FastExpressionCompiler
                 case ExpressionType.ListInit:
                     {
                         var x = (ListInitExpression)e;
-                        lineIndent = GetRealLineIndent(sb, lineIndent);
+                        lineIndent = sb.GetRealLineIndent(lineIndent);
                         var elemIndent = lineIndent + indentSpaces;
 
                         x.NewExpression.ToCSharpString(sb, EnclosedIn.AvoidParens, ref named,
@@ -7672,7 +7672,7 @@ namespace DryIoc.FastExpressionCompiler
                 case ExpressionType.Lambda:
                     {
                         var x = (LambdaExpression)e;
-                        lineIndent = GetRealLineIndent(sb);
+                        lineIndent = sb.GetRealLineIndent(lineIndent);
                         // The result should be something like this (taken from the #237)
                         //
                         // `(DeserializerDlg<Word>)((ref ReadOnlySequence<Byte> input, Word value, out Int64 bytesRead) => {...})`
@@ -7736,7 +7736,7 @@ namespace DryIoc.FastExpressionCompiler
                     {
                         var x = (InvocationExpression)e;
 
-                        lineIndent = GetRealLineIndent(sb, lineIndent);
+                        lineIndent = sb.GetRealLineIndent(lineIndent);
                         var argIndent = lineIndent + indentSpaces;
 
                         // wrap the expression in the possibly excessive parentheses, because usually the expression is the delegate (except if delegate is parameter)
@@ -7767,7 +7767,7 @@ namespace DryIoc.FastExpressionCompiler
                 case ExpressionType.Conditional:
                     {
                         var x = (ConditionalExpression)e;
-                        lineIndent = GetRealLineIndent(sb);
+                        lineIndent = sb.GetRealLineIndent(lineIndent);
 
                         if (e.Type == typeof(void)) // otherwise output as ternary expression
                         {
@@ -7816,7 +7816,7 @@ namespace DryIoc.FastExpressionCompiler
                 case ExpressionType.Loop:
                     {
                         var x = (LoopExpression)e;
-                        lineIndent = GetRealLineIndent(sb);
+                        lineIndent = sb.GetRealLineIndent(lineIndent);
 
                         sb.NewLineIndent(lineIndent).Append("while (true)");
                         sb.NewLineIndent(lineIndent).Append("{");
@@ -7861,7 +7861,7 @@ namespace DryIoc.FastExpressionCompiler
                 case ExpressionType.Try:
                     {
                         var x = (TryExpression)e;
-                        lineIndent = GetRealLineIndent(sb);
+                        lineIndent = sb.GetRealLineIndent(lineIndent);
 
                         var returnsValue = e.Type != typeof(void);
                         void PrintPart(Expression part, ref SmallList4<NamedWithIndex> named)
@@ -7959,7 +7959,7 @@ namespace DryIoc.FastExpressionCompiler
                     {
                         var x = (SwitchExpression)e;
 
-                        lineIndent = sb.GetRealLineIndent();
+                        lineIndent = sb.GetRealLineIndent(lineIndent);
 
                         sb.Append("switch (");
                         x.SwitchValue.ToCSharpString(sb, EnclosedIn.AvoidParens, ref named,
@@ -8324,7 +8324,7 @@ namespace DryIoc.FastExpressionCompiler
         // Returns the number of consecutive spaces from the current position, 
         // or from the first non-space character to the prev newline.
         // e.g. for `\n    foo.Bar = ` and for `\n    ` indent is 4
-        internal static int GetRealLineIndent(this StringBuilder sb, int defaultIndent = 0)
+        internal static int GetRealLineIndent(this StringBuilder sb, int defaultIndent)
         {
             var lastSpacePos = -1;
             // go back from the last char in the builder
