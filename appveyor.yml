@@ -3,7 +3,7 @@ image:
   - Ubuntu
   - MacOS
 
-version: 6.0.0-preview-08-{build}
+version: 6.0.0-preview-10-{build}
 
 test: off
 
@@ -11,8 +11,8 @@ skip_commits:
   message: /noci .*/
 
 build_script:
-  - dotnet run -v:minimal -c:Release -p:DevMode=false -p:GeneratePackageOnBuild=false -f:net7.0 --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
-  - dotnet run -v:minimal -c:Release -p:DevMode=false -p:GeneratePackageOnBuild=false -p:UseCompilationOnly=true -f:net7.0 --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+  - dotnet run -v:minimal -c:Release -p:LatestSupportedNet=net7.0 -f:net7.0 --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+  - dotnet run -v:minimal -c:Release -p:LatestSupportedNet=net7.0 -f:net7.0 -p:UseCompilationOnly=true --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
 
 for:
   - matrix:
@@ -20,7 +20,7 @@ for:
         - image: Visual Studio 2022
 
     build_script:
-      - build_with_packaging.bat
+      - build_with_packaging.bat net8.0
 
     artifacts:
       - path: .\.dist\packages\*.nupkg

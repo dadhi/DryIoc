@@ -312,9 +312,9 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             Assert.Equal(new[] { service2, service3, service4 }, services);
         }
 
-        internal interface IService { }
+        internal new interface IService { }
 
-        internal class Service : IService
+        internal new class Service : IService
         {
             private readonly string _id;
 
@@ -338,7 +338,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             public override string ToString() => _id;
         }
 
-        internal class OtherService
+        internal new class OtherService
         {
             public OtherService(
                 [FromKeyedServices("service1")] IService service1,

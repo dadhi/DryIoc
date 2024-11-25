@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <TargetFrameworks Condition="'$(DevMode)' == 'true'">net8.0</TargetFrameworks>
-        <TargetFrameworks Condition="'$(DevMode)' != 'true'">net7.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(LatestSupportedNet)' == 'net9.0'">net9.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(LatestSupportedNet)' == 'net8.0'">net8.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(LatestSupportedNet)' == 'net7.0'">net7.0</TargetFrameworks>
 
         <Description>Benchmarks, sandbox for experiments.</Description>
         <NoWarn>1701;1702;AD0001;NU1608</NoWarn>
@@ -17,17 +18,17 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Autofac" Version="7.1.0" />
-        <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="8.0.0" />
-        <PackageReference Include="BenchmarkDotNet" Version="0.13.11" />
+        <PackageReference Include="Autofac" Version="8.1.1" />
+        <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="10.0.0" />
+        <PackageReference Include="BenchmarkDotNet" Version="0.14.0" />
         <PackageReference Include="Grace" Version="7.2.1" />
         <PackageReference Include="Grace.DependencyInjection.Extensions" Version="7.1.0" />
-        <PackageReference Include="LightInject" Version="6.6.4" />
+        <PackageReference Include="LightInject" Version="7.0.1" />
         <PackageReference Include="Microsoft.Experimental.Collections" Version="1.0.6-e190117-3" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
-        <PackageReference Include="SimpleInjector" Version="5.4.4" />
-        <PackageReference Include="Lamar" Version="13.0.0" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
+        <PackageReference Include="SimpleInjector" Version="5.5.0" />
+        <PackageReference Include="Lamar" Version="14.0.1" />
     </ItemGroup>
 
     <ItemGroup>

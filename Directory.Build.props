@@ -1,14 +1,17 @@
 <Project>
     <PropertyGroup>
-        <LangVersion>latest</LangVersion>
-
         <Authors>Maksim Volkau</Authors>
         <Copyright>Copyright © 2013-2024 Maksim Volkau</Copyright>
+
+        <LangVersion>latest</LangVersion>
 
         <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
         <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
 
+        <LatestSupportedNet>net9.0</LatestSupportedNet>
         <DevMode>true</DevMode>        <!-- Hey, indicates the use of the new .NET frameworks -->
+
+        <NoWarn>$(NoWarn);NETSDK1005</NoWarn>
 
     </PropertyGroup>
 

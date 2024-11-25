@@ -6,11 +6,11 @@ set started_at=%time%
 set /a started_at_ms=%started_at:~0,2%*24*60*100+%started_at:~3,2%*60*100+%started_at:~6,2%*100+%started_at:~9,2%
 
 echo:
-echo:# Build and Run TestRunner on .NET 8.0
+echo:# Build and Run TestRunner for .NET 9.0
 echo:[started at %started_at%]
 echo:
 
-dotnet run -v:minimal -f:net8.0 -c:Release -p:GeneratePackageOnBuild=false --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+dotnet run -v:m -c:Release -f:net9.0 -p:LatestSupportedNet=net9.0 --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
 if %ERRORLEVEL% neq 0 goto :error
 
 rem Calculate elapsed time

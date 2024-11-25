@@ -1,8 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks Condition="'$(DevMode)' == 'true'">net7.0;net8.0</TargetFrameworks>
-        <TargetFrameworks Condition="'$(DevMode)' != 'true'">net6.0;net7.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(LatestSupportedNet)' == 'net9.0'">net8.0;net9.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(LatestSupportedNet)' == 'net8.0'">net8.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(LatestSupportedNet)' == 'net7.0'">net7.0</TargetFrameworks>
+        <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
     </PropertyGroup>
 
     <ItemGroup>
@@ -10,14 +12,14 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="xunit.runner.visualstudio" Version="2.5.6">
+        <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="xunit" Version="2.6.4" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
-        <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Specification.Tests" Version="8.0.0" />
+        <PackageReference Include="xunit" Version="2.9.2" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.0" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Specification.Tests" Version="9.0.0" />
     </ItemGroup>
 
 </Project>

@@ -4,6 +4,9 @@
     <PropertyGroup>
         <IsPackable>false</IsPackable>
         <IsTestProject>true</IsTestProject>
+        <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+
+        <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
         <MSBuildWarningsAsMessages>
             $(MSBuildWarningsAsMessages);MSB3277
         </MSBuildWarningsAsMessages>

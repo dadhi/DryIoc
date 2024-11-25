@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFrameworks Condition="'$(DevMode)' == 'true'">netstandard2.0;net6.0;net7.0;net8.0</TargetFrameworks>
-        <TargetFrameworks Condition="'$(DevMode)' != 'true'">netstandard2.0;net6.0;net7.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(LatestSupportedNet)' == 'net9.0'">netstandard2.0;net8.0;net9.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(LatestSupportedNet)' == 'net8.0'">netstandard2.0;net8.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(LatestSupportedNet)' == 'net7.0'">netstandard2.0;net7.0</TargetFrameworks>
+        <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
 
         <Product>DryIoc.Microsoft.DependencyInjection</Product>
 
@@ -32,6 +34,6 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
     </ItemGroup>
 </Project>
