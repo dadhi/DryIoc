@@ -1,12 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-     <TargetFrameworks>net7.0;net472</TargetFrameworks>
-     <DefineConstants>$(DefineConstants);DRYIOC_SYNTAX_TESTS</DefineConstants>
+    <TargetFrameworks>net7.0;net472</TargetFrameworks>
+    <DefineConstants>$(DefineConstants);DRYIOC_SYNTAX_TESTS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
-     <Compile Include="..\DryIoc.IssuesTests\Issue123_TipsForMigrationFromAutofac.cs" Link="Issue123_TipsForMigrationFromAutofac.cs" />
-     <Compile Include="..\DryIoc.IssuesTests\Issue123_TipsForMigrationFromAutofac_WithParameter.cs" Link="Issue123_TipsForMigrationFromAutofac_WithParameter.cs" /> 
+    <Compile Include="..\DryIoc.IssuesTests\Issue123_TipsForMigrationFromAutofac.cs" Link="Issue123_TipsForMigrationFromAutofac.cs" />
+    <Compile Include="..\DryIoc.IssuesTests\Issue123_TipsForMigrationFromAutofac_WithParameter.cs" Link="Issue123_TipsForMigrationFromAutofac_WithParameter.cs" />
   </ItemGroup>
 
   <ItemGroup>

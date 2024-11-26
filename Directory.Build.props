@@ -9,7 +9,6 @@
         <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
 
         <LatestSupportedNet>net9.0</LatestSupportedNet>
-        <DevMode>true</DevMode>        <!-- Hey, indicates the use of the new .NET frameworks -->
 
         <NoWarn>$(NoWarn);NETSDK1005</NoWarn>
 

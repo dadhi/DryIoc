@@ -20,7 +20,7 @@ for:
         - image: Visual Studio 2022
 
     build_script:
-      - build_with_packaging.bat net8.0
+      - build.bat net8.0
 
     artifacts:
       - path: .\.dist\packages\*.nupkg

@@ -6,6 +6,8 @@
     <OutputType>Exe</OutputType>
     <IsTestProject>false</IsTestProject>
     <SkipDocGen>true</SkipDocGen>
+
+    <NoWarn>$(NoWarn);NETSDK1005;NETSDK1138;NU1702</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(UseCompilationOnly)' == 'true'">
