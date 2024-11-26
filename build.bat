@@ -27,7 +27,7 @@ if %ERRORLEVEL% neq 0 goto :error
 echo:
 echo:## Finished: Clean, Restore and Build
 echo:
-echo:## Starting: TestRunners for .NET 8.0 and .NET FRAMEWORK 4.7.2...
+echo:## Starting: TestRunners for the latest supported .NET and .NET FRAMEWORK 4.7.2...
 echo:
 echo:### Latest supported .NET  - Default rules (interpretation, then compilation)
 
