@@ -15,13 +15,13 @@ namespace PerformanceTests
 {
     public class RealisticUnitOfWorkBenchmark
     {
-        public static IContainer PrepareDryIoc() => 
+        public static IContainer PrepareDryIoc() =>
             PrepareDryIoc(new Container());
 
         public static IContainer PrepareDryIoc_WebRequestScoped() =>
             PrepareDryIoc_WebRequestScoped(new Container());
 
-        public static IContainer PrepareDryIocInterpretationOnly() => 
+        public static IContainer PrepareDryIocInterpretationOnly() =>
             PrepareDryIoc(new Container(Rules.Default.WithUseInterpretation()));
 
         private static IContainer PrepareDryIoc(IContainer container)
@@ -473,7 +473,7 @@ namespace PerformanceTests
                 c.Export<Trans12>();
                 c.Export<Trans22>();
 
-                c.ExportFactory<Scoped13, Single1, SingleObj13, ScopedFac12>((scoped13, single1, singleObj13) => 
+                c.ExportFactory<Scoped13, Single1, SingleObj13, ScopedFac12>((scoped13, single1, singleObj13) =>
                     new ScopedFac12(scoped13, single1, singleObj13)).Lifestyle.SingletonPerScope();
 
                 c.ExportFactory<Scoped23, Single2, SingleObj23, ScopedFac22>((scoped23, single2, singleObj23) =>
@@ -525,15 +525,15 @@ namespace PerformanceTests
 
         private static void RegisterDummyPopulation(IExportRegistrationBlock block)
         {
-            block.Export<D1> ().Lifestyle.SingletonPerScope();
-            block.Export<D2> ().Lifestyle.SingletonPerScope();
-            block.Export<D3> ().Lifestyle.SingletonPerScope();
-            block.Export<D4> ().Lifestyle.SingletonPerScope();
-            block.Export<D5> ().Lifestyle.SingletonPerScope();
-            block.Export<D6> ().Lifestyle.SingletonPerScope();
-            block.Export<D7> ().Lifestyle.SingletonPerScope();
-            block.Export<D8> ().Lifestyle.SingletonPerScope();
-            block.Export<D9> ().Lifestyle.SingletonPerScope();
+            block.Export<D1>().Lifestyle.SingletonPerScope();
+            block.Export<D2>().Lifestyle.SingletonPerScope();
+            block.Export<D3>().Lifestyle.SingletonPerScope();
+            block.Export<D4>().Lifestyle.SingletonPerScope();
+            block.Export<D5>().Lifestyle.SingletonPerScope();
+            block.Export<D6>().Lifestyle.SingletonPerScope();
+            block.Export<D7>().Lifestyle.SingletonPerScope();
+            block.Export<D8>().Lifestyle.SingletonPerScope();
+            block.Export<D9>().Lifestyle.SingletonPerScope();
             block.Export<D10>().Lifestyle.SingletonPerScope();
             block.Export<D11>().Lifestyle.SingletonPerScope();
             block.Export<D12>().Lifestyle.SingletonPerScope();
@@ -611,10 +611,10 @@ namespace PerformanceTests
             builder.RegisterType<Single1>().AsSelf().SingleInstance();
             builder.RegisterType<Single2>().AsSelf().SingleInstance();
 
-            builder.Register(c => 
+            builder.Register(c =>
                 new ScopedFac1(c.Resolve<Scoped1>(), c.Resolve<Scoped3>(), c.Resolve<Single1>(), c.Resolve<SingleObj1>()))
                 .AsSelf().InstancePerLifetimeScope();
-            builder.Register(c => 
+            builder.Register(c =>
                 new ScopedFac2(c.Resolve<Scoped2>(), c.Resolve<Scoped4>(), c.Resolve<Single2>(), c.Resolve<SingleObj2>()))
                 .AsSelf().InstancePerLifetimeScope();
 
@@ -635,10 +635,10 @@ namespace PerformanceTests
             builder.RegisterType<Trans12>().AsSelf().InstancePerDependency();
             builder.RegisterType<Trans22>().AsSelf().InstancePerDependency();
 
-            builder.Register(r => 
+            builder.Register(r =>
                 new ScopedFac12(r.Resolve<Scoped13>(), r.Resolve<Single1>(), r.Resolve<SingleObj13>()))
                 .AsSelf().InstancePerLifetimeScope();
-            builder.Register(r => 
+            builder.Register(r =>
                 new ScopedFac22(r.Resolve<Scoped23>(), r.Resolve<Single2>(), r.Resolve<SingleObj23>()))
                 .AsSelf().InstancePerLifetimeScope();
 
@@ -702,15 +702,15 @@ namespace PerformanceTests
 
         private static void RegisterDummyPopulation(ContainerBuilder builder)
         {
-            builder.RegisterType<D1> ().AsSelf().InstancePerLifetimeScope();
-            builder.RegisterType<D2> ().AsSelf().InstancePerLifetimeScope();
-            builder.RegisterType<D3> ().AsSelf().InstancePerLifetimeScope();
-            builder.RegisterType<D4> ().AsSelf().InstancePerLifetimeScope();
-            builder.RegisterType<D5> ().AsSelf().InstancePerLifetimeScope();
-            builder.RegisterType<D6> ().AsSelf().InstancePerLifetimeScope();
-            builder.RegisterType<D7> ().AsSelf().InstancePerLifetimeScope();
-            builder.RegisterType<D8> ().AsSelf().InstancePerLifetimeScope();
-            builder.RegisterType<D9> ().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<D1>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<D2>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<D3>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<D4>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<D5>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<D6>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<D7>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<D8>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<D9>().AsSelf().InstancePerLifetimeScope();
             builder.RegisterType<D10>().AsSelf().InstancePerLifetimeScope();
             builder.RegisterType<D11>().AsSelf().InstancePerLifetimeScope();
             builder.RegisterType<D12>().AsSelf().InstancePerLifetimeScope();
@@ -759,50 +759,50 @@ namespace PerformanceTests
                 return scope.Resolve<R>();
         }
 
-        public static IServiceProvider PrepareLamarMsDi() => 
+        public static IServiceProvider PrepareLamarMsDi() =>
             new Lamar.Container(AddServices());
 
 
         [MemoryDiagnoser]
         public class CompileResolutionExpression
         {
-/*
+            /*
 
-## Baseline 27.03.2022
+            ## Baseline 27.03.2022
 
-BenchmarkDotNet=v0.12.1, OS=Windows 10.0.19043
-Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
-.NET Core SDK=6.0.201
-  [Host]     : .NET Core 6.0.3 (CoreCLR 6.0.322.12309, CoreFX 6.0.322.12309), X64 RyuJIT
-  DefaultJob : .NET Core 6.0.3 (CoreCLR 6.0.322.12309, CoreFX 6.0.322.12309), X64 RyuJIT
+            BenchmarkDotNet=v0.12.1, OS=Windows 10.0.19043
+            Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+            .NET Core SDK=6.0.201
+              [Host]     : .NET Core 6.0.3 (CoreCLR 6.0.322.12309, CoreFX 6.0.322.12309), X64 RyuJIT
+              DefaultJob : .NET Core 6.0.3 (CoreCLR 6.0.322.12309, CoreFX 6.0.322.12309), X64 RyuJIT
 
 
-|                  Method |       Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 |  Gen 2 | Allocated |
-|------------------------ |-----------:|---------:|---------:|------:|--------:|--------:|-------:|-------:|----------:|
-|  CompileLightExpression |   430.1 us |  8.42 us | 16.62 us |  1.00 |    0.00 | 18.5547 | 9.2773 | 3.4180 | 115.17 KB |
-| CompileSystemExpression | 1,072.8 us | 14.31 us | 13.38 us |  2.55 |    0.17 | 35.1563 | 9.7656 |      - | 216.11 KB |
+            |                  Method |       Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 |  Gen 2 | Allocated |
+            |------------------------ |-----------:|---------:|---------:|------:|--------:|--------:|-------:|-------:|----------:|
+            |  CompileLightExpression |   430.1 us |  8.42 us | 16.62 us |  1.00 |    0.00 | 18.5547 | 9.2773 | 3.4180 | 115.17 KB |
+            | CompileSystemExpression | 1,072.8 us | 14.31 us | 13.38 us |  2.55 |    0.17 | 35.1563 | 9.7656 |      - | 216.11 KB |
 
-## Intrinsic, no array, single lambda, no GetParameters for GetCurrentScopeOrThrow
+            ## Intrinsic, no array, single lambda, no GetParameters for GetCurrentScopeOrThrow
 
-|                  Method |     Mean |   Error |  StdDev | Ratio | RatioSD |   Gen 0 |   Gen 1 |  Gen 2 | Allocated |
-|------------------------ |---------:|--------:|--------:|------:|--------:|--------:|--------:|-------:|----------:|
-|  CompileLightExpression | 369.1 us | 3.39 us | 2.83 us |  1.00 |    0.00 | 18.0664 |  8.7891 | 3.4180 | 112.88 KB |
-| CompileSystemExpression | 712.7 us | 8.17 us | 6.82 us |  1.93 |    0.03 | 35.1563 | 10.7422 |      - |  216.1 KB |
+            |                  Method |     Mean |   Error |  StdDev | Ratio | RatioSD |   Gen 0 |   Gen 1 |  Gen 2 | Allocated |
+            |------------------------ |---------:|--------:|--------:|------:|--------:|--------:|--------:|-------:|----------:|
+            |  CompileLightExpression | 369.1 us | 3.39 us | 2.83 us |  1.00 |    0.00 | 18.0664 |  8.7891 | 3.4180 | 112.88 KB |
+            | CompileSystemExpression | 712.7 us | 8.17 us | 6.82 us |  1.93 |    0.03 | 35.1563 | 10.7422 |      - |  216.1 KB |
 
-## RegisterDelegate wins
+            ## RegisterDelegate wins
 
-|                  Method |     Mean |   Error |  StdDev | Ratio | RatioSD |   Gen 0 |   Gen 1 |  Gen 2 | Allocated |
-|------------------------ |---------:|--------:|--------:|------:|--------:|--------:|--------:|-------:|----------:|
-|  CompileLightExpression | 363.1 us | 6.89 us | 6.11 us |  1.00 |    0.00 | 18.0664 |  8.7891 | 2.9297 | 111.51 KB |
-| CompileSystemExpression | 702.9 us | 2.52 us | 2.10 us |  1.94 |    0.03 | 35.1563 | 10.7422 |      - |  216.1 KB |
+            |                  Method |     Mean |   Error |  StdDev | Ratio | RatioSD |   Gen 0 |   Gen 1 |  Gen 2 | Allocated |
+            |------------------------ |---------:|--------:|--------:|------:|--------:|--------:|--------:|-------:|----------:|
+            |  CompileLightExpression | 363.1 us | 6.89 us | 6.11 us |  1.00 |    0.00 | 18.0664 |  8.7891 | 2.9297 | 111.51 KB |
+            | CompileSystemExpression | 702.9 us | 2.52 us | 2.10 us |  1.94 |    0.03 | 35.1563 | 10.7422 |      - |  216.1 KB |
 
-## Optimizing Invoke
+            ## Optimizing Invoke
 
-|                  Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |   Gen 1 |  Gen 2 | Allocated |
-|------------------------ |---------:|---------:|---------:|------:|--------:|--------:|--------:|-------:|----------:|
-|  CompileLightExpression | 445.2 us |  8.81 us | 20.07 us |  1.00 |    0.00 | 33.2031 | 15.6250 | 3.9063 | 111.36 KB |
-| CompileSystemExpression | 842.9 us | 16.06 us | 25.00 us |  1.91 |    0.11 | 69.3359 | 17.5781 |      - | 216.18 KB |
-*/
+            |                  Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |   Gen 1 |  Gen 2 | Allocated |
+            |------------------------ |---------:|---------:|---------:|------:|--------:|--------:|--------:|-------:|----------:|
+            |  CompileLightExpression | 445.2 us |  8.81 us | 20.07 us |  1.00 |    0.00 | 33.2031 | 15.6250 | 3.9063 | 111.36 KB |
+            | CompileSystemExpression | 842.9 us | 16.06 us | 25.00 us |  1.91 |    0.11 | 69.3359 | 17.5781 |      - | 216.18 KB |
+            */
             LambdaExpression _lightExpr;
             System.Linq.Expressions.LambdaExpression _sysExpr;
 
@@ -823,39 +823,39 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
         [MemoryDiagnoser]
         public class CreateContainerAndRegisterServices
         {
-/*
-## Baseline:
+            /*
+            ## Baseline:
 
-                            Method |        Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
----------------------------------- |------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
- BmarkMicrosoftDependencyInjection |    37.16 us |  0.1617 us |  0.1434 us |   1.00 |    0.00 |      9.0942 |      0.0610 |           - |            41.93 KB |
-                       BmarkDryIoc |    47.27 us |  0.5879 us |  0.5211 us |   1.27 |    0.02 |     11.5967 |      0.0610 |           - |            53.59 KB |
-                   BmarkDryIocMsDi |    50.20 us |  0.8907 us |  0.8332 us |   1.35 |    0.02 |     12.3901 |      0.0610 |           - |            57.36 KB |
-                  BmarkAutofacMsDi |   416.15 us |  4.9245 us |  4.6064 us |  11.19 |    0.13 |     59.5703 |     14.1602 |           - |           275.06 KB |
-                      BmarkAutofac |   417.75 us |  1.9344 us |  1.7148 us |  11.24 |    0.06 |     56.1523 |      3.4180 |           - |           260.33 KB |
-                        BmarkGrace | 5,933.57 us | 48.6780 us | 45.5335 us | 159.79 |    1.51 |     70.3125 |     31.2500 |      7.8125 |            338.2 KB |
-                    BmarkGraceMsDi | 6,295.46 us | 43.3164 us | 40.5182 us | 169.46 |    0.98 |     78.1250 |     39.0625 |      7.8125 |           371.36 KB |
+                                        Method |        Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+            ---------------------------------- |------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
+             BmarkMicrosoftDependencyInjection |    37.16 us |  0.1617 us |  0.1434 us |   1.00 |    0.00 |      9.0942 |      0.0610 |           - |            41.93 KB |
+                                   BmarkDryIoc |    47.27 us |  0.5879 us |  0.5211 us |   1.27 |    0.02 |     11.5967 |      0.0610 |           - |            53.59 KB |
+                               BmarkDryIocMsDi |    50.20 us |  0.8907 us |  0.8332 us |   1.35 |    0.02 |     12.3901 |      0.0610 |           - |            57.36 KB |
+                              BmarkAutofacMsDi |   416.15 us |  4.9245 us |  4.6064 us |  11.19 |    0.13 |     59.5703 |     14.1602 |           - |           275.06 KB |
+                                  BmarkAutofac |   417.75 us |  1.9344 us |  1.7148 us |  11.24 |    0.06 |     56.1523 |      3.4180 |           - |           260.33 KB |
+                                    BmarkGrace | 5,933.57 us | 48.6780 us | 45.5335 us | 159.79 |    1.51 |     70.3125 |     31.2500 |      7.8125 |            338.2 KB |
+                                BmarkGraceMsDi | 6,295.46 us | 43.3164 us | 40.5182 us | 169.46 |    0.98 |     78.1250 |     39.0625 |      7.8125 |           371.36 KB |
 
-## v4.1
+            ## v4.1
 
-BenchmarkDotNet=v0.12.0, OS=Windows 10.0.18362
-Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
-.NET Core SDK=3.1.100
-  [Host]     : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
-  DefaultJob : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
+            BenchmarkDotNet=v0.12.0, OS=Windows 10.0.18362
+            Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+            .NET Core SDK=3.1.100
+              [Host]     : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
+              DefaultJob : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
 
 
-|                            Method |        Mean |     Error |    StdDev |  Ratio | RatioSD |   Gen 0 |   Gen 1 | Gen 2 | Allocated |
-|---------------------------------- |------------:|----------:|----------:|-------:|--------:|--------:|--------:|------:|----------:|
-| BmarkMicrosoftDependencyInjection |    29.24 us |  0.233 us |  0.218 us |   1.00 |    0.00 |  9.0332 |  0.0305 |     - |  41.54 KB |
-|                       BmarkDryIoc |    35.03 us |  0.223 us |  0.186 us |   1.20 |    0.01 |  8.7891 |  0.0610 |     - |  40.63 KB |
-|                   BmarkDryIocMsDi |    35.96 us |  0.233 us |  0.218 us |   1.23 |    0.01 |  9.5825 |  0.1831 |     - |   44.3 KB |
-|                        BmarkGrace | 5,210.27 us | 28.299 us | 26.471 us | 178.18 |    1.81 | 70.3125 | 31.2500 |     - | 332.61 KB |
-|                    BmarkGraceMsDi | 5,277.32 us | 37.934 us | 31.677 us | 180.23 |    1.77 | 78.1250 | 39.0625 |     - | 365.01 KB |
-|                      BmarkAutofac |   300.60 us |  2.431 us |  2.030 us |  10.27 |    0.11 | 53.7109 | 15.6250 |     - | 248.44 KB |
-|                  BmarkAutofacMsDi |   307.78 us |  1.040 us |  0.922 us |  10.52 |    0.09 | 55.1758 | 17.0898 |     - | 254.09 KB |
+            |                            Method |        Mean |     Error |    StdDev |  Ratio | RatioSD |   Gen 0 |   Gen 1 | Gen 2 | Allocated |
+            |---------------------------------- |------------:|----------:|----------:|-------:|--------:|--------:|--------:|------:|----------:|
+            | BmarkMicrosoftDependencyInjection |    29.24 us |  0.233 us |  0.218 us |   1.00 |    0.00 |  9.0332 |  0.0305 |     - |  41.54 KB |
+            |                       BmarkDryIoc |    35.03 us |  0.223 us |  0.186 us |   1.20 |    0.01 |  8.7891 |  0.0610 |     - |  40.63 KB |
+            |                   BmarkDryIocMsDi |    35.96 us |  0.233 us |  0.218 us |   1.23 |    0.01 |  9.5825 |  0.1831 |     - |   44.3 KB |
+            |                        BmarkGrace | 5,210.27 us | 28.299 us | 26.471 us | 178.18 |    1.81 | 70.3125 | 31.2500 |     - | 332.61 KB |
+            |                    BmarkGraceMsDi | 5,277.32 us | 37.934 us | 31.677 us | 180.23 |    1.77 | 78.1250 | 39.0625 |     - | 365.01 KB |
+            |                      BmarkAutofac |   300.60 us |  2.431 us |  2.030 us |  10.27 |    0.11 | 53.7109 | 15.6250 |     - | 248.44 KB |
+            |                  BmarkAutofacMsDi |   307.78 us |  1.040 us |  0.922 us |  10.52 |    0.09 | 55.1758 | 17.0898 |     - | 254.09 KB |
 
-*/
+            */
             [Benchmark(Baseline = true)]
             public object BmarkMicrosoftDependencyInjection() => PrepareMsDi();
 
@@ -1350,13 +1350,17 @@ Intel Core i5-8350U CPU 1.70GHz (Kaby Lake R), 1 CPU, 8 logical and 4 physical c
 | DryIoc_MsDI | 159.9 us | 4.89 us | 13.38 us |  0.98 |    0.13 | 13.9160 |      - |  43.05 KB |        1.14 |
 |        MsDI | 213.8 us | 4.37 us | 12.68 us |  1.31 |    0.16 | 23.1934 | 0.4883 |  71.34 KB |        1.90 |
 
+
+## v6.0.0 + .NET 9.0
+
+
+
+
 */
 
-            // [Benchmark]
             [Benchmark(Baseline = true)]
             public object DryIoc() => Measure(PrepareDryIoc());
 
-            // [Benchmark(Baseline = true)]
             [Benchmark]
             public object DryIoc_MsDI() => Measure(PrepareDryIocMsDi());
 
@@ -1367,19 +1371,19 @@ Intel Core i5-8350U CPU 1.70GHz (Kaby Lake R), 1 CPU, 8 logical and 4 physical c
             // [Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(PrepareDryIocInterpretationOnly());
 
-            // [Benchmark]
+            [Benchmark]
             public object Autofac() => Measure(PrepareAutofac());
 
-            // [Benchmark]
+            [Benchmark]
             public object Autofac_MsDI() => Measure(PrepareAutofacMsDi());
 
-            // [Benchmark]
+            [Benchmark]
             public object Lamar_MsDI() => Measure(PrepareLamarMsDi());
 
-            // [Benchmark]
+            [Benchmark]
             public object Grace() => Measure(PrepareGrace());
 
-            // [Benchmark]
+            [Benchmark]
             public object Grace_MsDI() => Measure(PrepareGraceMsDi());
         }
 
@@ -1734,12 +1738,32 @@ Intel Core i5-8350U CPU 1.70GHz (Kaby Lake R), 1 CPU, 8 logical and 4 physical c
   [Host]     : .NET 7.0.0 (7.0.22.51805), X64 RyuJIT AVX2
   DefaultJob : .NET 7.0.0 (7.0.22.51805), X64 RyuJIT AVX2
 
-
 |      Method |     Mean |     Error |    StdDev |   Median | Ratio | RatioSD |   Gen0 | Allocated | Alloc Ratio |
 |------------ |---------:|----------:|----------:|---------:|------:|--------:|-------:|----------:|------------:|
 |      DryIoc | 1.804 us | 0.0361 us | 0.0768 us | 1.787 us |  1.00 |    0.00 | 0.9499 |   2.91 KB |        1.00 |
 | DryIoc_MsDI | 2.698 us | 0.1138 us | 0.3266 us | 2.789 us |  1.50 |    0.16 | 0.9575 |   2.94 KB |        1.01 |
 |        MsDI | 3.911 us | 0.0782 us | 0.1991 us | 3.853 us |  2.18 |    0.18 | 1.5259 |   4.68 KB |        1.61 |
+
+
+## DryIoc v6.0.0 + .NET 9.0 + Degradation
+
+BenchmarkDotNet v0.14.0, Windows 11 (10.0.22631.4391/23H2/2023Update/SunValley3)
+Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+.NET SDK 9.0.100
+  [Host]     : .NET 9.0.0 (9.0.24.52809), X64 RyuJIT AVX2
+  DefaultJob : .NET 9.0.0 (9.0.24.52809), X64 RyuJIT AVX2
+
+| Method       | Mean      | Error     | StdDev    | Median    | Ratio | RatioSD | Gen0    | Gen1   | Allocated | Alloc Ratio |
+|------------- |----------:|----------:|----------:|----------:|------:|--------:|--------:|-------:|----------:|------------:|
+| DryIoc       |  6.123 us | 0.1225 us | 0.2740 us |  6.249 us |  1.00 |    0.06 |  0.6866 | 0.0076 |   4.22 KB |        1.00 |
+| DryIoc_MsDI  |  6.479 us | 0.1290 us | 0.3237 us |  6.637 us |  1.06 |    0.07 |  0.6790 | 0.0076 |   4.19 KB |        0.99 |
+| MsDI         |  3.016 us | 0.0594 us | 0.0751 us |  3.039 us |  0.49 |    0.03 |  0.7896 | 0.0114 |   4.85 KB |        1.15 |
+| Grace        |  1.460 us | 0.0291 us | 0.0797 us |  1.483 us |  0.24 |    0.02 |  0.5169 | 0.0038 |   3.17 KB |        0.75 |
+| Grace_MsDI   |  1.844 us | 0.0420 us | 0.1232 us |  1.823 us |  0.30 |    0.02 |  0.5493 | 0.0038 |   3.37 KB |        0.80 |
+| Lamar_MsDI   |  5.550 us | 0.1110 us | 0.2243 us |  5.634 us |  0.91 |    0.05 |  0.9766 | 0.9689 |   5.99 KB |        1.42 |
+| Autofac      | 37.527 us | 0.7087 us | 1.1241 us | 37.528 us |  6.14 |    0.33 |  7.2021 | 0.4272 |  44.33 KB |       10.51 |
+| Autofac_MsDI | 43.211 us | 0.3978 us | 0.3106 us | 43.284 us |  7.07 |    0.32 | 10.1318 | 0.6714 |  62.21 KB |       14.75 |
+
 */
 #pragma warning disable CS0169
             private IServiceProvider _msDi;
@@ -1774,7 +1798,6 @@ Intel Core i5-8350U CPU 1.70GHz (Kaby Lake R), 1 CPU, 8 logical and 4 physical c
             public object DryIoc() => Measure(_dryIoc);
 
             [Benchmark]
-            // [Benchmark(Baseline = true)]
             public object DryIoc_MsDI() => Measure(_dryIocMsDi);
 
             [Benchmark]
@@ -1786,19 +1809,19 @@ Intel Core i5-8350U CPU 1.70GHz (Kaby Lake R), 1 CPU, 8 logical and 4 physical c
             //[Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(_dryIocInterpretationOnly);
 
-            // [Benchmark]
+            [Benchmark]
             public object Grace() => Measure(_grace);
 
-            // [Benchmark]
+            [Benchmark]
             public object Grace_MsDI() => Measure(_graceMsDi);
 
-            // [Benchmark]
+            [Benchmark]
             public object Lamar_MsDI() => Measure(_lamarMsDi);
 
-            // [Benchmark]
+            [Benchmark]
             public object Autofac() => Measure(_autofac);
 
-            // [Benchmark]
+            [Benchmark]
             public object Autofac_MsDI() => Measure(_autofacMsDi);
         }
     }
