@@ -345,7 +345,8 @@ public partial class Container : IContainer
             }
 
             // Cached expression cannot be ConstantExpression because we unwrap the constant and put its value in the cache instead.
-            // Also the expression is already normalized via NormalizeExpression before put into cache, that's why will call CompileToFactoryDelegate
+            // Also the expression is already normalized via NormalizeExpression before put into cache, 
+            // that's why will call CompileOrInterpretFactoryDelegate
             var useInterpretation = Rules.UseInterpretation;
             while (entry.Value is Expression cachedExpr)
             {
@@ -6770,6 +6771,7 @@ public sealed class Rules
     private Settings GetSettingsForExpressionGeneration(bool allowRuntimeState = false) =>
         _settings & ~Settings.EagerCachingSingletonForFasterAccess
                     & ~Settings.ImplicitCheckForReuseMatchingScope
+                    & ~Settings.UseInterpretationForTheFirstResolution
                     & ~Settings.UseInterpretation
                     | Settings.GenerateResolutionCallForMissingDependency
                     | Settings.UsedForExpressionGeneration
@@ -6942,22 +6944,20 @@ public sealed class Rules
     /// If you need more resolutions then it make sense to compile to trade for the faster resolution times.
     /// Note: un-setting this effectively means the same as `WithoutUseInterpretation`, 
     /// otherwise it would be strange to compile the first resolution but then throw it away and start interpreting the rest.</summary>
-    public Rules WithoutInterpretationForTheFirstResolution() =>
-        WithSettings(_settings & ~Settings.UseInterpretation);
+    public Rules WithoutInterpretationForTheFirstResolution() => WithoutUseInterpretation();
 
     /// Subject
     public bool UseInterpretation =>
         (_settings & Settings.UseInterpretation) != 0;
 
-    /// <summary>Uses DryIoc own interpretation mechanism or is falling back to `Compile(preferInterpretation: true)`.
-    /// Note: the setting includes the `UseInterpretationForTheFirstResolution`</summary>
+    /// <summary>Uses DryIoc own interpretation mechanism or is falling back to `Compile(preferInterpretation: true)`.</summary>
     public Rules WithUseInterpretation() =>
-        WithSettings(_settings | Settings.UseInterpretation);
+        WithSettings(_settings | Settings.UseInterpretationForTheFirstResolution | Settings.UseInterpretation);
 
     /// <summary>Un-setting this thing means that DryIoc will always use Compilation, even in the first resolution cycle, 
     /// so it means as well the `WithoutInterpretationForTheFirstResolution`.</summary>
     public Rules WithoutUseInterpretation() =>
-        WithSettings(_settings & ~Settings.UseInterpretation);
+        WithSettings(_settings & ~Settings.UseInterpretationForTheFirstResolution & ~Settings.UseInterpretation);
 
     /// <summary>If Decorator reuse is not set instructs to use `Decorator.SetupWith(useDecorateeReuse: true)`</summary>
     public bool UseDecorateeReuseForDecorators =>
@@ -7099,7 +7099,7 @@ public sealed class Rules
         UsedForExpressionGeneration = 1 << 16,
         // UseFastExpressionCompilerIfPlatformSupported = 1 << 17, // todo: @wip @remove the default in V5 without opt-out because of complexity, but the System.Compile(preferInterpretation?) is still used as a fallback  
         UseInterpretationForTheFirstResolution = 1 << 18,
-        UseInterpretation = 1 << 19 | UseInterpretationForTheFirstResolution,
+        UseInterpretation = 1 << 19,
         UseDecorateeReuseForDecorators = 1 << 20,
         UsedForValidation = 1 << 21, // informational flag, will appear in exceptions during validation
         ServiceProviderGetServiceShouldThrowIfUnresolved = 1 << 22,
@@ -9174,10 +9174,8 @@ public static class Registrator
     }
 
     /// <summary>Adding the factory directly to scope for resolution</summary> 
-#pragma warning disable CS8974 // Converting method group to non-delegate type
     public static void Use<TService>(this IResolverContext r, Func<IResolverContext, TService> factory) =>
-        r.Use(typeof(TService), factory.ToFactoryDelegate);
-#pragma warning restore CS8974 // Converting method group to non-delegate type
+        r.Use(typeof(TService), (Func<IResolverContext, object>)factory.ToFactoryDelegate);
 
     /// <summary>Adding the factory directly to the scope for resolution</summary>
     public static void Use(this IResolverContext r, Type serviceType, Func<IResolverContext, object> factory) =>

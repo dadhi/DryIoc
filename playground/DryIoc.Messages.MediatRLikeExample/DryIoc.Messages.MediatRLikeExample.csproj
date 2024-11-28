@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
-    <NoWarn>CS8892</NoWarn>
+    <NoWarn>$(NoWarn);CS8892</NoWarn>
 </PropertyGroup>
 
   <ItemGroup>

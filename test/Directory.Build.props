@@ -6,6 +6,8 @@
         <IsTestProject>true</IsTestProject>
         <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 
+        <NoWarn>$(NoWarn);NU1702</NoWarn>
+
         <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
         <MSBuildWarningsAsMessages>
             $(MSBuildWarningsAsMessages);MSB3277

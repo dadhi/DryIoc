@@ -21,7 +21,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build_benchmark",
-            "program": "${workspaceFolder}/playground/Playground/bin/Debug/net8.0/Playground.dll",
+            "program": "${workspaceFolder}/playground/Playground/bin/Debug/net9.0/Playground.dll",
             "args": [],
             "cwd": "${workspaceFolder}/playground/Playground",
             // For more information about the 'console' field, see https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md#console-terminal-window
@@ -36,7 +36,7 @@
             "request": "launch",
             "preLaunchTask": "build_testrunner",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/test/DryIoc.TestRunner/bin/Debug/net8.0/DryIoc.TestRunner.dll",
+            "program": "${workspaceFolder}/test/DryIoc.TestRunner/bin/Debug/net9.0/DryIoc.TestRunner.dll",
             "args": [],
             "cwd": "${workspaceFolder}/test/DryIoc.TestRunner",
             // For more information about the 'console' field, see https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md#console-terminal-window
@@ -51,7 +51,7 @@
             "request": "launch",
             "preLaunchTask": "build_usg",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/playground/DryIoc.UseCompileTimeDIGenerator/bin/Debug/net8.0/DryIoc.UseCompileTimeDIGenerator.dll",
+            "program": "${workspaceFolder}/playground/DryIoc.UseCompileTimeDIGenerator/bin/Debug/net9.0/DryIoc.UseCompileTimeDIGenerator.dll",
             "args": [],
             "cwd": "${workspaceFolder}/playground/DryIoc.UseCompileTimeDIGenerator",
             // For more information about the 'console' field, see https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md#console-terminal-window

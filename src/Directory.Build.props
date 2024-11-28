@@ -27,7 +27,6 @@
     </PropertyGroup>
 
     <PropertyGroup>
-        <NoWarn>$(NoWarn);NU5104</NoWarn>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     </PropertyGroup>
 
