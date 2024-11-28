@@ -7380,6 +7380,11 @@ public static class ImHashMap
     [MethodImpl((MethodImplOptions)256)]
     public static ImHashMapEntry<K, V> EntryWithHash<K, V>(K key, V value) => new KVEntry<K, V>(key.GetHashCode(), key, value);
 
+    /// <summary>Creates the entry with the key, value and hash of `key.GetHashCode()`</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static ImHashMapEntry<K, V> EntryWithHash<K, V, TEq>(K key, V value, TEq eq) where TEq : struct, IEq<K> =>
+        new KVEntry<K, V>(eq.GetHashCode(key), key, value);
+
     /// <summary>Creates the entry but without assigning its value yet</summary>
     [MethodImpl((MethodImplOptions)256)]
     public static ImHashMapEntry<K, V> EntryWithDefaultValue<K, V>(int hash, K key) => new KVEntry<K, V>(hash, key);
@@ -7423,7 +7428,7 @@ public static class ImHashMap
     }
 
     /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
-    public static ImHashMap<K, V> BuildUnchecked<K, V>(
+    public static ImHashMap<K, V> BuildFromDifferent<K, V>(
         ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2, ImHashMapEntry<K, V> e3, ImHashMapEntry<K, V> e4)
     {
         if (e0.Hash > e1.Hash)
@@ -7439,7 +7444,7 @@ public static class ImHashMap
     public static ImHashMap<K, V> BuildFromDifferent<K, V>(
         ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2, ImHashMapEntry<K, V> e3, ImHashMapEntry<K, V> e4,
         ImHashMapEntry<K, V> e5) =>
-        new ImHashMap<K, V>.Leaf5Plus(e5, (ImHashMap<K, V>.Leaf5)BuildUnchecked(e0, e1, e2, e3, e4));
+        new ImHashMap<K, V>.Leaf5Plus(e5, (ImHashMap<K, V>.Leaf5)BuildFromDifferent(e0, e1, e2, e3, e4));
 
     /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
     public static ImHashMap<K, V> BuildFromDifferent<K, V>(
@@ -7508,7 +7513,7 @@ public static class ImHashMap
     public static ImHashMapEntry<K, V> Entry<K, V>(in HKV<K, V> item) => new KVEntry<K, V>(item.Hash, item.Key, item.Value);
 
     /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
-    public static ImHashMap<K, V> BuildUnchecked<K, V, E>(E items) where E : IEnumerable<HKV<K, V>>
+    public static ImHashMap<K, V> BuildFromDifferent<K, V, E>(E items) where E : IEnumerable<HKV<K, V>>
     {
         var en = items.GetEnumerator();
         if (!en.MoveNext())
@@ -7527,7 +7532,7 @@ public static class ImHashMap
             return BuildFromDifferent(e0, e1, e2, e3);
         var e4 = Entry(en.Current);
         if (!en.MoveNext())
-            return BuildUnchecked(e0, e1, e2, e3, e4);
+            return BuildFromDifferent(e0, e1, e2, e3, e4);
         var e5 = Entry(en.Current);
         if (!en.MoveNext())
             return BuildFromDifferent(e0, e1, e2, e3, e4, e5);

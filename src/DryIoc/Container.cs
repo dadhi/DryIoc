@@ -14020,6 +14020,11 @@ public interface IScope : IEnumerable<IScope>, IDisposable
     /// <summary>Try to retrieve factory or instance (wrapped in factory) via the Use method.</summary>
     bool TryGetUsed(int hash, Type type, out object instance);
 
+    /// <summary>Replaces all used instances map with the new one. Use with caution. 
+    /// It is safe to use when you've created the scope to pre-initialize it with the used instances,
+    /// before returning it to the outside world</summary>
+    void InitializeUsed(ImHashMap<Type, object> all);
+
     /// <summary>The method will clone the scope factories and already created services,
     /// but may or may not drop the disposables thus ensuring that only the new disposables added in clone will be disposed</summary>
     IScope Clone(bool withDisposables);
@@ -14387,6 +14392,9 @@ public class Scope : IScope
         used = default;
         return false;
     }
+
+    /// <inheritdoc />
+    public void InitializeUsed(ImHashMap<Type, object> all) => _used = all;
 
     /// <summary>Enumerates all the parent scopes upwards starting from this one.</summary>
     public IEnumerator<IScope> GetEnumerator()

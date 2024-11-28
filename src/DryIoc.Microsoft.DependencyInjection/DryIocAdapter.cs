@@ -28,6 +28,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;  // for MethodImplAttribute
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using DryIoc.ImTools;
 
 #nullable disable
 
@@ -144,6 +145,7 @@ public static class DryIocAdapter
         {
             if (par.IsDefined(typeof(ServiceKeyAttribute), false))
                 return GetServiceKeyAsParameterValue(req, par);
+
             if (par.IsDefined(typeof(FromKeyedServicesAttribute), false))
             {
                 var attr = par.GetCustomAttribute<FromKeyedServicesAttribute>(false);
@@ -156,6 +158,7 @@ public static class DryIocAdapter
 
                 return ParameterServiceInfo.Of(par, ServiceDetails.OfServiceKey(theKey));
             };
+
             return null;
         };
 
@@ -168,11 +171,14 @@ public static class DryIocAdapter
         var serviceKey = req.ServiceKey;
         if (serviceKey == null)
             return ParameterServiceInfo.DefinitelyUnresolvedParameter;
+
         if (serviceKey is Registrator.AnyServiceKey anyKey)
             serviceKey = anyKey.ResolutionKey;
+
         if (!par.ParameterType.IsAssignableFrom(serviceKey.GetType()))
             throw new InvalidOperationException(
                 $"Unable to inject service key `{serviceKey.Print()}` into the #{par.Position} parameter `{par}` because of incompatible type.");
+
         return ParameterServiceInfo.Of(par, ServiceDetails.OfValue(serviceKey));
     }
 
@@ -246,7 +252,8 @@ public static class DryIocAdapter
 
         var serviceProvider = new DryIocServiceProvider(container);
 
-        // those are singletons
+        // those are singleton capabilities
+        // we
         var singletons = container.SingletonScope;
         singletons.Use<IServiceProvider>(serviceProvider);
         singletons.Use<ISupportRequiredService>(serviceProvider);
@@ -336,7 +343,7 @@ public static class DryIocAdapter
     [MethodImpl((MethodImplOptions)256)]
     public static IReuse ToReuse(this ServiceLifetime lifetime) =>
         lifetime == ServiceLifetime.Singleton ? Reuse.Singleton :
-        lifetime == ServiceLifetime.Scoped ? Reuse.ScopedOrSingleton : // see, that we have Reuse.ScopedOrSingleton here instead of Reuse.Scoped
+        lifetime == ServiceLifetime.Scoped ? Reuse.ScopedOrSingleton : // see that we have Reuse.ScopedOrSingleton here instead of Reuse.Scoped
         Reuse.Transient;
 
     /// <summary>Unpacks the service descriptor to register the service in DryIoc container
@@ -392,7 +399,7 @@ public static class DryIocAdapter
                 var keyedInstance = descriptor.KeyedImplementationInstance;
                 container.Register(InstanceFactory.Of(keyedInstance), serviceType,
                     serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
-                container.TrackDisposable(keyedInstance); // todo: @wip @incompatible calling this method depends on the `ifAlreadyRegistered` policy
+                container.TrackDisposable(keyedInstance); // todo: @incompatible calling this method depends on the `ifAlreadyRegistered` policy
             }
         }
         else
@@ -419,22 +426,6 @@ public static class DryIocAdapter
     }
 }
 
-// todo: @wip @remove
-// /// <summary>Bare-bones IServiceScope implementations</summary>
-// public sealed class DryIocServiceScope : IServiceScope
-// {
-//     /// <inheritdoc />
-//     public IServiceProvider ServiceProvider => _resolverContext;
-//     private readonly IResolverContext _resolverContext;
-
-//     /// <summary>Creating from resolver context</summary>
-//     public DryIocServiceScope(IResolverContext resolverContext) => 
-//         _resolverContext = resolverContext;
-
-//     /// <summary>Disposes the underlying resolver context</summary>
-//     public void Dispose() => _resolverContext.Dispose();
-// }
-
 /// <summary>Impl of `IsRegistered`, `GetRequiredService`, `CreateScope`.</summary>
 public sealed class DryIocServiceProvider : IDisposable,
     IServiceProvider, IServiceScopeFactory, IServiceScope,
@@ -444,17 +435,29 @@ public sealed class DryIocServiceProvider : IDisposable,
     /// <summary>Exposes underlying (possible scoped) DryIoc container</summary>
     public readonly IContainer Container;
 
+    /// <summary>The configuration of provider how-to deal with the unresolved service in `GetService`.
+    /// The configuration is set by the `DryIoc.Rules.ServiceProviderGetServiceShouldThrowIfUnresolved`</summary>
+    public readonly IfUnresolved IfUnresolved;
+
     /// <summary>Statefully wraps the passed <paramref name="container"/></summary>
-    public DryIocServiceProvider(IContainer container) =>
+    public DryIocServiceProvider(IContainer container)
+    {
         Container = container;
+        IfUnresolved = container.Rules.ServiceProviderGetServiceShouldThrowIfUnresolved
+            ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered;
+    }
 
     IServiceScope IServiceScopeFactory.CreateScope()
     {
         var scopedContainer = Container.WithNewOpenScope(out var newScope);
         var scopedProvider = new DryIocServiceProvider(scopedContainer);
-        newScope.Use<IServiceProvider>(scopedProvider);
-        newScope.Use<ISupportRequiredService>(scopedProvider);
-        newScope.Use<IKeyedServiceProvider>(scopedProvider);
+
+        newScope.InitializeUsed(ImHashMap.BuildFromDifferent(
+            ImHashMap.EntryWithHash(typeof(IServiceProvider), (object)scopedProvider, default(RefEq<Type>)),
+            ImHashMap.EntryWithHash(typeof(ISupportRequiredService), (object)scopedProvider, default(RefEq<Type>)),
+            ImHashMap.EntryWithHash(typeof(IKeyedServiceProvider), (object)scopedProvider, default(RefEq<Type>))
+        ));
+
         return scopedProvider;
     }
 
@@ -462,13 +465,16 @@ public sealed class DryIocServiceProvider : IDisposable,
 
     /// <inheritdoc />
     public object GetService(Type serviceType) =>
-        Container.Resolve(serviceType,
-            Container.Rules.ServiceProviderGetServiceShouldThrowIfUnresolved ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered);
+        Container.Resolve(serviceType, IfUnresolved);
+
+    /// <inheritdoc />
+    public object GetRequiredService(Type serviceType) =>
+        Container.Resolve(serviceType, IfUnresolved.Throw);
 
     /// <inheritdoc />
     public bool IsService(Type serviceType)
     {
-        // I am not fully comprehend but MS.DI considers asking for the open-generic type even if it is registered to return `false`
+        // I am not fully comprehend, but MS.DI considers asking for the open-generic type even if it is registered, to return `false`
         // Probably mixing here the fact that open type cannot be instantiated without providing the concrete type argument.
         // But I think it is conflating two things and making the reasoning harder.
         if (serviceType.IsGenericTypeDefinition)
@@ -493,23 +499,18 @@ public sealed class DryIocServiceProvider : IDisposable,
     }
 
     /// <inheritdoc />
-    public object GetRequiredService(Type serviceType) =>
-        Container.Resolve(serviceType, IfUnresolved.Throw);
-
-    /// <inheritdoc />
     public object GetKeyedService(Type serviceType, object serviceKey)
     {
         if (serviceKey == null)
             return GetService(serviceType);
 
-        var ifUnresolved = Container.Rules.ServiceProviderGetServiceShouldThrowIfUnresolved ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered;
         if (serviceKey == KeyedService.AnyKey)
-            return Container.Resolve(serviceType, Registrator.AnyKey, ifUnresolved);
+            return Container.Resolve(serviceType, Registrator.AnyKey, IfUnresolved);
 
         var keyedService = Container.Resolve(serviceType, serviceKey, IfUnresolved.ReturnDefaultIfNotRegistered);
         if (keyedService != null)
             return keyedService;
-        return Container.Resolve(serviceType, Registrator.AnyKeyOfResolutionKey(serviceKey), ifUnresolved);
+        return Container.Resolve(serviceType, Registrator.AnyKeyOfResolutionKey(serviceKey), IfUnresolved);
     }
 
     /// <inheritdoc />
