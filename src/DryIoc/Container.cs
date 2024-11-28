@@ -782,20 +782,26 @@ public partial class Container : IContainer
     /// <summary>Creates the new scope using the Container's current scope as a parent.
     /// Made virtual to allow additional code run when scope is opened, e.g. automatically resolve some services, see #539.
     /// </summary>
-    public virtual IContainer WithNewOpenScope()
+    public virtual IContainer WithNewOpenScope(out IScope newScope)
     {
-        if (_singletonScope.IsDisposed)
-            Throw.It(Error.ContainerIsDisposed, ToString());
-        return _ownScopeOrContext == null
-                ? new Container(Rules, _registry, _singletonScope, new Scope(), 0, null, this)
-                : _ownScopeOrContext is IScope scope
-                    ? new Container(Rules, _registry, _singletonScope, Scope.OfSomeParent(scope), 0, null, this)
-                    : WithNewOpenScopeInScopeContext((IScopeContext)_ownScopeOrContext);
+        Debug.Assert(!_singletonScope.IsDisposed);
+        if (_ownScopeOrContext == null)
+        {
+            newScope = new Scope();
+            return new Container(Rules, _registry, _singletonScope, newScope, 0, null, this);
+        }
+        if (_ownScopeOrContext is IScope scope)
+        {
+            newScope = Scope.OfSomeParent(scope);
+            return new Container(Rules, _registry, _singletonScope, newScope, 0, null, this);
+        }
+
+        return WithNewOpenScopeInScopeContext((IScopeContext)_ownScopeOrContext, out newScope);
     }
 
-    private IContainer WithNewOpenScopeInScopeContext(IScopeContext scopeContext)
+    private IContainer WithNewOpenScopeInScopeContext(IScopeContext scopeContext, out IScope newScope)
     {
-        scopeContext.SetNewOpen();
+        newScope = scopeContext.SetNewOpen();
         return new Container(Rules, _registry, _singletonScope, scopeContext, 0, null, this);
     }
 
@@ -5108,7 +5114,7 @@ public interface IResolverContext : IResolver, IDisposable
     IResolverContext WithScopeContext(IScopeContext scopeContext);
 
     /// <summary>Combines `WithCurrentScope` and `OwnCurrentScope` for the hot-path case to avoid two virtual calls</summary>
-    IContainer WithNewOpenScope();
+    IContainer WithNewOpenScope(out IScope newScope);
 
     /// <summary>Puts instance created via the passed factory on demand into the current or singleton scope</summary>
     void Use(Type serviceType, object instance);
@@ -5298,7 +5304,10 @@ public static class ResolverContext
     /// }
     /// ]]></code></example>
     [MethodImpl((MethodImplOptions)256)]
-    public static IResolverContext OpenScope(this IResolverContext r) => r.WithNewOpenScope();
+    public static IResolverContext OpenScope(this IResolverContext r)
+    {
+        return r.WithNewOpenScope(out _);
+    }
 
     /// <summary>Check if the service instance or factory is added to the current or singleton scope</summary>
     [MethodImpl((MethodImplOptions)256)]

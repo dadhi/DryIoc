@@ -450,12 +450,11 @@ public sealed class DryIocServiceProvider : IDisposable,
 
     IServiceScope IServiceScopeFactory.CreateScope()
     {
-        var scopedContainer = Container.WithNewOpenScope();
+        var scopedContainer = Container.WithNewOpenScope(out var newScope);
         var scopedProvider = new DryIocServiceProvider(scopedContainer);
-        var currentScope = scopedContainer.CurrentScope;
-        currentScope.Use<IServiceProvider>(scopedProvider);
-        currentScope.Use<ISupportRequiredService>(scopedProvider);
-        currentScope.Use<IKeyedServiceProvider>(scopedProvider);
+        newScope.Use<IServiceProvider>(scopedProvider);
+        newScope.Use<ISupportRequiredService>(scopedProvider);
+        newScope.Use<IKeyedServiceProvider>(scopedProvider);
         return scopedProvider;
     }
 

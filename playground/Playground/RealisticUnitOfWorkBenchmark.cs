@@ -1350,11 +1350,24 @@ Intel Core i5-8350U CPU 1.70GHz (Kaby Lake R), 1 CPU, 8 logical and 4 physical c
 | DryIoc_MsDI | 159.9 us | 4.89 us | 13.38 us |  0.98 |    0.13 | 13.9160 |      - |  43.05 KB |        1.14 |
 |        MsDI | 213.8 us | 4.37 us | 12.68 us |  1.31 |    0.16 | 23.1934 | 0.4883 |  71.34 KB |        1.90 |
 
-
 ## v6.0.0 + .NET 9.0
 
+BenchmarkDotNet v0.14.0, Windows 11 (10.0.22631.4391/23H2/2023Update/SunValley3)
+Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+.NET SDK 9.0.100
+  [Host]     : .NET 9.0.0 (9.0.24.52809), X64 RyuJIT AVX2
+  DefaultJob : .NET 9.0.0 (9.0.24.52809), X64 RyuJIT AVX2
 
-
+| Method       | Mean         | Error      | StdDev     | Median       | Ratio  | RatioSD | Gen0     | Gen1     | Gen2    | Allocated | Alloc Ratio |
+|------------- |-------------:|-----------:|-----------:|-------------:|-------:|--------:|---------:|---------:|--------:|----------:|------------:|
+| DryIoc       |     66.97 us |   0.350 us |   0.274 us |     66.95 us |   1.00 |    0.01 |   5.2490 |   0.4883 |       - |  32.74 KB |        1.00 |
+| DryIoc_MsDI  |     95.54 us |   1.342 us |   1.378 us |     94.97 us |   1.43 |    0.02 |   6.5918 |   0.6104 |       - |  40.89 KB |        1.25 |
+| MsDI         |     80.52 us |   1.538 us |   2.156 us |     79.50 us |   1.20 |    0.03 |  14.8926 |        - |       - |  91.15 KB |        2.78 |
+| Autofac      |    332.89 us |   6.535 us |  10.553 us |    327.54 us |   4.97 |    0.16 |  49.8047 |        - |       - | 306.75 KB |        9.37 |
+| Autofac_MsDI |    380.09 us |   6.029 us |   5.344 us |    378.20 us |   5.68 |    0.08 |  59.0820 |        - |       - | 364.74 KB |       11.14 |
+| Lamar_MsDI   |  3,858.14 us |  74.237 us |  93.886 us |  3,892.21 us |  57.61 |    1.39 |  78.1250 |   7.8125 |       - | 525.47 KB |       16.05 |
+| Grace        | 12,418.61 us | 221.073 us | 356.991 us | 12,232.74 us | 185.43 |    5.31 | 109.3750 |  93.7500 | 15.6250 | 685.86 KB |       20.95 |
+| Grace_MsDI   | 14,668.73 us | 284.140 us | 304.026 us | 14,597.95 us | 219.02 |    4.50 | 125.0000 | 109.3750 | 15.6250 | 854.48 KB |       26.10 |
 
 */
 
@@ -1745,7 +1758,7 @@ Intel Core i5-8350U CPU 1.70GHz (Kaby Lake R), 1 CPU, 8 logical and 4 physical c
 |        MsDI | 3.911 us | 0.0782 us | 0.1991 us | 3.853 us |  2.18 |    0.18 | 1.5259 |   4.68 KB |        1.61 |
 
 
-## DryIoc v6.0.0 + .NET 9.0 + Degradation
+## DryIoc v6.0.0 + .NET 9.0
 
 BenchmarkDotNet v0.14.0, Windows 11 (10.0.22631.4391/23H2/2023Update/SunValley3)
 Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
@@ -1753,16 +1766,17 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
   [Host]     : .NET 9.0.0 (9.0.24.52809), X64 RyuJIT AVX2
   DefaultJob : .NET 9.0.0 (9.0.24.52809), X64 RyuJIT AVX2
 
-| Method       | Mean      | Error     | StdDev    | Median    | Ratio | RatioSD | Gen0    | Gen1   | Allocated | Alloc Ratio |
-|------------- |----------:|----------:|----------:|----------:|------:|--------:|--------:|-------:|----------:|------------:|
-| DryIoc       |  6.123 us | 0.1225 us | 0.2740 us |  6.249 us |  1.00 |    0.06 |  0.6866 | 0.0076 |   4.22 KB |        1.00 |
-| DryIoc_MsDI  |  6.479 us | 0.1290 us | 0.3237 us |  6.637 us |  1.06 |    0.07 |  0.6790 | 0.0076 |   4.19 KB |        0.99 |
-| MsDI         |  3.016 us | 0.0594 us | 0.0751 us |  3.039 us |  0.49 |    0.03 |  0.7896 | 0.0114 |   4.85 KB |        1.15 |
-| Grace        |  1.460 us | 0.0291 us | 0.0797 us |  1.483 us |  0.24 |    0.02 |  0.5169 | 0.0038 |   3.17 KB |        0.75 |
-| Grace_MsDI   |  1.844 us | 0.0420 us | 0.1232 us |  1.823 us |  0.30 |    0.02 |  0.5493 | 0.0038 |   3.37 KB |        0.80 |
-| Lamar_MsDI   |  5.550 us | 0.1110 us | 0.2243 us |  5.634 us |  0.91 |    0.05 |  0.9766 | 0.9689 |   5.99 KB |        1.42 |
-| Autofac      | 37.527 us | 0.7087 us | 1.1241 us | 37.528 us |  6.14 |    0.33 |  7.2021 | 0.4272 |  44.33 KB |       10.51 |
-| Autofac_MsDI | 43.211 us | 0.3978 us | 0.3106 us | 43.284 us |  7.07 |    0.32 | 10.1318 | 0.6714 |  62.21 KB |       14.75 |
+
+| Method       | Mean      | Error     | StdDev    | Ratio | RatioSD | Gen0    | Gen1   | Allocated | Alloc Ratio |
+|------------- |----------:|----------:|----------:|------:|--------:|--------:|-------:|----------:|------------:|
+| DryIoc       |  1.357 us | 0.0105 us | 0.0093 us |  1.00 |    0.01 |  0.4730 | 0.0038 |   2.91 KB |        1.00 |
+| DryIoc_MsDI  |  1.815 us | 0.0126 us | 0.0118 us |  1.34 |    0.01 |  0.5074 | 0.0038 |   3.11 KB |        1.07 |
+| MsDI         |  2.800 us | 0.0146 us | 0.0114 us |  2.06 |    0.02 |  0.7896 | 0.0114 |   4.85 KB |        1.67 |
+| Grace        |  1.535 us | 0.0125 us | 0.0117 us |  1.13 |    0.01 |  0.5169 | 0.0038 |   3.17 KB |        1.09 |
+| Grace_MsDI   |  1.709 us | 0.0249 us | 0.0256 us |  1.26 |    0.02 |  0.5493 | 0.0038 |   3.37 KB |        1.16 |
+| Lamar_MsDI   |  5.314 us | 0.0197 us | 0.0184 us |  3.92 |    0.03 |  0.9689 | 0.9613 |   5.95 KB |        2.05 |
+| Autofac      | 36.715 us | 0.2231 us | 0.1863 us | 27.06 |    0.22 |  7.2021 | 0.4883 |  44.49 KB |       15.31 |
+| Autofac_MsDI | 48.139 us | 0.6987 us | 0.6194 us | 35.48 |    0.50 | 10.1318 | 0.6714 |  62.27 KB |       21.42 |
 
 */
 #pragma warning disable CS0169

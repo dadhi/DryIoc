@@ -70,7 +70,6 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 
 ```
 
-
 <details>
   <summary>Older versions for the comparison</summary>
 
@@ -99,6 +98,30 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 
 #### Hot run - Opening the scope and resolving the root scoped service for the Nth time
 
+DryIoc 6.0.0 (.MsDI 8.0.0), MsDI 9.0.0, Grace 7.2.1 (.MsDI 7.1.0), Autofac 8.1.1 (.MsDI 10.0.0), Lamar 14.0.1
+
+```md
+BenchmarkDotNet v0.14.0, Windows 11 (10.0.22631.4391/23H2/2023Update/SunValley3)
+Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+.NET SDK 9.0.100
+  [Host]     : .NET 9.0.0 (9.0.24.52809), X64 RyuJIT AVX2
+  DefaultJob : .NET 9.0.0 (9.0.24.52809), X64 RyuJIT AVX2
+
+| Method       |      Mean |     Error |    StdDev | Ratio | RatioSD |    Gen0 |   Gen1 | Allocated | Alloc Ratio |
+| ------------ | --------: | --------: | --------: | ----: | ------: | ------: | -----: | --------: | ----------: |
+| DryIoc       |  1.357 us | 0.0105 us | 0.0093 us |  1.00 |    0.01 |  0.4730 | 0.0038 |   2.91 KB |        1.00 |
+| DryIoc_MsDI  |  1.815 us | 0.0126 us | 0.0118 us |  1.34 |    0.01 |  0.5074 | 0.0038 |   3.11 KB |        1.07 |
+| MsDI         |  2.800 us | 0.0146 us | 0.0114 us |  2.06 |    0.02 |  0.7896 | 0.0114 |   4.85 KB |        1.67 |
+| Grace        |  1.535 us | 0.0125 us | 0.0117 us |  1.13 |    0.01 |  0.5169 | 0.0038 |   3.17 KB |        1.09 |
+| Grace_MsDI   |  1.709 us | 0.0249 us | 0.0256 us |  1.26 |    0.02 |  0.5493 | 0.0038 |   3.37 KB |        1.16 |
+| Lamar_MsDI   |  5.314 us | 0.0197 us | 0.0184 us |  3.92 |    0.03 |  0.9689 | 0.9613 |   5.95 KB |        2.05 |
+| Autofac      | 36.715 us | 0.2231 us | 0.1863 us | 27.06 |    0.22 |  7.2021 | 0.4883 |  44.49 KB |       15.31 |
+| Autofac_MsDI | 48.139 us | 0.6987 us | 0.6194 us | 35.48 |    0.50 | 10.1318 | 0.6714 |  62.27 KB |       21.42 |
+```
+
+<details>
+<summary>Older versions for the comparison</summary>
+
 DryIoc 5.0.0 (.MsDI 6.0.0), MsDI 6.0.0, Grace 7.2.1 (.MsDI 7.1.0), Autofac 6.3.0 (.MsDI 7.2.0), Lamar 8.0.1
 
 ```md
@@ -119,37 +142,12 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 | Autofac      | 47.040 us | 0.7367 us | 0.6531 us | 30.65 |    0.48 |  7.7515 | 0.6104 |     - |  47.73 KB |
 | Autofac_MsDI | 59.566 us | 0.8734 us | 0.7742 us | 38.76 |    0.61 | 11.3525 | 0.9155 |     - |  69.59 KB |
 ```
-
-<details>
-<summary>Older versions for the comparison</summary>
-
-DryIoc 5.0.0 (.MsDI 5.0.0), MsDI 5.0.1, Grace 7.2.0 (.MsDI 7.1.0), Autofac 6.1.0 (.MsDI 7.1.0), Lamar 5.0.3
-
-```md
-BenchmarkDotNet=v0.12.0, OS=Windows 10.0.18363
-Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
-.NET Core SDK=5.0.200
-  [Host]     : .NET Core 3.1.12 (CoreCLR 4.700.21.6504, CoreFX 4.700.21.6905), X64 RyuJIT
-  DefaultJob : .NET Core 3.1.12 (CoreCLR 4.700.21.6504, CoreFX 4.700.21.6905), X64 RyuJIT
-
-| Method              |      Mean |     Error |    StdDev |    Median | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-| ------------------- | --------: | --------: | --------: | --------: | ----: | ------: | ------: | -----: | ----: | --------: |
-| MsDI                |  3.675 us | 0.0730 us | 0.1070 us |  3.699 us |  1.00 |    0.00 |  0.7095 | 0.0114 |     - |   4.35 KB |
-| DryIoc              |  1.359 us | 0.0147 us | 0.0138 us |  1.354 us |  0.37 |    0.01 |  0.4768 | 0.0057 |     - |   2.93 KB |
-| DryIoc_MsDIAdapter  |  2.051 us | 0.0408 us | 0.0437 us |  2.048 us |  0.56 |    0.02 |  0.4807 | 0.0038 |     - |   2.95 KB |
-| Grace               |  1.751 us | 0.0339 us | 0.0377 us |  1.748 us |  0.47 |    0.02 |  0.5150 | 0.0076 |     - |   3.17 KB |
-| Grace_MsDIAdapter   |  2.395 us | 0.0578 us | 0.0594 us |  2.402 us |  0.65 |    0.03 |  0.5569 |      - |     - |   3.41 KB |
-| Lamar_MsDIAdapter   |  6.802 us | 0.0675 us | 0.0563 us |  6.800 us |  1.85 |    0.06 |  1.5335 | 0.7629 |     - |   9.44 KB |
-| Autofac             | 50.699 us | 0.9995 us | 2.3947 us | 49.903 us | 14.13 |    0.81 |  7.7515 | 0.6104 |     - |  47.84 KB |
-| Autofac_MsDIAdapter | 60.233 us | 1.1734 us | 1.2050 us | 60.089 us | 16.38 |    0.46 | 10.7422 | 0.8545 |     - |  66.26 KB |
-```
-
 </details>
 
 
 ## Reliability
 
-* 1800 of case tests.
+* More than 2000 of test cases covered.
 * Thread-safe and lock-free registrations and resolutions. 
 * Detects recursive dependencies (cycles) in object graph.
 * Throws exceptions as early as possible with a lot of details.
