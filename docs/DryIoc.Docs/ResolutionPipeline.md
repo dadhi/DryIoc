@@ -5,7 +5,7 @@
   - [Relative Performance](#relative-performance)
   - [Rules.WithUseInterpretation](#ruleswithuseinterpretation)
   - [Rules.WithoutUseInterpretationForFirstResolution](#ruleswithoutuseinterpretationforfirstresolution)
-  - [Rules.WithoutFastExpressionCompiler](#ruleswithoutfastexpressioncompiler)
+
 
 ## Overview
 
@@ -46,14 +46,3 @@ On the contrary, if you want to Compile on the first resolution, maybe to "warm-
 ```cs
 var c = new Container(rules => rules.WithoutUseInterpretationForFirstResolution());
 ```
-
-## Rules.WithoutFastExpressionCompiler
-
-By default, DryIoc relies on [its own Expression Tree compiler](https://github.com/dadhi/FastExpressionCompiler). But it doesn't support certain old platforms, e.g. PCL, <= .NET 4.0, <= .NET Standard 1.2 - so the default `Expression.Compile` is used for them. If you want for some reason to fully switch to `Expression.Compile` you may do so via:
-
-```cs
-var c = new Container(rules => rules.WithoutFastExpressionCompiler());
-```
-
-But I would not recommend using it, maybe just for the last resort troubleshooting only.
-It is very likely that the option will be removed in future DryIoc versions.
