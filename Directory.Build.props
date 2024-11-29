@@ -10,7 +10,7 @@
 
         <LatestSupportedNet>net9.0</LatestSupportedNet>
 
-        <NoWarn>$(NoWarn);NETSDK1138;NETSDK1005;NU5104;NU1900</NoWarn>
+        <NoWarn>NETSDK1138;NETSDK1005;NU5104;NU1900</NoWarn>
 
     </PropertyGroup>
 

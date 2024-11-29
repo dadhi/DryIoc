@@ -5583,13 +5583,7 @@ public static class WrappersSupport
         return itemKey;
     }
 
-    // todo: @perf use UnsafeAccessor
-    // #if NET8_0_OR_GREATER
-    //     [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "InternalPreserveStackTrace")]
-    //     private static extern void InternalPreserveStackTrace(Exception exception);
-    // #else
     private static readonly MethodInfo _enumerableCastMethod = typeof(Enumerable).GetMethod(nameof(Enumerable.Cast));
-    // #endif
 
     private static Expression GetLazyEnumerableExpressionOrDefault(Request request, Type itemType = null)
     {
@@ -16037,14 +16031,14 @@ public static class ReflectionTools
         typeof(WeakReference).GetConstructor(new[] { typeof(object) });
 
     // todo: @perf preserve the stack trace by the modern means, e.g. via ExceptionDispatchInfo.Capture
+    private const string InternalPreserveStackTraceMethod = nameof(InternalPreserveStackTrace);
 #if NET8_0_OR_GREATER
-    [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "InternalPreserveStackTrace")]
+    [UnsafeAccessor(UnsafeAccessorKind.Method, Name = InternalPreserveStackTraceMethod)]
     private static extern void InternalPreserveStackTrace(Exception exception);
 #else
     private static Lazy<Action<Exception>> _preserveExceptionStackTraceAction = new Lazy<Action<Exception>>(() =>
-        typeof(Exception).GetSingleMethodOrNull("InternalPreserveStackTrace", true)
-        // todo: @wip #642 @fixme assert the method has single parameter of Exception and void return type.
-        ?.To(x => x.CreateDelegate(typeof(Action<Exception>)).To<Action<Exception>>()));
+        typeof(Exception).GetMethod(InternalPreserveStackTraceMethod, BindingFlags.Instance | BindingFlags.NonPublic)
+        ?.To(static x => x.CreateDelegate(typeof(Action<Exception>)).To<Action<Exception>>()));
     private static void InternalPreserveStackTrace(Exception exception) =>
         _preserveExceptionStackTraceAction.Value?.Invoke(exception);
 #endif
