@@ -212,7 +212,7 @@ public class Recursive_dependency_detected
 
 ### How to allow recursive dependency
 
-In some case recursive dependency is what you wont, usually inside `Lazy` or `Func` wrapper:
+In some case recursive dependency is what you want, usually inside `Lazy` or `Func` with [caveat](Wrappers.md#really-lazy-lazy-and-func):
 ```cs md*/
 
 public class Allow_a_recursive_dependencies
