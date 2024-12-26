@@ -12,10 +12,11 @@ echo:
 echo:# Build and Run TestRunners for %LatestSupportedNet% and .NET FRAMEWORK 4.7.2
 echo:
 echo:## %LatestSupportedNet%
-dotnet run -v:minimal -f:net8.0 -c:Release -p:GeneratePackageOnBuild=false --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+dotnet run -v:minimal -c:Release -f:net9.0 -p:LatestSupportedNet=net9.0 --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+
 echo:
 echo:## .NET FRAMEWORK 4.7.2
-dotnet run -v:minimal -c:Release -p:GeneratePackageOnBuild=false --project test/DryIoc.TestRunner.net472/DryIoc.TestRunner.net472.csproj
+dotnet run -v:minimal -c:Release --project test/DryIoc.TestRunner.net472/DryIoc.TestRunner.net472.csproj
 
 if %ERRORLEVEL% neq 0 goto :error
 

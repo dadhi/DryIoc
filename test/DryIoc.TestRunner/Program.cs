@@ -9,10 +9,12 @@ public class Program
 {
     public static void Main()
     {
-        Rules.UnsafeResetDefaultRulesToUseCompilationOnly();
-        new GHIssue623_Scoped_service_decorator().Run();
+        new GHIssue672_Wrong_decorator_parameter_with_custom_args().Run();
 
-        new GHIssue503_Compile_time_container().Run();
+        // Rules.UnsafeResetDefaultRulesToUseCompilationOnly();
+        // new GHIssue623_Scoped_service_decorator().Run();
+
+        // new GHIssue503_Compile_time_container().Run();
         // new GHIssue667_Resolve_with_serviceKey_does_not_invoke_factory_selector().Run();
 
         RunAllTests();

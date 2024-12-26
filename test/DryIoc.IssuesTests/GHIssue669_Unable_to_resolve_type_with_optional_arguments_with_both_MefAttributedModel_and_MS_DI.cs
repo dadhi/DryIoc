@@ -1,5 +1,4 @@
 using NUnit.Framework;
-using DryIoc.ImTools;
 using DryIoc.MefAttributedModel;
 using DryIoc.Microsoft.DependencyInjection;
 
