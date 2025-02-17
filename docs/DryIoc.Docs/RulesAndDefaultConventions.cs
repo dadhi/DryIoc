@@ -955,7 +955,7 @@ public class Silence_registering_disposable_transient_exception
 
 ### WithTrackingDisposableTransient
 
-In detail is described [here](ReuseAndScopes.md#disposabletransient).
+In detail is described [here](ReuseAndScopes.md#disposable-transient).
 
 
 ### WithDefaultReuseInsteadOfTransient
