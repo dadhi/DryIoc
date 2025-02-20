@@ -24,8 +24,10 @@ THE SOFTWARE.
 */
 
 // ReSharper disable CoVariantArrayConversion
+#nullable disable
 
 #define LIGHT_EXPRESSION
+
 #if DEBUG && NET6_0_OR_GREATER
 #define DEBUG_INFO_LOCAL_VARIABLE_USAGE
 #define DEMIT
@@ -60,8 +62,6 @@ namespace DryIoc.FastExpressionCompiler
     using System.Diagnostics.CodeAnalysis;
     using static System.Environment;
     using static CodePrinter;
-
-#nullable disable
 
     /// <summary>The flags for the compiler</summary>
     [Flags]
@@ -594,6 +594,10 @@ namespace DryIoc.FastExpressionCompiler
             /// The top expression should Not contain not passed parameters.</summary>
             public SmallList<ParameterExpression> NonPassedParameters;
 
+            /// <summary>If the N's bit is set, it means the parameter is mutated (assigned or passed by-ref),
+            /// where N is the index of the param in `NonPassedParameters`</summary>
+            public ulong NonPassedParamMutatedIndexBits;
+
             /// <summary>Index of the compiled lambda in the parent lambda closure array</summary>
             public short LambdaVarIndex;
 
@@ -602,9 +606,6 @@ namespace DryIoc.FastExpressionCompiler
             public short NonPassedParamsVarIndex;
 
             public NestedLambdaInfo(LambdaExpression lambdaExpression) => LambdaExpression = lambdaExpression;
-
-            /// <summary>Returns the type of lambda</summary>
-            public Type GetLambdaType() => (Lambda is NestedLambdaWithConstantsAndNestedLambdas n ? n.NestedLambda : Lambda).GetType();
 
             /// <summary>Compares 2 lambda expressions for equality</summary>
             public bool HasTheSameLambdaExpression(LambdaExpression lambda) => // todo: @unclear parameters or is comparing the body is enough?
@@ -616,7 +617,7 @@ namespace DryIoc.FastExpressionCompiler
                 ;
 
             public override string ToString() =>
-                $"Lambda: {(Lambda is NestedLambdaWithConstantsAndNestedLambdas n ? "compiled+closure" : Lambda != null ? "compiled" : "null")}, Expr: {LambdaExpression.ToString()}";
+                $"Lambda: {(Lambda is NestedLambdaForNonPassedParams n ? "compiled+closure" : Lambda != null ? "compiled" : "null")}, Expr: {LambdaExpression.ToString()}";
         }
 
         [Flags]
@@ -853,14 +854,14 @@ namespace DryIoc.FastExpressionCompiler
             public bool IsLocalVar(ParameterExpression varParamExpr)
             {
                 ref var blocks = ref _varInBlockMap.TryGetValueRefUnsafe(varParamExpr, out var found);
-                return found & blocks.Count != 0;
+                return found && blocks.Count != 0;
             }
 
             [MethodImpl((MethodImplOptions)256)]
             public int GetDefinedLocalVarOrDefault(ParameterExpression varParamExpr)
             {
                 ref var blocks = ref _varInBlockMap.TryGetValueRefUnsafe(varParamExpr, out var found);
-                return found & blocks.Count != 0 // rare case with the block count 0 may occur when we collected the block and vars, but not yet defined the variable for it
+                return found && blocks.Count != 0 // rare case with the block count 0 may occur when we collected the block and vars, but not yet defined the variable for it
                     ? (int)(blocks.GetLastSurePresentItem() & ushort.MaxValue)
                     : -1;
             }
@@ -879,7 +880,7 @@ namespace DryIoc.FastExpressionCompiler
                 }
             }
             found = false;
-            return ref labels.NotFound();
+            return ref RefTools<LabelInfo>.GetNullRef();
         }
 
         [MethodImpl((MethodImplOptions)256)]
@@ -903,9 +904,9 @@ namespace DryIoc.FastExpressionCompiler
 
         private static ConstructorInfo[] _nonPassedParamsArrayClosureCtors = typeof(ArrayClosureWithNonPassedParams).GetConstructors();
 
-        public static ConstructorInfo ArrayClosureWithNonPassedParamsConstructor = _nonPassedParamsArrayClosureCtors[0];
+        public static ConstructorInfo ArrayClosureWithNonPassedParamsAndConstantsCtor = _nonPassedParamsArrayClosureCtors[0];
 
-        public static ConstructorInfo ArrayClosureWithNonPassedParamsConstructorWithoutConstants = _nonPassedParamsArrayClosureCtors[1];
+        public static ConstructorInfo ArrayClosureWithNonPassedParamsCtor = _nonPassedParamsArrayClosureCtors[1];
 
         public static Result NotSupported_RuntimeVariables { get; private set; }
 
@@ -958,7 +959,8 @@ namespace DryIoc.FastExpressionCompiler
                 var closureItems = t.ConstantsAndNestedLambdas;
                 if (itemIndex < closureItems.Length)
                 {
-                    d = (Delegate)closureItems[itemIndex];
+                    var nestedLambda = closureItems[itemIndex];
+                    d = (Delegate)(nestedLambda is NestedLambdaForNonPassedParams n ? n.NestedLambda : nestedLambda);
                     return true;
                 }
             }
@@ -966,35 +968,56 @@ namespace DryIoc.FastExpressionCompiler
             return false;
         }
 
+        public static IEnumerable<object> EnumerateDebugConstantsAndNestedLambdas(this Delegate parentLambda)
+        {
+            var target = parentLambda.Target;
+            if (target is ExpressionCompiler.DebugArrayClosure t)
+            {
+                foreach (var item in t.ConstantsAndNestedLambdas)
+                    if (item is NestedLambdaForNonPassedParams nestedLambda)
+                        yield return nestedLambda.NestedLambda;
+                    else
+                        yield return item;
+            }
+        }
+
         // todo: @perf better to move the case with no constants to another class OR we can reuse ArrayClosure but now ConstantsAndNestedLambdas will hold NonPassedParams
         public sealed class ArrayClosureWithNonPassedParams : ArrayClosure
         {
             public readonly object[] NonPassedParams;
-
-            public ArrayClosureWithNonPassedParams(object[] constantsAndNestedLambdas, object[] nonPassedParams) : base(constantsAndNestedLambdas) =>
+            public ArrayClosureWithNonPassedParams(object[] nonPassedParams, object[] constantsAndNestedLambdas) : base(constantsAndNestedLambdas) =>
                 NonPassedParams = nonPassedParams;
-
             // todo: @perf optimize for this case
             public ArrayClosureWithNonPassedParams(object[] nonPassedParams) : base(null) =>
                 NonPassedParams = nonPassedParams;
         }
 
-        // todo: @perf this class is required until we move to a single constants list per lambda hierarchy 
-        public sealed class NestedLambdaWithConstantsAndNestedLambdas
+        // todo: @perf this class is required until we (maybe) move to single constants list per lambda hierarchy
+        // Those two classes are required only if there are non-passed parameters,
+        // this class stores the context for creating the ArrayClosureWithNonPassedParams at the point of emitting the nested lambda.
+        // See the #437 and #353 for the context
+        public class NestedLambdaForNonPassedParams
         {
             public static FieldInfo NestedLambdaField =
-                typeof(NestedLambdaWithConstantsAndNestedLambdas).GetTypeInfo().GetDeclaredField(nameof(NestedLambda));
+                typeof(NestedLambdaForNonPassedParams).GetField(nameof(NestedLambda));
+            public static FieldInfo NonPassedParamsField =
+                typeof(NestedLambdaForNonPassedParams).GetField(nameof(NonPassedParams));
 
-            public static FieldInfo ConstantsAndNestedLambdasField =
-                typeof(NestedLambdaWithConstantsAndNestedLambdas).GetTypeInfo().GetDeclaredField(nameof(ConstantsAndNestedLambdas));
-
+#pragma warning disable CS0649
             public readonly object NestedLambda;
+            public object[] NonPassedParams;
+#pragma warning restore CS0649
+            public NestedLambdaForNonPassedParams(object nestedLambda) => NestedLambda = nestedLambda;
+        }
+
+        public sealed class NestedLambdaForNonPassedParamsWithConstants : NestedLambdaForNonPassedParams
+        {
+            public static FieldInfo ConstantsAndNestedLambdasField =
+                typeof(NestedLambdaForNonPassedParamsWithConstants).GetField(nameof(ConstantsAndNestedLambdas));
+
             public readonly object ConstantsAndNestedLambdas;
-            public NestedLambdaWithConstantsAndNestedLambdas(object nestedLambda, object constantsAndNestedLambdas)
-            {
-                NestedLambda = nestedLambda;
-                ConstantsAndNestedLambdas = constantsAndNestedLambdas;
-            }
+            public NestedLambdaForNonPassedParamsWithConstants(object nestedLambda, object constantsAndNestedLambdas)
+                : base(nestedLambda) => ConstantsAndNestedLambdas = constantsAndNestedLambdas;
         }
 
         internal static class CurryClosureFuncs
@@ -1321,13 +1344,16 @@ namespace DryIoc.FastExpressionCompiler
                                 nestedLambda.NestedLambdas.Add(compiledNestedLambda);
                             else
                                 rootNestedLambdas.Add(compiledNestedLambda);
+
                             if (compiledNestedLambda.NonPassedParameters.Count != 0 &&
-                                !PropagateNonPassedParamsToOuterLambda(ref closure, nestedLambda, paramExprs, nestedParamExprs, ref compiledNestedLambda.NonPassedParameters))
+                                !PropagateNonPassedParamsToOuterLambda(ref closure,
+                                    nestedLambda, paramExprs, nestedParamExprs, ref compiledNestedLambda.NonPassedParameters))
                                 return Result.ParameterIsNotVariableNorInPassedParameters;
+
                             return r;
                         }
 
-                        var nestedClosureInfo = new ClosureInfo(ClosureStatus.ToBeCollected);
+                        var nestedClosure = new ClosureInfo(ClosureStatus.ToBeCollected);
                         var newNestedLambda = new NestedLambdaInfo(nestedLambdaExpr);
 
                         if (nestedLambda != null)
@@ -1335,14 +1361,15 @@ namespace DryIoc.FastExpressionCompiler
                         else
                             rootNestedLambdas.Add(newNestedLambda);
 
-                        if ((r = TryCollectInfo(ref nestedClosureInfo, nestedLambdaExpr.Body, nestedParamExprs, newNestedLambda, ref rootNestedLambdas, flags)) != Result.OK)
+                        if ((r = TryCollectInfo(ref nestedClosure, nestedLambdaExpr.Body, nestedParamExprs, newNestedLambda, ref rootNestedLambdas, flags)) != Result.OK)
                             return r;
 
                         if (newNestedLambda.NonPassedParameters.Count != 0 &&
-                            !PropagateNonPassedParamsToOuterLambda(ref closure, nestedLambda, paramExprs, nestedParamExprs, ref newNestedLambda.NonPassedParameters))
+                            !PropagateNonPassedParamsToOuterLambda(ref closure,
+                                nestedLambda, paramExprs, nestedParamExprs, ref newNestedLambda.NonPassedParameters))
                             return Result.ParameterIsNotVariableNorInPassedParameters;
 
-                        if (!TryCompileNestedLambda(ref nestedClosureInfo, newNestedLambda, flags))
+                        if (!TryCompileNestedLambda(ref nestedClosure, newNestedLambda, flags))
                             return Result.NestedLambdaCompileError;
 
                         return r;
@@ -1491,16 +1518,20 @@ namespace DryIoc.FastExpressionCompiler
                     case ExpressionType.Switch:
                         var switchExpr = ((SwitchExpression)expr);
                         if ((r = TryCollectInfo(ref closure, switchExpr.SwitchValue, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK ||
-                            switchExpr.DefaultBody != null &&
+                            switchExpr.DefaultBody != null && // todo: @check is the order of collection affects the result?
                             (r = TryCollectInfo(ref closure, switchExpr.DefaultBody, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK)
                             return r;
 
                         var switchCases = switchExpr.Cases;
-                        for (var i = 0; i < switchCases.Count - 1; i++)
-                            if ((r = TryCollectInfo(ref closure, switchCases[i].Body, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK)
-                                return r;
-                        expr = switchCases[switchCases.Count - 1].Body;
-                        continue;
+                        if (switchCases.Count != 0)
+                        {
+                            for (var i = 0; i < switchCases.Count - 1; i++)
+                                if ((r = TryCollectInfo(ref closure, switchCases[i].Body, paramExprs, nestedLambda, ref rootNestedLambdas, flags)) != Result.OK)
+                                    return r;
+                            expr = switchCases[switchCases.Count - 1].Body;
+                            continue;
+                        }
+                        return r;
 
                     case ExpressionType.Extension:
                         expr = expr.Reduce();
@@ -1619,21 +1650,21 @@ namespace DryIoc.FastExpressionCompiler
         }
 
 #if LIGHT_EXPRESSION
-        private static bool PropagateNonPassedParamsToOuterLambda(ref ClosureInfo closure, NestedLambdaInfo nestedLambda,
+        private static bool PropagateNonPassedParamsToOuterLambda(ref ClosureInfo closure, NestedLambdaInfo lambda,
             IParameterProvider paramExprs, IParameterProvider nestedLambdaParamExprs, ref SmallList<ParameterExpression> nestedNonPassedParams)
         {
             var paramExprCount = paramExprs.ParameterCount;
             var nestedLambdaParamExprCount = nestedLambdaParamExprs.ParameterCount;
 #else
-        private static bool PropagateNonPassedParamsToOuterLambda(ref ClosureInfo closure, NestedLambdaInfo nestedLambda,
+        private static bool PropagateNonPassedParamsToOuterLambda(ref ClosureInfo closure, NestedLambdaInfo lambda,
             IReadOnlyList<PE> paramExprs, IReadOnlyList<PE> nestedLambdaParamExprs, ref SmallList<ParameterExpression> nestedNonPassedParams)
         {
             var paramExprCount = paramExprs.Count;
             var nestedLambdaParamExprCount = nestedLambdaParamExprs.Count;
 #endif
             // If nested non passed parameter is not matched with any outer passed parameter,
-            // then ensure it goes to outer non passed parameter.
-            // But check that having a non-passed parameter in root expression is invalid.
+            // then we ensure it goes to the outer non passed parameter.
+            // But having the non-passed parameter in the root expression (nestedLambda == null) is invalid, and results in false.
             for (var i = 0; i < nestedNonPassedParams.Count; i++)
             {
                 var nestedNonPassedParam = nestedNonPassedParams.GetSurePresentItemRef(i);
@@ -1643,17 +1674,18 @@ namespace DryIoc.FastExpressionCompiler
                     for (var p = 0; !isInNestedLambda && p < nestedLambdaParamExprCount; ++p)
                         isInNestedLambda = ReferenceEquals(nestedLambdaParamExprs.GetParameter(p), nestedNonPassedParam);
 
-                var isInOuterLambda = false;
+                var isInLambda = false;
                 if (paramExprCount != 0)
-                    for (var p = 0; !isInOuterLambda && p < paramExprCount; ++p)
-                        isInOuterLambda = ReferenceEquals(paramExprs.GetParameter(p), nestedNonPassedParam);
+                    for (var p = 0; !isInLambda && p < paramExprCount; ++p)
+                        isInLambda = ReferenceEquals(paramExprs.GetParameter(p), nestedNonPassedParam);
 
-                if (!isInNestedLambda & !isInOuterLambda)
+                if (!isInNestedLambda & !isInLambda)
                 {
-                    if (nestedLambda != null)
-                        _ = nestedLambda.NonPassedParameters.GetIndexOrAdd(nestedNonPassedParam, default(RefEq<ParameterExpression>));
-                    else if (!closure.IsLocalVar(nestedNonPassedParam))
+                    if (closure.IsLocalVar(nestedNonPassedParam))
+                        continue;
+                    if (lambda == null) // means that we at the root level lambda, and non-passed parameter cannot be provided
                         return false;
+                    _ = lambda.NonPassedParameters.GetIndexOrAdd(nestedNonPassedParam, default(RefEq<ParameterExpression>));
                 }
             }
 
@@ -1720,8 +1752,7 @@ namespace DryIoc.FastExpressionCompiler
             var method = new DynamicMethod(string.Empty, nestedReturnType, closurePlusParamTypes, typeof(ArrayClosure), true);
             var il = method.GetILGenerator();
 
-            var containsConstantsOrNestedLambdas = nestedClosureInfo.ContainsConstantsOrNestedLambdas();
-            if (containsConstantsOrNestedLambdas & ((nestedClosureInfo.Status & ClosureStatus.HasClosure) != 0))
+            if (nestedConstsAndLambdas != null)
                 EmittingVisitor.EmitLoadConstantsAndNestedLambdasIntoVars(il, ref nestedClosureInfo);
 
             var parent = nestedReturnType == typeof(void) ? ParentFlags.IgnoreResult : ParentFlags.LambdaCall;
@@ -1732,14 +1763,15 @@ namespace DryIoc.FastExpressionCompiler
                 return false;
             il.Demit(OpCodes.Ret);
 
-            // If we don't have closure then create a static or an open delegate to pass closure later with `TryEmitNestedLambda`,
-            // constructing the new closure with non-passed arguments and the rest of items
-            nestedLambdaInfo.Lambda = nestedLambdaClosure != null
+            // If we don't have closure then create a static or an open delegate to pass closure later in `TryEmitNestedLambda`,
+            // constructing the new closure with NonPassedParams and the rest of items stored in NestedLambdaWithConstantsAndNestedLambdas
+            var nestedLambda = nestedLambdaClosure != null
                 ? method.CreateDelegate(nestedLambdaExpr.Type, nestedLambdaClosure)
                 : method.CreateDelegate(Tools.GetFuncOrActionType(closurePlusParamTypes, nestedReturnType), null);
 
-            if (nestedConstsAndLambdas != null & containsConstantsOrNestedLambdas & hasNonPassedParameters)
-                nestedLambdaInfo.Lambda = new NestedLambdaWithConstantsAndNestedLambdas(nestedLambdaInfo.Lambda, nestedConstsAndLambdas);
+            nestedLambdaInfo.Lambda = !hasNonPassedParameters ? nestedLambda
+                : nestedConstsAndLambdas == null ? new NestedLambdaForNonPassedParams(nestedLambda)
+                : new NestedLambdaForNonPassedParamsWithConstants(nestedLambda, nestedConstsAndLambdas);
 
             ReturnClosureTypeToParamTypesToPool(closurePlusParamTypes);
             return true;
@@ -1901,6 +1933,7 @@ namespace DryIoc.FastExpressionCompiler
         [MethodImpl((MethodImplOptions)256)]
         public static bool IgnoresResult(this ParentFlags parent) => (parent & ParentFlags.IgnoreResult) != 0;
 
+        [MethodImpl((MethodImplOptions)256)]
         internal static bool EmitPopIfIgnoreResult(this ILGenerator il, ParentFlags parent)
         {
             if ((parent & ParentFlags.IgnoreResult) != 0)
@@ -1913,6 +1946,14 @@ namespace DryIoc.FastExpressionCompiler
         {
             if (sourceType.IsValueType)
                 il.Demit(OpCodes.Box, sourceType);
+            return true;
+        }
+
+        [MethodImpl((MethodImplOptions)256)]
+        internal static bool TryEmitUnboxOf(this ILGenerator il, Type sourceType)
+        {
+            if (sourceType.IsValueType)
+                il.Demit(OpCodes.Unbox_Any, sourceType);
             return true;
         }
 
@@ -1948,7 +1989,7 @@ namespace DryIoc.FastExpressionCompiler
                     {
                         case ExpressionType.Parameter:
                             return (parent & ParentFlags.IgnoreResult) != 0 ||
-                                TryEmitParameter((ParameterExpression)expr, paramExprs, il, ref closure, parent, byRefIndex);
+                                TryEmitParameter((ParameterExpression)expr, paramExprs, il, ref closure, setup, parent, byRefIndex);
 
                         case ExpressionType.TypeAs:
                         case ExpressionType.IsTrue:
@@ -2104,12 +2145,22 @@ namespace DryIoc.FastExpressionCompiler
 
                                 expr = statementExprs[statementCount - 1]; // The last (result) statement in block will provide the result
 
-                                // Try to trim the statements up to the Throw (if any)
+                                // Try to trim the statements from the end of the Block up to the Throw (if any),
+                                // or to the prior Label as in the #442 case 2
                                 if (statementCount > 1)
                                 {
                                     var throwIndex = statementCount - 1;
-                                    while (throwIndex != -1 && statementExprs[throwIndex].NodeType != ExpressionType.Throw)
-                                        --throwIndex;
+                                    for (; throwIndex != -1; --throwIndex)
+                                    {
+                                        var se = statementExprs[throwIndex];
+                                        if (se.NodeType == ExpressionType.Label)
+                                        {
+                                            throwIndex = -1; // stop the search
+                                            break;
+                                        }
+                                        if (se.NodeType == ExpressionType.Throw)
+                                            break;
+                                    }
 
                                     // If we have a Throw and it is not the last one
                                     if (throwIndex != -1 && throwIndex != statementCount - 1)
@@ -2463,7 +2514,9 @@ namespace DryIoc.FastExpressionCompiler
                     case GotoExpressionKind.Goto:
                         if (gotoValue != null)
                             goto case GotoExpressionKind.Return;
-                        il.Demit(OpCodes.Br, labelInfo.GetOrDefineLabel(il));
+
+                        var gotoOpCode = (parent & ParentFlags.TryCatch) != 0 ? OpCodes.Leave : OpCodes.Br;
+                        il.Demit(gotoOpCode, labelInfo.GetOrDefineLabel(il));
                         return true;
 
                     case GotoExpressionKind.Return:
@@ -2692,7 +2745,7 @@ namespace DryIoc.FastExpressionCompiler
 #else
                 IReadOnlyList<PE> paramExprs,
 #endif
-                ILGenerator il, ref ClosureInfo closure, ParentFlags parent, int byRefIndex = -1)
+                ILGenerator il, ref ClosureInfo closure, CompilerFlags setup, ParentFlags parent, int byRefIndex = -1)
             {
                 var paramExprCount = paramExprs.GetCount();
                 var paramType = paramExpr.Type;
@@ -2705,8 +2758,42 @@ namespace DryIoc.FastExpressionCompiler
                 var varIndex = closure.GetDefinedLocalVarOrDefault(paramExpr);
                 if (varIndex != -1)
                 {
+                    // todo: @perf analyze if the variable is actually may be mutated in the nested lambda by being assigned or passed by ref
+                    // Check if the variable is passed to the nested closure (#437), so it should be loaded from the nested closure NonPassedParams array
+                    var nestedLambdasCount = closure.NestedLambdas.Count;
+                    if (nestedLambdasCount != 0)
+                    {
+                        var nestedLambdas = closure.NestedLambdas.Items;
+                        for (var nestedLambdaIndex = 0; nestedLambdaIndex < nestedLambdasCount; ++nestedLambdaIndex)
+                        {
+                            var lambdaInfo = nestedLambdas[nestedLambdaIndex];
+                            var nonPassedParamCount = lambdaInfo.NonPassedParameters.Count;
+                            if (nonPassedParamCount != 0)
+                            {
+                                var varIndexInNonPassedParams = lambdaInfo.NonPassedParameters.TryGetIndex(paramExpr, default(RefEq<ParameterExpression>));
+                                if (varIndexInNonPassedParams != -1 &&
+                                    (lambdaInfo.NonPassedParamMutatedIndexBits & (1UL << varIndexInNonPassedParams)) != 0)
+                                {
+                                    // Load the nested lambda item from the closure constants and nested lambdas array
+                                    var closureArrayItemIndex = closure.Constants.Count + nestedLambdaIndex;
+                                    EmitLoadClosureArrayItem(il, closureArrayItemIndex);
+
+                                    // Check if the NonPassedArray field is being set (not null),
+                                    // otherwise the nested lambda is not yet emitted, and it is not expected for the variable to be set inside it
+                                    il.Demit(OpCodes.Ldfld, NestedLambdaForNonPassedParams.NonPassedParamsField);
+
+                                    // Load the variable from the NonPassedParams array
+                                    EmitLoadConstantInt(il, varIndexInNonPassedParams);
+                                    il.Demit(OpCodes.Ldelem_Ref);
+                                    il.TryEmitUnboxOf(paramType);
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+
                     var valueTypeMemberButNotIndexAccess = isValueType &
-                        // means the parameter is the instance for what method is called or the instance for the member access, see #274, #283
+                        // means the parameter is the instance for the called method or the instance for the member access, see #274, #283
                         (parent & (ParentFlags.MemberAccess | ParentFlags.InstanceAccess)) != 0 &
                         (
                             // but the variable is not used as an index for the method call or the member access
@@ -2836,12 +2923,7 @@ namespace DryIoc.FastExpressionCompiler
                 il.Demit(OpCodes.Ldfld, ArrayClosureWithNonPassedParamsField);
                 EmitLoadConstantInt(il, nonPassedParamIndex);
                 il.Demit(OpCodes.Ldelem_Ref);
-
-                // source type is object, NonPassedParams is object array
-                if (paramType.IsValueType)
-                    il.Demit(OpCodes.Unbox_Any, paramType);
-
-                return true;
+                return il.TryEmitUnboxOf(paramType);
             }
 
 #if LIGHT_EXPRESSION
@@ -3236,37 +3318,51 @@ namespace DryIoc.FastExpressionCompiler
 
             public static bool TryEmitConstant(Expression expr, ILGenerator il, ref ClosureInfo closure, int byRefIndex = -1)
             {
+                var ok = false;
 #if LIGHT_EXPRESSION
                 // todo: @perf @simplify convert to intrinsic?
                 if (expr == NullConstant)
                 {
                     il.Demit(OpCodes.Ldnull);
-                    return true;
+                    ok = true;
                 }
-                if (expr == FalseConstant)
+                else if (expr == FalseConstant)
                 {
                     il.Demit(OpCodes.Ldc_I4_0);
-                    return true;
+                    ok = true;
                 }
-                if (expr == TrueConstant)
+                else if (expr == TrueConstant)
                 {
                     il.Demit(OpCodes.Ldc_I4_1);
-                    return true;
+                    ok = true;
                 }
-                if (expr is IntConstantExpression n)
+                else if (expr is IntConstantExpression n)
                 {
                     EmitLoadConstantInt(il, n.IntValue);
-                    return true;
+                    ok = true;
                 }
 #endif
-                var constExpr = (ConstantExpression)expr;
-                var constValue = constExpr.Value;
-                if (constValue != null)
-                    return TryEmitConstant(closure.ContainsConstantsOrNestedLambdas(), expr.Type, constValue.GetType(), constValue, il, ref closure, byRefIndex);
-                if (expr.Type.IsValueType)
-                    return EmitLoadLocalVariable(il, InitValueTypeVariable(il, expr.Type)); // yep, this is a proper way to emit the Nullable null
-                il.Demit(OpCodes.Ldnull);
-                return true;
+                if (!ok)
+                {
+                    var constExpr = (ConstantExpression)expr;
+                    var constValue = constExpr.Value;
+                    if (constValue != null)
+                        ok = TryEmitConstant(closure.ContainsConstantsOrNestedLambdas(), expr.Type, constValue.GetType(), constValue, il, ref closure, byRefIndex);
+                    else if (expr.Type.IsValueType) // null for a value type
+                    {
+                        EmitLoadLocalVariable(il, InitValueTypeVariable(il, expr.Type)); // yep, this is a proper way to emit the Nullable null
+                        ok = true;
+                    }
+                    else
+                    {
+                        il.Demit(OpCodes.Ldnull);
+                        ok = true;
+                    }
+                }
+
+                if (ok && byRefIndex != -1)
+                    EmitStoreAndLoadLocalVariableAddress(il, expr.Type);
+                return ok;
             }
 
             [MethodImpl((MethodImplOptions)256)]
@@ -3437,9 +3533,11 @@ namespace DryIoc.FastExpressionCompiler
                 // Load constants array field from Closure and store it into the variable
                 il.Demit(OpCodes.Ldarg_0);
                 il.Demit(OpCodes.Ldfld, ArrayClosureArrayField);
-                EmitStoreLocalVariable(il, il.GetNextLocalVarIndex(typeof(object[]))); // always does Stloc_0
-                // important that the constant will contain the nested lambdas as well in the same array after the actual constants, so the Count indicates where the constants end
-                var constItems = closure.Constants.Items; // todo: @perf why do we getting when non constants is stored but just a nested lambda is present?
+                EmitStoreLocalVariable(il, il.GetNextLocalVarIndex(typeof(object[]))); // always does Stloc_0, because it is done at start of the lambda emit
+
+                // important that the constant will contain the nested lambdas as well in the same array after the actual constants, 
+                // so the Count indicates where the constants end
+                var constItems = closure.Constants.Items;
                 var constCount = closure.Constants.Count;
 
                 short varIndex;
@@ -3467,7 +3565,7 @@ namespace DryIoc.FastExpressionCompiler
                     {
                         var lambdaInfo = nestedLambdas[i];
                         EmitLoadClosureArrayItem(il, constCount + i);
-                        lambdaInfo.LambdaVarIndex = varIndex = (short)il.GetNextLocalVarIndex(lambdaInfo.GetLambdaType());
+                        lambdaInfo.LambdaVarIndex = varIndex = (short)il.GetNextLocalVarIndex(lambdaInfo.Lambda.GetType());
                         EmitStoreLocalVariable(il, varIndex);
                     }
                 }
@@ -3540,23 +3638,18 @@ namespace DryIoc.FastExpressionCompiler
                 return null;
             });
 
-            // todo: @perf merge with EmitLoadLocalVariable 
-            private static int InitValueTypeVariable(ILGenerator il, Type exprType)
+            [MethodImpl((MethodImplOptions)256)]
+            private static int InitValueTypeVariable(ILGenerator il, Type exprType, int valueVarIndex)
             {
-                var locVarIndex = il.GetNextLocalVarIndex(exprType);
-                EmitLoadLocalVariableAddress(il, locVarIndex);
+                Debug.Assert(valueVarIndex != -1);
+                EmitLoadLocalVariableAddress(il, valueVarIndex);
                 il.Demit(OpCodes.Initobj, exprType);
-                return locVarIndex;
+                return valueVarIndex;
             }
 
-            private static int InitValueTypeVariable(ILGenerator il, Type exprType, int locVarIndex)
-            {
-                if (locVarIndex == -1)
-                    locVarIndex = il.GetNextLocalVarIndex(exprType);
-                EmitLoadLocalVariableAddress(il, locVarIndex);
-                il.Demit(OpCodes.Initobj, exprType);
-                return locVarIndex;
-            }
+            // todo: @perf merge with EmitLoadLocalVariable
+            private static int InitValueTypeVariable(ILGenerator il, Type exprType) =>
+                InitValueTypeVariable(il, exprType, il.GetNextLocalVarIndex(exprType));
 
 #if LIGHT_EXPRESSION
             private static bool EmitNewArrayBounds(NewArrayExpression expr, IParameterProvider paramExprs,
@@ -3648,8 +3741,9 @@ namespace DryIoc.FastExpressionCompiler
 #endif
             {
                 var valueVarIndex = -1;
-                if (expr.Type.IsValueType)
-                    valueVarIndex = il.GetNextLocalVarIndex(expr.Type);
+                var exprType = expr.Type;
+                if (exprType.IsValueType)
+                    valueVarIndex = il.GetNextLocalVarIndex(exprType);
 
                 var newExpr = expr.NewExpression;
 #if LIGHT_EXPRESSION
@@ -3657,6 +3751,8 @@ namespace DryIoc.FastExpressionCompiler
                 {
                     if (!TryEmit(expr.Expression, paramExprs, il, ref closure, setup, parent))
                         return false;
+                    if (valueVarIndex != -1)
+                        EmitStoreLocalVariable(il, valueVarIndex);
                 }
                 else
 #endif
@@ -3676,11 +3772,14 @@ namespace DryIoc.FastExpressionCompiler
                                 return false;
                     }
 
-                    // ReSharper disable once ConditionIsAlwaysTrueOrFalse
                     if (newExpr.Constructor != null)
+                    {
                         il.Demit(OpCodes.Newobj, newExpr.Constructor);
-                    else if (newExpr.Type.IsValueType)
-                        valueVarIndex = InitValueTypeVariable(il, newExpr.Type, valueVarIndex);
+                        if (valueVarIndex != -1)
+                            EmitStoreLocalVariable(il, valueVarIndex);
+                    }
+                    else if (valueVarIndex != -1)
+                        InitValueTypeVariable(il, exprType, valueVarIndex);
                     else
                         return false; // null constructor and not a value type, better to fallback
                 }
@@ -3742,11 +3841,11 @@ namespace DryIoc.FastExpressionCompiler
 #endif
             {
                 var valueVarIndex = -1;
-                if (expr.Type.IsValueType)
-                    valueVarIndex = il.GetNextLocalVarIndex(expr.Type);
+                var exprType = expr.Type;
+                if (exprType.IsValueType)
+                    valueVarIndex = il.GetNextLocalVarIndex(exprType);
 
                 var newExpr = expr.NewExpression;
-                var exprType = newExpr.Type;
 #if SUPPORTS_ARGUMENT_PROVIDER
                 var argExprs = (IArgumentProvider)newExpr;
 #else
@@ -3762,11 +3861,14 @@ namespace DryIoc.FastExpressionCompiler
                             return false;
                 }
 
-                // ReSharper disable once ConditionIsAlwaysTrueOrFalse
                 if (newExpr.Constructor != null)
+                {
                     il.Demit(OpCodes.Newobj, newExpr.Constructor);
-                else if (exprType.IsValueType)
-                    valueVarIndex = InitValueTypeVariable(il, exprType, valueVarIndex);
+                    if (valueVarIndex != -1)
+                        EmitStoreLocalVariable(il, valueVarIndex);
+                }
+                else if (valueVarIndex != -1)
+                    InitValueTypeVariable(il, exprType, valueVarIndex);
                 else
                     return false; // null constructor and not a value type, better to fallback
 
@@ -4732,6 +4834,12 @@ namespace DryIoc.FastExpressionCompiler
                         if (!TryEmit(objExpr, paramExprs, il, ref closure, setup, p))
                             return false;
 
+                        if (parent.IgnoresResult())
+                        {
+                            il.Demit(OpCodes.Pop); // pop the obj value - it is emitted only for the side effects
+                            return true;
+                        }
+
                         // #248 indicates that expression is argument passed by ref to Call
                         var isByAddress = byRefIndex != -1;
 
@@ -4768,6 +4876,8 @@ namespace DryIoc.FastExpressionCompiler
                     }
                     else if (field.IsLiteral)
                     {
+                        if (parent.IgnoresResult())
+                            return true; // do nothing
                         var fieldValue = field.GetValue(null);
                         if (fieldValue != null)
                             return TryEmitConstant(false, null, field.FieldType, fieldValue, il, ref closure);
@@ -4775,6 +4885,8 @@ namespace DryIoc.FastExpressionCompiler
                     }
                     else
                     {
+                        if (parent.IgnoresResult())
+                            return true; // do nothing
                         il.Demit(OpCodes.Ldsfld, field);
                     }
                     return true;
@@ -4806,38 +4918,38 @@ namespace DryIoc.FastExpressionCompiler
                 EmitLoadLocalVariable(il, nestedLambdaInfo.LambdaVarIndex);
 
                 // If lambda does not use any outer parameters to be set in closure, then we're done
-                if (nestedLambdaInfo.NonPassedParameters.Count == 0)
+                var nonPassedParams = nestedLambdaInfo.NonPassedParameters;
+                if (nonPassedParams.Count == 0)
                     return true;
 
                 //-------------------------------------------------------------------
                 // For the lambda with non-passed parameters (or variables) in closure
-                // we are loading `NestedLambdaWithConstantsAndNestedLambdas` pair.
 
-                var containsConstants = nestedLambdaInfo.Lambda is NestedLambdaWithConstantsAndNestedLambdas;
-                if (containsConstants)
-                {
-                    il.Demit(OpCodes.Ldfld, NestedLambdaWithConstantsAndNestedLambdas.NestedLambdaField);
-                    EmitLoadLocalVariable(il, nestedLambdaInfo.LambdaVarIndex); // load the variable for the second time
-                    il.Demit(OpCodes.Ldfld, NestedLambdaWithConstantsAndNestedLambdas.ConstantsAndNestedLambdasField);
-                }
-
-                // - create `NonPassedParameters` array for the non-passed parameters and variables
-                EmitLoadConstantInt(il, nestedLambdaInfo.NonPassedParameters.Count); // load the length of array
+                // Emit the NonPassedParams array for the non-passed parameters and variables
+                var nonPassedParamsCount = nonPassedParams.Count;
+                EmitLoadConstantInt(il, nonPassedParamsCount); // load the length of array
                 il.Demit(OpCodes.Newarr, typeof(object));
-
-                // we need to store the array in local variable, because we may assign to closed variable after the closure is passed to the lambda
-                var nonPassedParamsVarIndex = il.GetNextLocalVarIndex(typeof(object[]));
-                EmitStoreAndLoadLocalVariable(il, nonPassedParamsVarIndex);
+                var nonPassedParamsVarIndex = EmitStoreAndLoadLocalVariable(il, typeof(object[]));
                 nestedLambdaInfo.NonPassedParamsVarIndex = (short)nonPassedParamsVarIndex;
 
-                // - populate the `NonPassedParameters` array
-                for (var nestedParamIndex = 0; nestedParamIndex < nestedLambdaInfo.NonPassedParameters.Count; ++nestedParamIndex)
+                // Store the NonPassedParams back into the NestedLambda wrapper for the #437.
+                // Also, it is needed to be able to assign the closed variable after the closure is passed to the lambda, 
+                // e.g. `var x = 1; var f = () => x + 1; x = 2; f();` expects 3, not 2
+                il.Demit(OpCodes.Stfld, NestedLambdaForNonPassedParams.NonPassedParamsField);
+
+                // Populate the NonPassedParams array
+                for (var nestedParamIndex = 0; nestedParamIndex < nonPassedParamsCount; ++nestedParamIndex)
                 {
-                    // Duplicate nested array on stack to store the item, and load index to where to store
-                    il.Demit(OpCodes.Dup);
+                    // todo: @wip move this code to where the assignment and by-ref parameter passing
+                    Debug.Assert(nestedParamIndex < 64, "Assume that we don't have more than 64 mutated non-passed parameters");
+                    if (nonPassedParamsCount < 64)
+                        nestedLambdaInfo.NonPassedParamMutatedIndexBits |= 1UL << nestedParamIndex;
+
+                    // Load the array and index where to store the item
+                    EmitLoadLocalVariable(il, nonPassedParamsVarIndex);
                     EmitLoadConstantInt(il, nestedParamIndex);
 
-                    var nestedParam = nestedLambdaInfo.NonPassedParameters.GetSurePresentItemRef(nestedParamIndex);
+                    var nestedParam = nonPassedParams.GetSurePresentItemRef(nestedParamIndex);
                     var outerParamIndex = outerParamExprCount - 1;
                     while (outerParamIndex != -1 && !ReferenceEquals(outerParamExprs.GetParameter(outerParamIndex), nestedParam))
                         --outerParamIndex;
@@ -4873,14 +4985,27 @@ namespace DryIoc.FastExpressionCompiler
                     il.Demit(OpCodes.Stelem_Ref);
                 }
 
-                // - emit the closure constructor call
-                var closureCtor = containsConstants
-                    ? ArrayClosureWithNonPassedParamsConstructor
-                    : ArrayClosureWithNonPassedParamsConstructorWithoutConstants;
-                il.Demit(OpCodes.Newobj, closureCtor);
+                // Load the actual lambda delegate on stack
+                EmitLoadLocalVariable(il, nestedLambdaInfo.LambdaVarIndex);
+                il.Demit(OpCodes.Ldfld, NestedLambdaForNonPassedParams.NestedLambdaField);
 
-                // - call `Curry` method with nested lambda and array closure to produce a closed lambda with the expected signature
-                var lambdaTypeArgs = nestedLambdaInfo.GetLambdaType().GetGenericArguments();
+                // Load the nonPassedParams as a first argument of closure
+                EmitLoadLocalVariable(il, nonPassedParamsVarIndex);
+
+                // Load the constants as a second argument and call the closure constructor
+                if (nestedLambdaInfo.Lambda is NestedLambdaForNonPassedParamsWithConstants)
+                {
+                    EmitLoadLocalVariable(il, nestedLambdaInfo.LambdaVarIndex);
+                    il.Demit(OpCodes.Ldfld, NestedLambdaForNonPassedParamsWithConstants.ConstantsAndNestedLambdasField);
+                    il.Demit(OpCodes.Newobj, ArrayClosureWithNonPassedParamsAndConstantsCtor);
+                }
+                else
+                    il.Demit(OpCodes.Newobj, ArrayClosureWithNonPassedParamsCtor);
+
+                // Call the `Curry` method with the nested lambda and closure to produce a closed lambda with the expected signature
+                var lambda = nestedLambdaInfo.Lambda;
+                var lambdaType = (lambda is NestedLambdaForNonPassedParams lp ? lp.NestedLambda : lambda).GetType();
+                var lambdaTypeArgs = lambdaType.GetGenericArguments();
                 var nestedLambdaExpr = nestedLambdaInfo.LambdaExpression;
                 var closureMethod = nestedLambdaExpr.ReturnType == typeof(void)
                     ? CurryClosureActions.Methods[lambdaTypeArgs.Length - 1].MakeGenericMethod(lambdaTypeArgs)
@@ -4888,7 +5013,7 @@ namespace DryIoc.FastExpressionCompiler
 
                 var ok = EmitMethodCall(il, closureMethod);
 
-                // converting to the original possibly custom delegate type, see #308
+                // Convert to the original possibly custom delegate type, see #308
                 if (closureMethod.ReturnType != nestedLambdaExpr.Type)
                 {
                     il.Demit(OpCodes.Ldftn, closureMethod.ReturnType.FindDelegateInvokeMethod());
@@ -4984,7 +5109,7 @@ namespace DryIoc.FastExpressionCompiler
                 var customEqualMethod = expr.Comparison;
                 var cases = expr.Cases;
                 var caseCount = cases.Count;
-                if (caseCount == 1)
+                if (caseCount == 1 && expr.DefaultBody != null)
                 {
                     // optimization for the single case
                     // todo: @perf make a similar one for the two cases, probably use the two IfThenElses emit
@@ -5037,6 +5162,13 @@ namespace DryIoc.FastExpressionCompiler
                 // Emit the switch value once and store it in the local variable for comparison in cases below
                 if (!TryEmit(switchValueExpr, paramExprs, il, ref closure, setup, operandParent, param0ByRefIndex))
                     return false;
+
+                if (caseCount == 0) // see #440
+                {
+                    il.Demit(OpCodes.Pop); // remove the switch value result
+                    return expr.DefaultBody == null ||
+                        TryEmit(expr.DefaultBody, paramExprs, il, ref closure, setup, parent);
+                }
 
                 var switchValueVar = EmitStoreLocalVariable(il, switchValueType);
 
@@ -5539,6 +5671,8 @@ namespace DryIoc.FastExpressionCompiler
                         il.DmarkLabel(valueLabel);
                     }
                 }
+
+                il.EmitPopIfIgnoreResult(parent);
                 return true;
             }
 
@@ -6514,34 +6648,42 @@ namespace DryIoc.FastExpressionCompiler
         }
 
         [MethodImpl((MethodImplOptions)256)]
-        public static void Demit(this ILGenerator il, OpCode opcode, Type value, [CallerMemberName] string emitterName = null, [CallerLineNumber] int emitterLine = 0)
+        public static void Demit(this ILGenerator il, OpCode opcode, Type type, [CallerMemberName] string emitterName = null, [CallerLineNumber] int emitterLine = 0)
         {
-            il.Emit(opcode, value);
-            Debug.WriteLine($"{opcode} {value}  -- {emitterName}:{emitterLine}");
+            il.Emit(opcode, type);
+            Debug.WriteLine($"{opcode} {type.ToCode(stripNamespace: true)}  -- {emitterName}:{emitterLine}");
         }
 
         [MethodImpl((MethodImplOptions)256)]
         public static void Demit(this ILGenerator il, OpCode opcode, FieldInfo value, [CallerMemberName] string emitterName = null, [CallerLineNumber] int emitterLine = 0)
         {
             il.Emit(opcode, value);
-            var t = value.DeclaringType;
-            var fieldStr = value.FieldType.Name + " " + t.Name + "." + value.Name;
-            Debug.WriteLine($"{opcode} {fieldStr}  -- {emitterName}:{emitterLine}");
+            var t = value.DeclaringType?.ToCode(stripNamespace: true) ?? "";
+            var fieldType = value.FieldType.ToCode(stripNamespace: true);
+            Debug.WriteLine($"{opcode} {fieldType} {t}.{value.Name}  -- {emitterName}:{emitterLine}");
         }
 
         [MethodImpl((MethodImplOptions)256)]
         public static void Demit(this ILGenerator il, OpCode opcode, MethodInfo value, [CallerMemberName] string emitterName = null, [CallerLineNumber] int emitterLine = 0)
         {
             il.Emit(opcode, value);
-            Debug.WriteLine($"{opcode} {value}  -- {emitterName}:{emitterLine}");
+            var t = value.DeclaringType?.ToCode(stripNamespace: true) ?? "";
+            var retType = value.ReturnType.ToCode(stripNamespace: true);
+            var sig = value.ToString();
+            var paramStart = sig.IndexOf('(');
+            var paramList = paramStart == -1 ? "()" : sig.Substring(paramStart);
+            Debug.WriteLine($"{opcode} {retType} {t}.{paramList}  -- {emitterName}:{emitterLine}");
         }
 
         [MethodImpl((MethodImplOptions)256)]
         public static void Demit(this ILGenerator il, OpCode opcode, ConstructorInfo value, [CallerMemberName] string emitterName = null, [CallerLineNumber] int emitterLine = 0)
         {
             il.Emit(opcode, value);
-            var ctorStr = value.ToString().Replace(".", (value.DeclaringType?.Name ?? "") + ".");
-            Debug.WriteLine($"{opcode} {ctorStr}  -- {emitterName}:{emitterLine}");
+            var t = value.DeclaringType?.ToCode(stripNamespace: true) ?? "";
+            var sig = value.ToString();
+            var paramStart = sig.IndexOf('(');
+            var paramList = paramStart == -1 ? "()" : sig.Substring(paramStart);
+            Debug.WriteLine($"{opcode} {t}{paramList}  -- {emitterName}:{emitterLine}");
         }
 
         [MethodImpl((MethodImplOptions)256)]
@@ -6797,7 +6939,7 @@ namespace DryIoc.FastExpressionCompiler
         public override void Emit(OpCode opcode, MethodInfo meth)
         {
             ArgumentNullException.ThrowIfNull(meth);
- 
+
             int stackchange = 0;
             int token;
             DynamicMethod? dynMeth = meth as DynamicMethod;
@@ -6806,7 +6948,7 @@ namespace DryIoc.FastExpressionCompiler
                 RuntimeMethodInfo? rtMeth = meth as RuntimeMethodInfo;
                 if (rtMeth == null)
                     throw new ArgumentException(SR.Argument_MustBeRuntimeMethodInfo, nameof(meth));
- 
+
                 RuntimeType declaringType = rtMeth.GetRuntimeType();
                 if (declaringType != null && (declaringType.IsGenericType || declaringType.IsArray))
                     token = GetTokenFor(rtMeth, declaringType);
@@ -6822,10 +6964,10 @@ namespace DryIoc.FastExpressionCompiler
                 }
                 token = GetTokenFor(dynMeth);
             }
- 
+
             EnsureCapacity(7);
             InternalEmit(opcode);
- 
+
             if (opcode.StackBehaviourPush == StackBehaviour.Varpush
                 && meth.ReturnType != typeof(void))
             {
@@ -6842,7 +6984,7 @@ namespace DryIoc.FastExpressionCompiler
             {
                 stackchange--;
             }
- 
+
             UpdateStackSize(opcode, stackchange);
             PutInteger4(token);
         }
@@ -6859,14 +7001,14 @@ namespace DryIoc.FastExpressionCompiler
 
             m_ILStream[m_length++] = (byte)opcode.Value; 
             UpdateStackSize(opcode, 0);
- 
+
             int stackchange = 0;
             if (meth.ReturnType != typeof(void))
                 stackchange++;
             stackchange -= paramCount;
             if (!meth.IsStatic)
                 stackchange--;
- 
+
             UpdateStackSize(opcode, stackchange);
 
             BinaryPrimitives.WriteInt32LittleEndian(m_ILStream.AsSpan(m_length), token);
