@@ -57,7 +57,7 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        public interface IMyInterface {}
+        public interface IMyInterface { }
 
         public class MyClass : IMyInterface { }
     }

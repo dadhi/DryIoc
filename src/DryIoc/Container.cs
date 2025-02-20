@@ -14080,7 +14080,7 @@ public class Scope : IScope
     public bool IsDisposed => _disposed == 1;
     internal int _disposed;
 
-    private ImHashMap<int, ImList<IDisposable>> _disposables;
+    internal ImHashMap<int, ImList<IDisposable>> _disposables;
     internal ImHashMap<Type, object> _used;
 
     internal const int MAP_COUNT = 16;
@@ -14412,7 +14412,7 @@ public class Scope : IScope
         var ds = _disposables;
         if (ds is ImHashMapEntry<int, ImList<IDisposable>> e)
             for (var d = e.Value; d.Tail != null; d = d.Tail)
-                d.Head.Dispose();
+                d.Head.Dispose(); // todo: @check do we need to try-catch the exceptions here?
         else if (!ds.IsEmpty)
             SafelyDisposeOrderedDisposables(ds);
 
@@ -14452,13 +14452,29 @@ public class Scope : IScope
     public KeyValuePair<int, object>[] GetSnapshotOfServicesWithFactoryIDs()
     {
         var maps = _maps.CopyNonEmpty();
-        var items = maps.ForEach(new List<KeyValuePair<int, object>>(),
+        var result = new List<KeyValuePair<int, object>>();
+        var items = maps.ForEach(result,
             static (entry, _, it) =>
             {
                 if (entry.Value != NoItem)
                     it.Add(entry.Key.Pair(entry.Value));
             });
         return items.ToArray();
+    }
+
+    /// <summary>Mostly for the testing and the diagnostics reasons</summary>
+    public IEnumerable<IDisposable> GetTrackedDisposables()
+    {
+        var dsByOrder = _disposables;
+        if (dsByOrder is ImHashMapEntry<int, ImList<IDisposable>> likelyUnorderedOrSingleOrdered)
+            for (var d = likelyUnorderedOrSingleOrdered.Value; !d.IsEmpty; d = d.Tail)
+                yield return d.Head;
+        else if (!dsByOrder.IsEmpty)
+        {
+            foreach (var dOrdered in dsByOrder.Enumerate())
+                for (var dd = dOrdered.Value; !dd.IsEmpty; dd = dd.Tail)
+                    yield return dd.Head;
+        }
     }
 }
 
@@ -16655,6 +16671,17 @@ public class CompileTimeRegisterAttribute : Attribute
 {
 }
 
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = true)]
+internal class RegisterAttribute : Attribute // todo: @wip make it public
+{
+    // public Type ServiceType;
+
+    // todo: @feature @wip implement the Register in the attribute
+    // void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered, bool isStaticallyChecked);
+    // public static ReflectionFactory Of(Type implementationType = null, IReuse reuse = null, Made made = null, Setup setup = null)
+    // todo: add RegisterMany
+}
+
 /// <summary>Ports some methods from .Net 4.0/4.5</summary>
 public static partial class Portable
 {
@@ -16669,7 +16696,7 @@ public static partial class Portable
         var definedTypesProperty = typeof(Assembly).GetTypeInfo().GetDeclaredProperty("DefinedTypes");
         if (definedTypesProperty != null)
             return definedTypesProperty.PropertyType == typeof(IEnumerable<TypeInfo>)
-                ? a => ((IEnumerable<TypeInfo>)definedTypesProperty.GetValue(a, null)).Select(t => t.AsType())
+                ? a => ((IEnumerable<TypeInfo>)definedTypesProperty.GetValue(a, null)).Select(static t => t.AsType())
                 : a => (IEnumerable<Type>)definedTypesProperty.GetValue(a, null);
 
         var getTypesMethod = typeof(Assembly).GetTypeInfo().GetDeclaredMethod("GetTypes");

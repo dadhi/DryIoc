@@ -39,6 +39,9 @@ namespace DryIoc.UnitTests
             I_can_silence_throw_on_registering_disposable_transient_for_specific_registration();
             I_can_silence_throw_on_registering_disposable_transient_for_whole_container();
             Should_track_transient_disposable_dependency_in_singleton_scope();
+            Should_track_transient_disposable_service_in_singleton_scope();
+            I_can_override_global_disposable_transient_tracking_for_the_registration();
+            I_can_override_global_disposable_transient_tracking_and_prohibit_its_registration();
             Should_not_track_func_of_transient_disposable_dependency_in_singleton_scope();
             Should_track_lazy_of_transient_disposable_dependency_in_singleton_scope();
             Should_track_transient_disposable_dependency_in_current_scope();
@@ -52,7 +55,7 @@ namespace DryIoc.UnitTests
             If_IfAlreadyRegistered_per_Container_affects_RegisterMany_as_expected();
             Can_specify_to_capture_stack_trace_and_display_it_disposed_exception();
             DisposedContainer_error_message_should_include_tip_how_to_enable_stack_trace();
-            return 38;
+            return 41;
         }
 
         [Test]
@@ -271,7 +274,7 @@ namespace DryIoc.UnitTests
         public void You_can_specify_rules_to_disable_registration_based_on_reuse_type()
         {
             var container = new Container(Rules.Default.WithFactorySelector(
-                (request, f, factories) => 
+                (request, f, factories) =>
                     f != null ? (request.ServiceKey == null && !(f.Reuse is SingletonReuse) ? f : null)
                     : factories.FirstOrDefault(x => x.Key.Equals(request.ServiceKey) && !(x.Value.Reuse is SingletonReuse)).Value));
 
@@ -461,6 +464,19 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Should_track_transient_disposable_service_in_singleton_scope()
+        {
+            using var container = new Container(rules => rules.WithTrackingDisposableTransients());
+
+            container.Register<AD>();
+            _ = container.Resolve<AD>();
+
+            var scope = (Scope)container.SingletonScope;
+            var anyTracked = scope.GetTrackedDisposables().Any();
+            Assert.IsTrue(anyTracked);
+        }
+
+        [Test]
         public void Should_track_transient_disposable_dependency_in_singleton_scope()
         {
             var container = new Container(rules => rules.WithTrackingDisposableTransients());
@@ -472,6 +488,33 @@ namespace DryIoc.UnitTests
             container.Dispose();
 
             Assert.IsTrue(singleton.Ad.IsDisposed);
+        }
+
+        [Test]
+        public void I_can_override_global_disposable_transient_tracking_for_the_registration()
+        {
+            using var container = new Container(Rules.Default.WithTrackingDisposableTransients());
+
+            container.Register<AD>(setup: Setup.With(allowDisposableTransient: true, trackDisposableTransient: false));
+            _ = container.Resolve<AD>();
+
+            var scope = (Scope)container.SingletonScope;
+            var anyTracked = scope.GetTrackedDisposables().Any();
+            Assert.IsFalse(anyTracked);
+        }
+
+        // [Test] // todo: @wip
+        public void I_can_override_global_disposable_transient_tracking_and_prohibit_its_registration()
+        {
+            using var container = new Container(Rules.Default.WithTrackingDisposableTransients());
+
+            // Does it even make sense to register disposable transient and at the same time prohibit its resgitrations.
+            // I think the only valid case for this is when you don't know that the registred service is IDisposable,
+            // or if it is changed over the course of the program development.
+            // Or if it is set in some integration scenario, for instance when we read those individual registration settings from
+            // the attribute.
+            Assert.DoesNotThrow(() =>
+                container.Register<AD>(setup: Setup.With(allowDisposableTransient: false, trackDisposableTransient: false)));
         }
 
         [Test]
@@ -692,7 +735,7 @@ namespace DryIoc.UnitTests
             StringAssert.Contains("stack-trace", ex.Message);
         }
 
-        class S {}
+        class S { }
 
         [Test]
         public void DisposedContainer_error_message_should_include_tip_how_to_enable_stack_trace()
@@ -789,7 +832,7 @@ namespace DryIoc.UnitTests
         {
             public INamedService NamedDependency { get; set; }
 
-            public ServiceWithImportedCtorParameter([Import("blah")]INamedService namedDependency)
+            public ServiceWithImportedCtorParameter([Import("blah")] INamedService namedDependency)
             {
                 NamedDependency = namedDependency;
             }
