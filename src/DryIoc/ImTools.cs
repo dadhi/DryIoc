@@ -2462,10 +2462,13 @@ public static class KeyValuePair
 }
 
 /// <summary>Helper structure which allows to distinguish null value from the default value for optional parameter.</summary>
-public struct Opt<T>
+public readonly struct Opt<T>
 {
     /// <summary>Allows to transparently convert parameter argument to opt structure.</summary>
     public static implicit operator Opt<T>(T value) => new Opt<T>(value);
+
+    // /// <summary>Converts back to the wrapped Value</summary>
+    // public static implicit operator T(Opt<T> opt) => opt.Value;
 
     /// <summary>Argument value.</summary>
     public readonly T Value;

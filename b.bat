@@ -26,7 +26,7 @@ set /a finished_at_ms=1%finished_at:~0,2%*24*60*100-100+%finished_at:~3,2%*60*10
 set /a ellapsed_ms=%finished_at_ms%*10-%started_at_ms%*10
 
 echo:
-echo:[FINISHED AT %finished_at%, ELAPSED: %ellapsed_ms% MS]
+echo:[FINISHED AT %finished_at%, ELAPSED: %ellapsed_ms% ms]
 echo:# Finished: ALL Successful
 exit /b 0
 

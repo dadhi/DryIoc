@@ -14,6 +14,9 @@ namespace DryIoc.UnitTests
     {
         public int Run()
         {
+            // @wip
+            I_can_override_global_disposable_transient_tracking_and_prohibit_its_registration();
+
             Given_service_with_two_ctors_I_can_specify_what_ctor_to_choose_for_resolve();
             I_should_be_able_to_add_rule_to_resolve_not_registered_service();
             I_can_remove_rule_to_resolve_not_registered_service();

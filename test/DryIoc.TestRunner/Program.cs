@@ -9,7 +9,8 @@ public class Program
 {
     public static void Main()
     {
-        // new RulesTests().Run();
+        new RulesTests().Run();
+
         // new GHIssue672_Wrong_decorator_parameter_with_custom_args().Run();
 
         // Rules.UnsafeResetDefaultRulesToUseCompilationOnly();
