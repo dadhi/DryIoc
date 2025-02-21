@@ -14,8 +14,7 @@ namespace DryIoc.UnitTests
     {
         public int Run()
         {
-            // @wip
-            I_can_override_global_disposable_transient_tracking_and_prohibit_its_registration();
+            I_can_override_global_disposable_transient_allowance_and_prohibit_its_registration_despite_local_setting();
 
             Given_service_with_two_ctors_I_can_specify_what_ctor_to_choose_for_resolve();
             I_should_be_able_to_add_rule_to_resolve_not_registered_service();
@@ -45,6 +44,7 @@ namespace DryIoc.UnitTests
             Should_track_transient_disposable_service_in_singleton_scope();
             I_can_override_global_disposable_transient_tracking_for_the_registration();
             I_can_override_global_disposable_transient_tracking_and_prohibit_its_registration();
+            I_can_override_global_disposable_transient_allowance_and_prohibit_its_registration_despite_local_setting();
             Should_not_track_func_of_transient_disposable_dependency_in_singleton_scope();
             Should_track_lazy_of_transient_disposable_dependency_in_singleton_scope();
             Should_track_transient_disposable_dependency_in_current_scope();
@@ -58,7 +58,7 @@ namespace DryIoc.UnitTests
             If_IfAlreadyRegistered_per_Container_affects_RegisterMany_as_expected();
             Can_specify_to_capture_stack_trace_and_display_it_disposed_exception();
             DisposedContainer_error_message_should_include_tip_how_to_enable_stack_trace();
-            return 41;
+            return 42;
         }
 
         [Test]
@@ -506,18 +506,31 @@ namespace DryIoc.UnitTests
             Assert.IsFalse(anyTracked);
         }
 
-        // [Test] // todo: @wip
+        [Test]
         public void I_can_override_global_disposable_transient_tracking_and_prohibit_its_registration()
         {
             using var container = new Container(Rules.Default.WithTrackingDisposableTransients());
 
-            // Does it even make sense to register disposable transient and at the same time prohibit its resgitrations.
+            // Does it even make sense to register disposable transient and at the same time prohibit its registrations?
             // I think the only valid case for this is when you don't know that the registred service is IDisposable,
             // or if it is changed over the course of the program development.
             // Or if it is set in some integration scenario, for instance when we read those individual registration settings from
             // the attribute.
-            Assert.DoesNotThrow(() =>
-                container.Register<AD>(setup: Setup.With(allowDisposableTransient: false, trackDisposableTransient: false)));
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Register<AD>(setup: Setup.With(allowDisposableTransient: false)));
+
+            Assert.AreEqual(Error.NameOf(Error.RegisteredDisposableTransientWontBeDisposedByContainer), ex.ErrorName);
+        }
+
+        [Test]
+        public void I_can_override_global_disposable_transient_allowance_and_prohibit_its_registration_despite_local_setting()
+        {
+            using var container = new Container(Rules.Default.WithoutThrowOnRegisteringDisposableTransient());
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Register<AD>(setup: Setup.With(allowDisposableTransient: false, trackDisposableTransient: true)));
+
+            Assert.AreEqual(Error.NameOf(Error.RegisteredDisposableTransientWontBeDisposedByContainer), ex.ErrorName);
         }
 
         [Test]

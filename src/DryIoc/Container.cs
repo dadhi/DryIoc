@@ -11397,6 +11397,9 @@ public abstract class Setup
     /// <summary>Stores reused instance as WeakReference.</summary>
     public bool WeaklyReferenced => (_settings & Settings.WeaklyReferenced) != 0;
 
+    /// <summary>Disallows registration of the disposable transient.</summary>
+    public bool ThrowOnRegisteringDisposableTransient => (_settings & Settings.ThrowOnRegisteringDisposableTransient) != 0;
+
     /// <summary>Allows registering transient disposable.</summary>
     public bool AllowDisposableTransient => (_settings & Settings.AllowDisposableTransient) != 0;
 
@@ -11427,7 +11430,7 @@ public abstract class Setup
 
     private Setup(Func<Request, bool> condition,
         bool openResolutionScope, bool asResolutionCall, bool asResolutionRoot, bool preventDisposal, bool weaklyReferenced,
-        Opt<bool> allowDisposableTransient, bool trackDisposableTransient, bool useParentReuse, int disposalOrder,
+        bool? allowDisposableTransient, bool trackDisposableTransient, bool useParentReuse, int disposalOrder,
         bool preferOverMultipleResolved = false, bool asResolutionCallForExpressionGeneration = false,
         bool avoidResolutionScopeTracking = false)
     {
@@ -11452,8 +11455,7 @@ public abstract class Setup
         if (trackDisposableTransient)
         {
             // tracking means both to allow and track the transients
-            _settings |= Settings.TrackDisposableTransient;
-            _settings |= Settings.AllowDisposableTransient;
+            _settings |= Settings.TrackDisposableTransient | Settings.AllowDisposableTransient;
         }
 
         if (allowDisposableTransient.HasValue)
@@ -11464,8 +11466,8 @@ public abstract class Setup
             {
                 // if the value is provided and it is false, then we should not track the transients, 
                 // nor allow to register transients at all
-                _settings &= ~Settings.TrackDisposableTransient;
                 _settings &= ~Settings.AllowDisposableTransient;
+                _settings &= ~Settings.TrackDisposableTransient;
                 _settings |= Settings.ThrowOnRegisteringDisposableTransient;
             }
         }
@@ -11515,7 +11517,7 @@ public abstract class Setup
         object metadataOrFuncOfMetadata = null, Func<Request, bool> condition = null,
         bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
         bool preventDisposal = false, bool weaklyReferenced = false,
-        Opt<bool> allowDisposableTransient = default, bool trackDisposableTransient = false,
+        bool? allowDisposableTransient = default, bool trackDisposableTransient = false,
         bool useParentReuse = false, int disposalOrder = 0, bool preferInSingleServiceResolve = false,
         bool avoidResolutionScopeTracking = false)
     {
@@ -11551,7 +11553,7 @@ public abstract class Setup
         bool alwaysWrapsRequiredServiceType = false, Func<Type, Type> unwrap = null,
         bool openResolutionScope = false, bool asResolutionCall = false,
         bool preventDisposal = false, bool weaklyReferenced = false,
-        Opt<bool> allowDisposableTransient = default, bool trackDisposableTransient = false,
+        bool? allowDisposableTransient = default, bool trackDisposableTransient = false,
         bool useParentReuse = false, Func<Request, bool> condition = null, int disposalOrder = 0,
         bool avoidResolutionScopeTracking = false) =>
             wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType && unwrap == null &&
@@ -11577,7 +11579,7 @@ public abstract class Setup
         Func<Request, bool> condition = null, int order = 0, bool useDecorateeReuse = false,
         bool openResolutionScope = false, bool asResolutionCall = false,
         bool preventDisposal = false, bool weaklyReferenced = false,
-        Opt<bool> allowDisposableTransient = default, bool trackDisposableTransient = false,
+        bool? allowDisposableTransient = default, bool trackDisposableTransient = false,
         int disposalOrder = 0, bool avoidResolutionScopeTracking = false) =>
         condition == null & order == 0 & !useDecorateeReuse & !openResolutionScope & !asResolutionCall &&
         !preventDisposal & !weaklyReferenced & !allowDisposableTransient.HasValue & !trackDisposableTransient &
@@ -11603,7 +11605,7 @@ public abstract class Setup
     /// <summary>Setup for decorator of type <paramref name="decorateeType"/>.</summary>
     public static Setup DecoratorOf(Type decorateeType = null,
         int order = 0, bool useDecorateeReuse = false, bool openResolutionScope = false, bool asResolutionCall = false,
-        bool preventDisposal = false, bool weaklyReferenced = false, Opt<bool> allowDisposableTransient = default,
+        bool preventDisposal = false, bool weaklyReferenced = false, bool? allowDisposableTransient = default,
         bool trackDisposableTransient = false, int disposalOrder = 0, object decorateeServiceKey = null)
     {
         Func<Request, bool> cond = decorateeType == null & decorateeServiceKey == null
@@ -11620,7 +11622,7 @@ public abstract class Setup
     /// <summary>Setup for decorator of type <typeparamref name="TDecoratee"/>.</summary>
     public static Setup DecoratorOf<TDecoratee>(
         int order = 0, bool useDecorateeReuse = false, bool openResolutionScope = false, bool asResolutionCall = false,
-        bool preventDisposal = false, bool weaklyReferenced = false, Opt<bool> allowDisposableTransient = default,
+        bool preventDisposal = false, bool weaklyReferenced = false, bool? allowDisposableTransient = default,
         bool trackDisposableTransient = false, int disposalOrder = 0, object decorateeServiceKey = null) =>
         DecoratorOf(typeof(TDecoratee), order, useDecorateeReuse, openResolutionScope, asResolutionCall,
             preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient,
@@ -11643,7 +11645,7 @@ public abstract class Setup
         /// Specify all the individual settings.
         public ServiceSetup(Func<Request, bool> condition = null, object metadataOrFuncOfMetadata = null,
             bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
-            bool preventDisposal = false, bool weaklyReferenced = false, Opt<bool> allowDisposableTransient = default,
+            bool preventDisposal = false, bool weaklyReferenced = false, bool? allowDisposableTransient = default,
             bool trackDisposableTransient = false, bool useParentReuse = false, int disposalOrder = 0,
             bool preferOverMultipleResolved = false, bool asResolutionCallForExpressionGeneration = false,
             bool avoidResolutionScopeTracking = false)
@@ -11687,7 +11689,7 @@ public abstract class Setup
         public WrapperSetup(int wrappedServiceTypeArgIndex, bool alwaysWrapsRequiredServiceType, Func<Type, Type> unwrap,
             Func<Request, bool> condition,
             bool openResolutionScope, bool asResolutionCall,
-            bool preventDisposal, bool weaklyReferenced, Opt<bool> allowDisposableTransient, bool trackDisposableTransient,
+            bool preventDisposal, bool weaklyReferenced, bool? allowDisposableTransient, bool trackDisposableTransient,
             bool useParentReuse, int disposalOrder, bool avoidResolutionScopeTracking)
             : base(condition, openResolutionScope, asResolutionCall, false, preventDisposal, weaklyReferenced,
                 allowDisposableTransient, trackDisposableTransient, useParentReuse, disposalOrder,
@@ -11759,7 +11761,7 @@ public abstract class Setup
         public DecoratorSetup(Func<Request, bool> condition, int order, bool useDecorateeReuse,
             bool openResolutionScope = false, bool asResolutionCall = false,
             bool preventDisposal = false, bool weaklyReferenced = false,
-            Opt<bool> allowDisposableTransient = default, bool trackDisposableTransient = false,
+            bool? allowDisposableTransient = default, bool trackDisposableTransient = false,
             int disposalOrder = 0, bool avoidResolutionScopeTracking = false)
             : base(condition, openResolutionScope, asResolutionCall, false, preventDisposal, weaklyReferenced,
                 allowDisposableTransient, trackDisposableTransient, false, disposalOrder,
@@ -12101,13 +12103,14 @@ public abstract class Factory
         {
             // Warn about registering disposable transient
             var reuse = Reuse ?? rules.DefaultReuse;
-            if (reuse != DryIoc.Reuse.Transient || setup.AllowDisposableTransient || !rules.ThrowOnRegisteringDisposableTransient ||
+            if (reuse != DryIoc.Reuse.Transient || setup.AllowDisposableTransient ||
+                !(setup.ThrowOnRegisteringDisposableTransient || rules.ThrowOnRegisteringDisposableTransient) ||
                 setup.UseParentReuse)
                 return true;
 
             var knownImplOrServiceType = CanAccessImplementationType ? ImplementationType : serviceType;
             if (typeof(IDisposable).IsAssignableFrom(knownImplOrServiceType))
-                return Throw.When(throwIfInvalid, Error.RegisteredDisposableTransientWontBeDisposedByContainer, serviceType, serviceKey ?? "{no key}", this);
+                return Throw.When(throwIfInvalid, Error.RegisteredDisposableTransientWontBeDisposedByContainer, serviceType, serviceKey, this);
         }
         else if (setup.FactoryType == FactoryType.Wrapper)
         {
@@ -12119,7 +12122,8 @@ public abstract class Factory
                 return Throw.When(throwIfInvalid, Error.DecoratorShouldNotBeRegisteredWithServiceKey, serviceKey);
 
             var reuse = Reuse ?? rules.DefaultReuse;
-            if (reuse != DryIoc.Reuse.Transient || setup.AllowDisposableTransient || !rules.ThrowOnRegisteringDisposableTransient ||
+            if (reuse != DryIoc.Reuse.Transient || setup.AllowDisposableTransient ||
+                !(setup.ThrowOnRegisteringDisposableTransient || rules.ThrowOnRegisteringDisposableTransient) ||
                 setup.UseDecorateeReuse)
                 return true;
 
@@ -15541,7 +15545,7 @@ public class ContainerException : InvalidOperationException
         errorCode == -1 ? Throw.GetDefaultMessage(errorCheck) : DryIoc.Error.Messages[errorCode];
 
     /// <summary>Prints argument for formatted message.</summary> <param name="arg">To print.</param> <returns>Printed string.</returns>
-    protected static string Print(object arg) => arg == null ? string.Empty : arg.Print();
+    protected static string Print(object arg) => arg == null ? "{null}" : arg.Print();
 
     /// <summary>Collects many exceptions.</summary>
     public ContainerException(int error, ContainerException[] exceptions)

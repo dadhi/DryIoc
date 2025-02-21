@@ -1214,6 +1214,10 @@ public static class PrintCode
     public static StringBuilder AppendBool(this StringBuilder code, bool x) =>
         code.Append(x.ToCode());
 
+    /// <summary>Prints valid c# Boolean? literal: null/true/false.</summary>
+    public static StringBuilder AppendBool(this StringBuilder code, bool? x) =>
+        code.Append(x == null ? "null" : x.Value.ToCode());
+
     /// <summary>Prints valid c# string constant.</summary>
     public static StringBuilder AppendString(this StringBuilder code, string x) =>
         code.Print(x);
@@ -1355,17 +1359,22 @@ public sealed class ExportedRegistrationInfo
     }
 
     /// <summary>Allows registering transient disposable. But the disposal is up to you.</summary>
-    public bool AllowDisposableTransient
+    public bool? AllowDisposableTransient
     {
-        get => (Flags & Setup.Settings.AllowDisposableTransient) != 0;
-        set => Flags = value ? Flags | Setup.Settings.AllowDisposableTransient : Flags & ~Setup.Settings.AllowDisposableTransient;
+        get => (Flags & Setup.Settings.ThrowOnRegisteringDisposableTransient) != 0 ? false
+            : (Flags & Setup.Settings.AllowDisposableTransient) != 0 ? true
+            : (bool?)null;
+        set => Flags = value == null ? Flags : value.Value ? Flags | Setup.Settings.AllowDisposableTransient
+            : Flags & ~Setup.Settings.AllowDisposableTransient & ~Setup.Settings.TrackDisposableTransient | Setup.Settings.ThrowOnRegisteringDisposableTransient;
     }
 
     /// <summary>Turns On tracking of disposable transient dependency in parent scope or in open scope if resolved directly.</summary>
     public bool TrackDisposableTransient
     {
         get => (Flags & Setup.Settings.TrackDisposableTransient) != 0;
-        set => Flags = value ? Flags | Setup.Settings.TrackDisposableTransient : Flags & ~Setup.Settings.TrackDisposableTransient;
+        set => Flags = value
+            ? Flags | Setup.Settings.TrackDisposableTransient | Setup.Settings.AllowDisposableTransient
+            : Flags & ~Setup.Settings.TrackDisposableTransient;
     }
 
     /// <summary>Instructs to use parent reuse. Applied only if Reuse is not specified.</summary>
