@@ -65,7 +65,7 @@ namespace DryIoc.Microsoft.DependencyInjection;
 /// in order to access DryIoc diagnostics for controllers, property-injection, etc.
 /// 
 /// </summary>
-public class DryIocServiceProviderFactory : IServiceProviderFactory<DryIocServiceProvider>
+public class DryIocServiceProviderFactory : IServiceProviderFactory<DryIocServiceProvider>, IKeyedServiceProvider
 {
     private readonly Func<IRegistrator, ServiceDescriptor, bool> _registerDescriptor;
     private readonly RegistrySharing _registrySharing;
