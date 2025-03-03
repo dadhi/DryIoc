@@ -12,8 +12,9 @@
         <PackageReference Include="Castle.Core" Version="5.1.1" />
         <PackageReference Include="MediatR" Version="9.0.0" />
         <PackageReference Include="NSubstitute" Version="5.1.0" />
-        <PackageReference Include="Moq" Version="4.20.70" />
+        <PackageReference Include="Moq" Version="4.20.72" />
         <PackageReference Include="log4net" Version="2.0.15" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.2" />
     </ItemGroup>
 
     <ItemGroup>

@@ -9,7 +9,9 @@ public class Program
 {
     public static void Main()
     {
-        new RegisterAttributeTests().Run();
+        new GHIssue678_Scope_is_lost_in_diposable_service().Run();
+
+        // new RegisterAttributeTests().Run();
 
         // new RulesTests().Run();
 

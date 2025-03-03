@@ -157,7 +157,7 @@ public static class DryIocAdapter
                     theKey = Registrator.AnyKey;
 
                 return ParameterServiceInfo.Of(par, ServiceDetails.OfServiceKey(theKey));
-            };
+            }
 
             return null;
         };
@@ -310,6 +310,10 @@ public static class DryIocAdapter
     /// </example>
     public static IServiceProvider ConfigureServiceProvider<TCompositionRoot>(this IContainer container) =>
         container.WithCompositionRoot<TCompositionRoot>().GetServiceProvider();
+
+    /// <summary>Facade to consolidate DryIoc registrations in <typeparamref name="TCompositionRoot"/></summary>
+    public static IServiceProvider ConfigureServiceProvider<TCompositionRoot>(this DryIocServiceProvider serviceProvider) =>
+        serviceProvider.Container.WithCompositionRoot<TCompositionRoot>().GetServiceProvider();
 
     /// <summary>Registers service descriptors into container. May be called multiple times with different service collections.</summary>
     /// <param name="container">The container.</param>
