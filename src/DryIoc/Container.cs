@@ -9435,6 +9435,62 @@ public static class Registrator
         IfAlreadyRegistered ifAlreadyRegistered, object serviceKey = null, object registeredServiceKey = null) =>
         Registrator.RegisterMapping(container,
             typeof(TService), typeof(TRegisteredService), ifAlreadyRegistered, serviceKey, registeredServiceKey);
+
+    /// <summary>Returns the number of the actual registrations made.</summary>
+    public static int RegisterByRegisterAttributes(this IRegistrator registrator, Type registrationAttributesTarget)
+    {
+        var attrs = registrationAttributesTarget.GetCustomAttributes<RegisterAttribute>(inherit: true);
+        var regCount = 0;
+        foreach (var attr in attrs)
+        {
+            var factory = CreateFactory(attr);
+
+            registrator.Register(factory, attr.ServiceType, attr.ServiceKey, attr.IfAlreadyRegistered,
+                isStaticallyChecked: attr.TypesAreStaticallyChecked);
+
+            ++regCount;
+        }
+        return regCount;
+    }
+
+    internal static ReflectionFactory CreateFactory(RegisterAttribute attr)
+    {
+        var reuse = GetReuse(attr);
+        var made = Made.Default;  // todo: @wip add features later
+        var setup = GetSetup(attr);
+        return ReflectionFactory.Of(attr.ImplementationType, reuse, made, setup);
+    }
+
+    internal static IReuse GetReuse(RegisterAttribute attr) =>
+        attr.ReuseType switch
+        {
+            var t when t == typeof(TransientReuse) => Reuse.Transient,
+            var t when t == typeof(SingletonReuse) => Reuse.Singleton,
+            var t when t == typeof(CurrentScopeReuse) =>
+                attr.ReuseScopeName == null & attr.ReuseScopeNames == null ? Reuse.Scoped :
+                attr.ReuseScopeName != null ? Reuse.ScopedTo(attr.ReuseScopeName) : Reuse.ScopedTo(attr.ReuseScopeNames),
+            // todo: @wip support this stuff later
+            // ScopedToServiceType;
+            // ScopedToServiceKey;
+            // ScopedOrSingleton;
+            var t => Throw.For<IReuse>(Error.RegisterAttributedUnsupportedReuseType, t)
+        };
+
+    internal static Setup GetSetup(RegisterAttribute attr)
+    {
+        // todo: @wip support other stuff later
+        var transientTracking = attr.TrackDisposableTransient;
+        if (transientTracking == DisposableTracking.TrackDisposableTransient)
+            return Setup.With(trackDisposableTransient: true);
+
+        if (transientTracking == DisposableTracking.AllowDisposableTransient)
+            return Setup.With(allowDisposableTransient: true);
+
+        if (transientTracking == DisposableTracking.ThrowOnRegisteringDisposableTransient)
+            return Setup.With(allowDisposableTransient: false);
+
+        return Setup.Default;
+    }
 }
 
 /// <summary>Extension methods for <see cref="IResolver"/>.</summary>
@@ -14573,6 +14629,33 @@ public interface IReuse : IConvertibleToExpression
     Expression Apply(Request request, Expression serviceFactoryExpr);
 }
 
+/// <summary>Transient reuse</summary>
+public sealed class TransientReuse : IReuse
+{
+    /// <inheritdoc />
+    public int Lifespan => 0;
+
+    /// <inheritdoc />
+    public object Name => null;
+
+    /// <inheritdoc />
+    public Expression Apply(Request _, Expression serviceFactoryExpr) => serviceFactoryExpr;
+
+    /// <inheritdoc />
+    public bool CanApply(Request request) => true;
+
+    private readonly Lazy<Expression> _transientReuseExpr = Lazy.Of<Expression>(() =>
+        Field(null, typeof(Reuse).GetField(nameof(Reuse.Transient))));
+
+    /// <inheritdoc />
+    public Expression ToExpression<S>(S state, Func<S, object, Expression> fallbackConverter) =>
+        _transientReuseExpr.Value;
+
+    /// <inheritdoc />
+    public override string ToString() => "TransientReuse";
+}
+
+
 /// <summary>Returns container bound scope for storing singleton objects.</summary>
 public sealed class SingletonReuse : IReuse
 {
@@ -15112,30 +15195,9 @@ public static class Reuse
     /// <summary>Obsolete: please prefer using `Scoped` without name instead. 
     /// The usage of the named scopes is the less performant than the unnamed ones. e.g. ASP.NET Core does not use the named scope.</summary>
     public static readonly IReuse InWebRequest = ScopedTo(WebRequestScopeName);
-
-    #region Implementation
-
-    private sealed class TransientReuse : IReuse
-    {
-        public int Lifespan => 0;
-
-        public object Name => null;
-
-        public Expression Apply(Request _, Expression serviceFactoryExpr) => serviceFactoryExpr;
-
-        public bool CanApply(Request request) => true;
-
-        private readonly Lazy<Expression> _transientReuseExpr = Lazy.Of<Expression>(() =>
-            Field(null, typeof(Reuse).GetField(nameof(Transient))));
-
-        public Expression ToExpression<S>(S state, Func<S, object, Expression> fallbackConverter) =>
-            _transientReuseExpr.Value;
-
-        public override string ToString() => "TransientReuse";
-    }
-
-    #endregion
 }
+
+
 
 /// <summary>Policy to handle unresolved service.</summary>
 public enum IfUnresolved : byte
@@ -15871,7 +15933,8 @@ public static class Error
             "service creation is failed with the exception and the exception was catched, but you're trying to resolve the failed service again. " + NewLine +
             "For all those reasons DryIoc has a timeout to prevent the infinite waiting. " + NewLine +
             $"You may change the default timeout via setting the static `Scope.{nameof(Scope.WaitForScopedServiceIsCreatedTimeoutMilliseconds)}`"),
-        ServiceTypeIsNull = Of("Registered service type is null");
+        ServiceTypeIsNull = Of("Registered service type is null"),
+        RegisterAttributedUnsupportedReuseType = Of("Not support reuse type {0} in the RegisterAttribute.");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 
@@ -16691,15 +16754,75 @@ public class CompileTimeRegisterAttribute : Attribute
 {
 }
 
-[AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = true)]
-internal class RegisterAttribute : Attribute // todo: @wip make it public
+/// <summary>Per-registration rules to handle the disposable transient</summary>
+public enum DisposableTracking : byte
 {
-    // public Type ServiceType;
+    /// <summary>Default behavior is to obey the container rules</summary>
+    UseContainerRules = 0,
+    /// <summary>Throws the Container exception when trying to register a disposable transient, overriding the container rules</summary>
+    ThrowOnRegisteringDisposableTransient,
+    /// <summary>Allow registering the disposable transient</summary>
+    AllowDisposableTransient,
+    /// <summary>Track disposable transient</summary>
+    TrackDisposableTransient
+}
 
-    // todo: @feature @wip implement the Register in the attribute
-    // void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered, bool isStaticallyChecked);
-    // public static ReflectionFactory Of(Type implementationType = null, IReuse reuse = null, Made made = null, Setup setup = null)
-    // todo: add RegisterMany
+/// <summary>Base registration attribute, 
+/// there may be descendant predefined and custom attributes simplifying the registration setup.</summary>
+public class RegisterAttribute : Attribute
+{
+    /// <summary>By default no, because the attribute operates on the</summary>
+    public virtual bool TypesAreStaticallyChecked => false;
+
+    /// <summary>A service type</summary>
+    public Type ServiceType;
+
+    /// <summary>An implementation type</summary>
+    public Type ImplementationType;
+
+    /// <summary>One of the IReuse implementation types.</summary>
+    public Type ReuseType; // todo: @wip change to the ScopeType, move it from the AttributedModel
+
+    /// <summary>Optional name of the bound scope for the Scoped reuse</summary>
+    public string ReuseScopeName;
+
+    /// <summary>Optional names of the bound scopes fore the Scoped reuse. Maybe overridden by <see cref="ReuseScopeName"/></summary>
+    public object[] ReuseScopeNames;
+
+    public Type ScopedToServiceType;
+    public Type ScopedToServiceKey;
+    public bool ScopedOrSingleton;
+
+    /// <summary>A service key</summary>
+    public object ServiceKey;
+
+    /// <summary>Uses the global container rules by default</summary>
+    public IfAlreadyRegistered? IfAlreadyRegistered;
+
+    // public Made Made;
+
+    /// <summary>How to track the disposable transient</summary>
+    public DisposableTracking TrackDisposableTransient;
+}
+
+// todo: @feature @wip implement the Register in the attribute
+// void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered, bool isStaticallyChecked);
+// public static ReflectionFactory Of(Type implementationType = null, IReuse reuse = null, Made made = null, Setup setup = null)
+// todo: add RegisterMany
+/// <summary>A single registration attribute</summary>
+public sealed class RegisterAttribute<TService, TImplementation, TReuse> : RegisterAttribute
+    where TReuse : IReuse
+{
+    /// <summary>In this case there are compile-time type constraints for the Implementation and Service types</summary>
+    public override bool TypesAreStaticallyChecked => true;
+
+    /// <summary>Creates the registration attribute</summary>
+    public RegisterAttribute()
+    {
+        ServiceType = typeof(TService);
+        ImplementationType = typeof(TImplementation);
+        ReuseType = typeof(TReuse);
+    }
 }
 
 /// <summary>Ports some methods from .Net 4.0/4.5</summary>
