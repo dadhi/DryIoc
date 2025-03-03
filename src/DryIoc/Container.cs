@@ -16789,9 +16789,10 @@ public class RegisterAttribute : Attribute
     /// <summary>Optional names of the bound scopes fore the Scoped reuse. Maybe overridden by <see cref="ReuseScopeName"/></summary>
     public object[] ReuseScopeNames;
 
-    public Type ScopedToServiceType;
-    public Type ScopedToServiceKey;
-    public bool ScopedOrSingleton;
+
+    // public Type ScopedToServiceType;
+    // public Type ScopedToServiceKey;
+    // public bool ScopedOrSingleton;
 
     /// <summary>A service key</summary>
     public object ServiceKey;
