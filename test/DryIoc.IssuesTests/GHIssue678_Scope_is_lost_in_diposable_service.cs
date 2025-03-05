@@ -64,21 +64,26 @@ public class GHIssue678_Scope_is_lost_in_diposable_service : ITest
 
     public class Strategy
     {
+        public Context ContextFromConstructor { get; }
+        public Context ContextResolveWithInjectedResolver { get; }
         public Strategy(Context context, IResolver resolver)
         {
-            var resolvedContext = resolver.Resolve<Context>();
+            ContextFromConstructor = context;
+            ContextResolveWithInjectedResolver = resolver.Resolve<Context>();
         }
     }
 
     public class ServiceC<TContext> : IDisposable
     {
+        public Strategy Strategy { get; }
+        public Context Context { get; }
         public ServiceC(Strategy strategy, Context context)
         {
+            Strategy = strategy;
+            Context = context;
         }
 
-        public void Dispose()
-        {
-        }
+        public void Dispose() { }
     }
 
     public class ServiceB
@@ -98,13 +103,16 @@ public class GHIssue678_Scope_is_lost_in_diposable_service : ITest
             scope.Use(_context);
 
             var context = scope.Resolve<Context>();
+            Assert.AreEqual("value", context.Value);
 
-            // here context.value is "value"
-            var anotherContext = scope.Resolve<Strategy>();
+            var strategy = scope.Resolve<Strategy>();
+            Assert.AreEqual("value", strategy.ContextResolveWithInjectedResolver.Value);
+            Assert.AreEqual("value", strategy.ContextFromConstructor.Value);
 
-            // here context.value is null
-            // here resolvedContext.value is "value" - resolvedContext is resolved from injected IResolver
             using var serviceC = scope.Resolve<ServiceC<Strategy>>();
+            Assert.AreEqual("value", serviceC.Strategy.ContextResolveWithInjectedResolver.Value);
+            Assert.AreEqual("value", serviceC.Strategy.ContextFromConstructor.Value);
+            Assert.AreEqual("value", serviceC.Context.Value);
         }
     }
 
@@ -123,7 +131,9 @@ public class GHIssue678_Scope_is_lost_in_diposable_service : ITest
 
         public void Do()
         {
-            using var serviceC = _container.Resolve<ServiceC<Strategy>>(); // this cause the issue, please comment this line to resolve problem
+            // todo: @wip @fixme uncommenting causes to fail `Assert.AreEqual("value", serviceC.Strategy.ContextFromConstructor.Value)`
+            // because the serviceC.Strategy.ContextFromConstructor is null for some reason
+            // using var serviceC = _container.Resolve<ServiceC<Strategy>>(); // this cause the issue, please comment this line to resolve problem
 
             _context.Value = "value";
 
