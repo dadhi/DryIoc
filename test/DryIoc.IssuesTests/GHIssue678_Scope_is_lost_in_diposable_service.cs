@@ -49,7 +49,7 @@ public class GHIssue678_Scope_is_lost_in_diposable_service : ITest
     {
         public CompositionRoot(IRegistrator registrator)
         {
-            registrator.Register<Context>(reuse: Reuse.Scoped);
+            registrator.Register<SomeValueContext>(reuse: Reuse.Scoped);
             registrator.Register<Strategy>();
             registrator.Register<ServiceC<Strategy>>();
             registrator.Register<ServiceB>();
@@ -57,30 +57,30 @@ public class GHIssue678_Scope_is_lost_in_diposable_service : ITest
         }
     }
 
-    public class Context
+    public class SomeValueContext
     {
         public string Value { get; set; }
     }
 
     public class Strategy
     {
-        public Context ContextFromConstructor { get; }
-        public Context ContextResolveWithInjectedResolver { get; }
-        public Strategy(Context context, IResolver resolver)
+        public SomeValueContext ContextFromConstructor { get; }
+        public SomeValueContext ContextResolveWithInjectedResolver { get; }
+        public Strategy(SomeValueContext context, IResolver resolver)
         {
             ContextFromConstructor = context;
-            ContextResolveWithInjectedResolver = resolver.Resolve<Context>();
+            ContextResolveWithInjectedResolver = resolver.Resolve<SomeValueContext>();
         }
     }
 
     public class ServiceC<TContext> : IDisposable
     {
         public Strategy Strategy { get; }
-        public Context Context { get; }
-        public ServiceC(Strategy strategy, Context context)
+        public SomeValueContext Contexto { get; }
+        public ServiceC(Strategy strategy, SomeValueContext contexto)
         {
             Strategy = strategy;
-            Context = context;
+            Contexto = contexto;
         }
 
         public void Dispose() { }
@@ -88,54 +88,56 @@ public class GHIssue678_Scope_is_lost_in_diposable_service : ITest
 
     public class ServiceB
     {
-        private readonly IContainer _container;
-        private readonly Context _context;
-
-        public ServiceB(IContainer container, Context context)
+        private readonly IResolverContext _resolver;
+        private readonly SomeValueContext _contexto;
+        public ServiceB(IResolverContext resolver, SomeValueContext contexto)
         {
-            _container = container;
-            _context = context;
+            _resolver = resolver;
+            _contexto = contexto;
         }
 
         public void Do()
         {
-            using var scope = _container.OpenScope();
-            scope.Use(_context);
+            using var scope = _resolver.OpenScope();
+            scope.Use(_contexto);
 
-            var context = scope.Resolve<Context>();
+            var context = scope.Resolve<SomeValueContext>();
             Assert.AreEqual("value", context.Value);
 
             var strategy = scope.Resolve<Strategy>();
             Assert.AreEqual("value", strategy.ContextResolveWithInjectedResolver.Value);
             Assert.AreEqual("value", strategy.ContextFromConstructor.Value);
 
+            // The problem here is because container uses cached expression for `ServiceC<Strategy>` 
+            // which is contain dependency of `SomeValueContext` created via `GetOrAddViaFactoryDelegate`,
+            // which is in turn does not checs the Used items!!!
+            // todo: @wip @fixme
             using var serviceC = scope.Resolve<ServiceC<Strategy>>();
             Assert.AreEqual("value", serviceC.Strategy.ContextResolveWithInjectedResolver.Value);
             Assert.AreEqual("value", serviceC.Strategy.ContextFromConstructor.Value);
-            Assert.AreEqual("value", serviceC.Context.Value);
+            Assert.AreEqual("value", serviceC.Contexto.Value);
         }
     }
 
     public class ServiceA
     {
-        private readonly IContainer _container;
-        private readonly Context _context;
+        private readonly IResolver _resolver;
+        private readonly SomeValueContext _contexto;
         private readonly ServiceB _serviceB;
 
-        public ServiceA(IContainer container, Context context, ServiceB serviceB)
+        public ServiceA(IResolver resolver, SomeValueContext contexto, ServiceB serviceB)
         {
-            _container = container;
-            _context = context;
+            _resolver = resolver;
+            _contexto = contexto;
             _serviceB = serviceB;
         }
 
         public void Do()
         {
-            // todo: @wip @fixme uncommenting causes to fail `Assert.AreEqual("value", serviceC.Strategy.ContextFromConstructor.Value)`
-            // because the serviceC.Strategy.ContextFromConstructor is null for some reason
-            // using var serviceC = _container.Resolve<ServiceC<Strategy>>(); // this cause the issue, please comment this line to resolve problem
+            // This resolution causes the issue, because it caches the expression with the dependency for creating the `SomeValueContext`
+            // using var serviceC = _resolver.Resolve<ServiceC<Strategy>>();
 
-            _context.Value = "value";
+            _contexto.Value = "value";
 
             _serviceB.Do();
         }
