@@ -49,7 +49,11 @@ public class GHIssue678_Scope_is_lost_in_diposable_service : ITest
     {
         public CompositionRoot(IRegistrator registrator)
         {
-            registrator.Register<SomeValueContext>(reuse: Reuse.Scoped);
+            registrator.Register<SomeValueContext>(reuse: Reuse.Scoped,
+                // Note: A workaround to setup the SomeValueContext as dynamic dependency (injected via resolution call internally),
+                // which may be likely overrided in the future via the `Use` or via replacing its registration
+                setup: Setup.With(asResolutionCall: true)
+            );
             registrator.Register<Strategy>();
             registrator.Register<ServiceC<Strategy>>();
             registrator.Register<ServiceB>();
@@ -110,8 +114,7 @@ public class GHIssue678_Scope_is_lost_in_diposable_service : ITest
 
             // The problem here is because container uses cached expression for `ServiceC<Strategy>` 
             // which is contain dependency of `SomeValueContext` created via `GetOrAddViaFactoryDelegate`,
-            // which is in turn does not checs the Used items!!!
-            // todo: @wip @fixme
+            // to avoid it you may consider to register the `SomeValueContext` as dynamic dependency, see `CompositionRoot`.
             using var serviceC = scope.Resolve<ServiceC<Strategy>>();
             Assert.AreEqual("value", serviceC.Strategy.ContextResolveWithInjectedResolver.Value);
             Assert.AreEqual("value", serviceC.Strategy.ContextFromConstructor.Value);
@@ -135,7 +138,7 @@ public class GHIssue678_Scope_is_lost_in_diposable_service : ITest
         public void Do()
         {
             // This resolution causes the issue, because it caches the expression with the dependency for creating the `SomeValueContext`
-            // using var serviceC = _resolver.Resolve<ServiceC<Strategy>>();
+            using var serviceC = _resolver.Resolve<ServiceC<Strategy>>();
 
             _contexto.Value = "value";
 
