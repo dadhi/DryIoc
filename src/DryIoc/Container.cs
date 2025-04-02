@@ -168,6 +168,7 @@ public partial class Container : IContainer
     public System.Threading.Tasks.ValueTask DisposeAsync()
     {
         Dispose(); // todo: @wip async dispose
+
         // if (disposableObjects != null && disposableObjects.Count > 0)
         // {
         //     HashSet<object> disposedObjects = new HashSet<object>();
@@ -180,13 +181,11 @@ public partial class Container : IContainer
         //             if (!disposedObjects.Add(objectToDispose))
         //                 continue;
 
-        //             ValueTask valueTask = asyncDisposable.DisposeAsync();
-        //             // If we end up here, it means that the ValueTask is not completed
-        //             if (!valueTask.IsCompletedSuccessfully)
-        //                 return Await(i, valueTask, disposableObjects, disposedObjects);
+        //             var valueTask = asyncDisposable.DisposeAsync();
+        //             if (valueTask.IsCompletedSuccessfully)
+        //                 valueTask.GetAwaiter().GetResult();
 
-        //             // If its a IValueTaskSource backed ValueTask, inform it its result has been read so it can reset
-        //             valueTask.GetAwaiter().GetResult();
+        //             return Await(i, valueTask, disposableObjects, disposedObjects);
         //         }
         //         else if (disposedObjects.Add(objectToDispose))
         //             ((IDisposable)objectToDispose).Dispose();
@@ -196,11 +195,11 @@ public partial class Container : IContainer
         // }
         return default;
 
-        // static async ValueTask Await(int i, ValueTask vt, List<object> toDispose, HashSet<object> disposedObjects)
+        // static async ValueTask Await(int i, ValueTask awaitedDisposable, List<object> toDispose, HashSet<object> disposedObjects)
         // {
-        //     await vt.ConfigureAwait(false);
+        //     await awaitedDisposable.ConfigureAwait(false);
 
-        //     // vt is acting on the disposable at index i,
+        //     // awaitedDisposable is acting on the disposable at index i,
         //     // decrement it and move to the next iteration
         //     i--;
 
@@ -208,17 +207,12 @@ public partial class Container : IContainer
         //     {
         //         object objectToDispose = toDispose[i];
         //         if (!disposedObjects.Add(objectToDispose))
-        //         {
         //             continue;
-        //         }
+
         //         if (objectToDispose is IAsyncDisposable asyncDisposable)
-        //         {
         //             await asyncDisposable.DisposeAsync().ConfigureAwait(false);
-        //         }
         //         else
-        //         {
         //             ((IDisposable)objectToDispose).Dispose();
-        //         }
         //     }
         // }
     }
@@ -14655,7 +14649,6 @@ public sealed class TransientReuse : IReuse
     public override string ToString() => "TransientReuse";
 }
 
-
 /// <summary>Returns container bound scope for storing singleton objects.</summary>
 public sealed class SingletonReuse : IReuse
 {
@@ -16781,14 +16774,13 @@ public class RegisterAttribute : Attribute
     public Type ImplementationType;
 
     /// <summary>One of the IReuse implementation types.</summary>
-    public Type ReuseType; // todo: @wip change to the ScopeType, move it from the AttributedModel
+    public Type ReuseType;
 
     /// <summary>Optional name of the bound scope for the Scoped reuse</summary>
     public string ReuseScopeName;
 
     /// <summary>Optional names of the bound scopes fore the Scoped reuse. Maybe overridden by <see cref="ReuseScopeName"/></summary>
     public object[] ReuseScopeNames;
-
 
     // public Type ScopedToServiceType;
     // public Type ScopedToServiceKey;
@@ -16806,7 +16798,7 @@ public class RegisterAttribute : Attribute
     public DisposableTracking TrackDisposableTransient;
 }
 
-// todo: @feature @wip implement the Register in the attribute
+// todo: @feature @wip implement the Register via attributes
 // void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered, bool isStaticallyChecked);
 // public static ReflectionFactory Of(Type implementationType = null, IReuse reuse = null, Made made = null, Setup setup = null)
 // todo: add RegisterMany

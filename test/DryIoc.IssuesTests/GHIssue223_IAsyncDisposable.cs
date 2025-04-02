@@ -12,21 +12,21 @@ namespace DryIoc.IssuesTests
         public int Run()
         {
             // ShouldDisposeAsyncDisposable().GetAwaiter().GetResult();
+
             return 1;
         }
 
-        // [Test] // @wip
         public async Task ShouldDisposeAsyncDisposable()
         {
             var container = new Container();
             List<object> disposedObjects = new();
 
-            container.RegisterDelegate<AsyncDisposable>(_ => new AsyncDisposable(disposedObject => disposedObjects.Add(disposedObject)), Reuse.Scoped);
+            container.RegisterDelegate(_ => new SomeAsyncDisposable(disposed => disposedObjects.Add(disposed)), Reuse.Scoped);
 
-            AsyncDisposable asyncDisposable = null;
+            SomeAsyncDisposable asyncDisposable = null;
             await using (var scope = container.OpenScope())
             {
-                asyncDisposable = container.Resolve<AsyncDisposable>();
+                asyncDisposable = container.Resolve<SomeAsyncDisposable>();
             }
 
             Assert.Contains(asyncDisposable, disposedObjects);
@@ -116,33 +116,26 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        public class AsyncDisposable : IAsyncDisposable
+        public sealed class SomeAsyncDisposable : IAsyncDisposable
         {
-            private readonly Action<object> onDisposed;
-
-            public AsyncDisposable(Action<object> onDisposed)
-            {
-                this.onDisposed = onDisposed;
-            }
+            private readonly Action<object> _disposeAction;
+            public SomeAsyncDisposable(Action<object> disposeAction) => _disposeAction = disposeAction;
             public ValueTask DisposeAsync()
             {
-                onDisposed(this);
+                _disposeAction(this);
                 return ValueTask.CompletedTask;
             }
         }
 
-        public class Disposable : IDisposable
+        public class SomeDisposable : IDisposable
         {
-            private readonly Action<object> onDisposed;
+            private readonly Action<object> _disposeAction;
 
-            public Disposable(Action<object> onDisposed)
-            {
-                this.onDisposed = onDisposed;
-            }
+            public SomeDisposable(Action<object> disposeAction) => _disposeAction = disposeAction;
 
             public void Dispose()
             {
-                onDisposed(this);
+                _disposeAction(this);
             }
         }
     }
