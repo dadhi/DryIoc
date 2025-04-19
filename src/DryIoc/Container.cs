@@ -59,6 +59,11 @@ using static ImTools.ArrayTools;
 using FastExpressionCompiler.LightExpression;
 using static FastExpressionCompiler.LightExpression.Expression;
 using static FastExpressionCompiler.LightExpression.ExpressionCompiler;
+using System.Threading.Tasks;
+
+#if SUPPORTS_ASYNC_DISPOSABLE
+using ValueTask = System.Threading.Tasks.ValueTask;
+#endif
 
 #nullable disable
 
@@ -134,87 +139,78 @@ public partial class Container : IContainer
         currentScope?.Dispose();
     }
 
+#if SUPPORTS_ASYNC_DISPOSABLE
+    private static ValueTask DisposeScopeContextCurrentScopeAsync(IScopeContext scopeContext)
+    {
+        IScope currentScope = null;
+        scopeContext.SetCurrent(s =>
+        {
+            // save the current scope for the later,
+            // do dispose it AFTER its parent is actually set to be a new ambient current scope.
+            currentScope = s;
+            return s?.Parent;
+        });
+        return currentScope?.DisposeAsync() ?? ValueTask.CompletedTask;
+    }
+#endif
+
     /// <summary>Dispose either open scope, or container with singletons, if no scope opened.</summary>
     public void Dispose()
     {
         // if already disposed - just leave
-        if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
-            return;
-
-        // nice to have a disposal stack-trace, but we can live without it if something goes wrong
-        if (Rules.CaptureContainerDisposeStackTrace)
-            TryCaptureContainerDisposeStackTrace();
-
-        // for the scoped container, indicated by the present parent
-        if (_parent != null)
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 0)
         {
-            Debug.Assert(_ownScopeOrContext != null, "The container with parent should be scoped");
-            if (_ownScopeOrContext is IScope scope)
-                scope.Dispose();
+            // nice to have a disposal stack-trace, but we can live without it if something goes wrong
+            if (Rules.CaptureContainerDisposeStackTrace)
+                TryCaptureContainerDisposeStackTrace();
+
+            // for the scoped container, indicated by the present parent
+            if (_parent != null)
+            {
+                Debug.Assert(_ownScopeOrContext != null, "The container with parent should be scoped");
+                if (_ownScopeOrContext is IScope scope)
+                    scope.Dispose();
+                else
+                    DisposeScopeContextCurrentScope((IScopeContext)_ownScopeOrContext);
+            }
             else
-                DisposeScopeContextCurrentScope((IScopeContext)_ownScopeOrContext);
-        }
-        else
-        {
-            _registry.Swap(Registry.Default);
-            Rules = Rules.Default;
-            _singletonScope.Dispose(); // will also dispose any tracked scopes
-            _ownScopeOrContext?.Dispose();
+            {
+                _registry.Swap(Registry.Default);
+                Rules = Rules.Default;
+                _singletonScope.Dispose(); // will also dispose any tracked scopes
+                _ownScopeOrContext?.Dispose();
+            }
         }
     }
 
 #if SUPPORTS_ASYNC_DISPOSABLE
     /// <inheritdoc/>
-    public System.Threading.Tasks.ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
-        Dispose(); // todo: @wip async dispose
+        // if already disposed - just leave
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 0)
+        {
+            // nice to have a disposal stack-trace, but we can live without it if something goes wrong
+            if (Rules.CaptureContainerDisposeStackTrace)
+                TryCaptureContainerDisposeStackTrace();
 
-        // if (disposableObjects != null && disposableObjects.Count > 0)
-        // {
-        //     HashSet<object> disposedObjects = new HashSet<object>();
-
-        //     for (var i = disposableObjects.Count - 1; i >= 0; i--)
-        //     {
-        //         object objectToDispose = disposableObjects[i];
-        //         if (objectToDispose is IAsyncDisposable asyncDisposable)
-        //         {
-        //             if (!disposedObjects.Add(objectToDispose))
-        //                 continue;
-
-        //             var valueTask = asyncDisposable.DisposeAsync();
-        //             if (valueTask.IsCompletedSuccessfully)
-        //                 valueTask.GetAwaiter().GetResult();
-
-        //             return Await(i, valueTask, disposableObjects, disposedObjects);
-        //         }
-        //         else if (disposedObjects.Add(objectToDispose))
-        //             ((IDisposable)objectToDispose).Dispose();
-        //         else
-        //             continue;
-        //     }
-        // }
-        return default;
-
-        // static async ValueTask Await(int i, ValueTask awaitedDisposable, List<object> toDispose, HashSet<object> disposedObjects)
-        // {
-        //     await awaitedDisposable.ConfigureAwait(false);
-
-        //     // awaitedDisposable is acting on the disposable at index i,
-        //     // decrement it and move to the next iteration
-        //     i--;
-
-        //     for (; i >= 0; --i)
-        //     {
-        //         object objectToDispose = toDispose[i];
-        //         if (!disposedObjects.Add(objectToDispose))
-        //             continue;
-
-        //         if (objectToDispose is IAsyncDisposable asyncDisposable)
-        //             await asyncDisposable.DisposeAsync().ConfigureAwait(false);
-        //         else
-        //             ((IDisposable)objectToDispose).Dispose();
-        //     }
-        // }
+            // for the scoped container, indicated by the present parent
+            if (_parent != null)
+            {
+                Debug.Assert(_ownScopeOrContext != null, "The container with parent should be scoped");
+                if (_ownScopeOrContext is IScope scope)
+                    await scope.DisposeAsync().ConfigureAwait(false);
+                else
+                    await DisposeScopeContextCurrentScopeAsync((IScopeContext)_ownScopeOrContext); // todo: @wip do it Async
+            }
+            else
+            {
+                _registry.Swap(Registry.Default);
+                Rules = Rules.Default;
+                await _singletonScope.DisposeAsync().ConfigureAwait(false); // will also dispose any tracked scopes
+                _ownScopeOrContext?.Dispose(); // todo: @wip do it Async
+            }
+        }
     }
 #endif
 
@@ -14049,6 +14045,9 @@ internal sealed class ScopedItemException
 /// <summary>Lazy object storage that will create object with provided factory on first access,
 /// then will be returning the same object for subsequent access.</summary>
 public interface IScope : IEnumerable<IScope>, IDisposable
+#if SUPPORTS_ASYNC_DISPOSABLE
+    , IAsyncDisposable
+#endif
 {
     /// <summary>Parent scope in scope stack. Null for root scope.</summary>
     IScope Parent { get; }
@@ -14490,6 +14489,58 @@ public class Scope : IScope
         _used = ImHashMap<Type, object>.Empty;
         _maps = _emptyMaps;
     }
+
+#if SUPPORTS_ASYNC_DISPOSABLE
+    public ValueTask DisposeAsync()
+    {
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
+            return ValueTask.CompletedTask;
+
+        var ds = _disposables;
+        if (ds is ImHashMapEntry<int, ImList<IDisposable>> e)
+            for (var d = e.Value; d.Tail != null; d = d.Tail)
+            {
+                if (d.Head is IAsyncDisposable asyncDisp)
+                {
+                    var pendingResult = asyncDisp.DisposeAsync();
+                    if (!pendingResult.IsCompleted)
+                        return DisposeRestAsync(pendingResult, d.Tail);
+
+                    if (pendingResult.IsFaulted) // rethrow the exception
+                        pendingResult.GetAwaiter().GetResult();
+                }
+                else
+                {
+                    d.Head.Dispose();
+                }
+            }
+        else if (!ds.IsEmpty)
+            SafelyDisposeOrderedDisposables(ds);
+
+        _disposables = ImHashMap<int, ImList<IDisposable>>.Empty; // todo: @perf @mem combine used and _factories together
+        _used = ImHashMap<Type, object>.Empty;
+        _maps = _emptyMaps;
+
+        return ValueTask.CompletedTask;
+    }
+
+    private static async ValueTask DisposeRestAsync(ValueTask currentPending, ImList<IDisposable> rest)
+    {
+        await currentPending.ConfigureAwait(false);
+
+        for (var d = rest; d.Tail != null; d = d.Tail)
+        {
+            if (d.Head is IAsyncDisposable asyncDisp)
+            {
+                await asyncDisp.DisposeAsync().ConfigureAwait(false);
+            }
+            else
+            {
+                d.Head.Dispose();
+            }
+        }
+    }
+#endif
 
     private static void SafelyDisposeOrderedDisposables(ImHashMap<int, ImList<IDisposable>> disposables)
     {
