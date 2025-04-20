@@ -3223,6 +3223,7 @@ public struct SmallList2<TItem>
     }
 }
 
+// todo: @wip @perf consider to create ImList4 with 4 first element on stack similar to SmallList4
 /// <summary>Immutable list - simplest linked list with the Head and the Tail.</summary>
 public sealed class ImList<T>
 {

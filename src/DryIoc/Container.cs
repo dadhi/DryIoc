@@ -14475,53 +14475,52 @@ public class Scope : IScope
     /// which may indicate container misconfiguration.</remarks>
     public void Dispose()
     {
-        if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
-            return;
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 0)
+        {
+            var ds = _disposables;
+            if (ds is ImHashMapEntry<int, ImList<IDisposable>> e)
+                for (var d = e.Value; d.Tail != null; d = d.Tail)
+                    d.Head.Dispose(); // todo: @check do we need to try-catch the exceptions here?
+            else if (!ds.IsEmpty)
+                SafelyDisposeOrderedDisposables(ds);
 
-        var ds = _disposables;
-        if (ds is ImHashMapEntry<int, ImList<IDisposable>> e)
-            for (var d = e.Value; d.Tail != null; d = d.Tail)
-                d.Head.Dispose(); // todo: @check do we need to try-catch the exceptions here?
-        else if (!ds.IsEmpty)
-            SafelyDisposeOrderedDisposables(ds);
-
-        _disposables = ImHashMap<int, ImList<IDisposable>>.Empty; // todo: @perf @mem combine used and _factories together
-        _used = ImHashMap<Type, object>.Empty;
-        _maps = _emptyMaps;
+            _disposables = ImHashMap<int, ImList<IDisposable>>.Empty; // todo: @perf @mem combine used and _factories together
+            _used = ImHashMap<Type, object>.Empty;
+            _maps = _emptyMaps;
+        }
     }
 
 #if SUPPORTS_ASYNC_DISPOSABLE
     /// <inheritdoc />
     public ValueTask DisposeAsync()
     {
-        if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
-            return default;
-
-        var ds = _disposables;
-        if (ds is ImHashMapEntry<int, ImList<IDisposable>> e)
-            for (var d = e.Value; d.Tail != null; d = d.Tail)
-            {
-                if (d.Head is IAsyncDisposable asyncDisp)
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 0)
+        {
+            var ds = _disposables;
+            if (ds is ImHashMapEntry<int, ImList<IDisposable>> e)
+                for (var d = e.Value; d.Tail != null; d = d.Tail)
                 {
-                    var pendingResult = asyncDisp.DisposeAsync();
-                    if (!pendingResult.IsCompleted)
-                        return DisposeRestAsync(pendingResult, d.Tail);
+                    if (d.Head is IAsyncDisposable asyncDisp)
+                    {
+                        var pendingResult = asyncDisp.DisposeAsync();
+                        if (!pendingResult.IsCompleted)
+                            return DisposeRestAsync(pendingResult, d.Tail);
 
-                    if (pendingResult.IsFaulted) // rethrow the exception
-                        pendingResult.GetAwaiter().GetResult();
+                        if (pendingResult.IsFaulted) // rethrow the exception
+                            pendingResult.GetAwaiter().GetResult();
+                    }
+                    else
+                    {
+                        d.Head.Dispose();
+                    }
                 }
-                else
-                {
-                    d.Head.Dispose();
-                }
-            }
-        else if (!ds.IsEmpty)
-            SafelyDisposeOrderedDisposables(ds);
+            else if (!ds.IsEmpty)
+                SafelyDisposeOrderedDisposables(ds);
 
-        _disposables = ImHashMap<int, ImList<IDisposable>>.Empty; // todo: @perf @mem combine used and _factories together
-        _used = ImHashMap<Type, object>.Empty;
-        _maps = _emptyMaps;
-
+            _disposables = ImHashMap<int, ImList<IDisposable>>.Empty; // todo: @perf @mem combine used and _factories together
+            _used = ImHashMap<Type, object>.Empty;
+            _maps = _emptyMaps;
+        }
         return default;
     }
 

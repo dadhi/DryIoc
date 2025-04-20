@@ -11,11 +11,13 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
+            DisposeAsync_for_Async_implementor().GetAwaiter().GetResult();
             DisposeAsync_for_both_Sync_and_Async_implementor().GetAwaiter().GetResult();
 
-            return 1;
+            return 2;
         }
 
+        [Test]
         public async Task DisposeAsync_for_both_Sync_and_Async_implementor()
         {
             var c = new Container();
@@ -37,6 +39,23 @@ namespace DryIoc.IssuesTests
                 _ = scope.Resolve<BothDisposableAndAsyncDisposable>();
             }
             Assert.AreEqual(IsAsync.Sync, isAsync);
+        }
+
+        [Test]
+        public async Task DisposeAsync_for_Async_implementor()
+        {
+            var c = new Container();
+
+            c.RegisterDelegate<Action<IsAsync>, SomeAsyncDisposable>(
+                static act => new SomeAsyncDisposable(act), Reuse.Scoped);
+
+            var isAsync = IsAsync.Unsure;
+            await using (var scope = c.OpenScope())
+            {
+                scope.Use<Action<IsAsync>>(a => isAsync = a);
+                _ = scope.Resolve<SomeAsyncDisposable>();
+            }
+            Assert.AreEqual(IsAsync.Async, isAsync);
         }
 
         // [Test]
@@ -123,17 +142,6 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        public sealed class SomeAsyncDisposable : IAsyncDisposable
-        {
-            private readonly Action<object> _disposeAction;
-            public SomeAsyncDisposable(Action<object> disposeAction) => _disposeAction = disposeAction;
-            public ValueTask DisposeAsync()
-            {
-                _disposeAction(this);
-                return ValueTask.CompletedTask;
-            }
-        }
-
         public class SomeDisposable : IDisposable
         {
             private readonly Action<object> _disposeAction;
@@ -155,6 +163,19 @@ namespace DryIoc.IssuesTests
 
             public void Dispose() =>
                 _disposeAction(IsAsync.Sync);
+
+            public ValueTask DisposeAsync()
+            {
+                _disposeAction(IsAsync.Async);
+                return default;
+            }
+        }
+
+        public class SomeAsyncDisposable : IAsyncDisposable
+        {
+            private readonly Action<IsAsync> _disposeAction;
+
+            public SomeAsyncDisposable(Action<IsAsync> disposeAction) => _disposeAction = disposeAction;
 
             public ValueTask DisposeAsync()
             {
