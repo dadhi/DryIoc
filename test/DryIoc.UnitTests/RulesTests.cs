@@ -473,7 +473,7 @@ namespace DryIoc.UnitTests
             _ = container.Resolve<AD>();
 
             var scope = (Scope)container.SingletonScope;
-            var anyTracked = scope.GetTrackedDisposables().Any();
+            var anyTracked = scope.GetTrackedDisposableOrAsyncDisposableObjects().Any();
             Assert.IsTrue(anyTracked);
         }
 
@@ -500,7 +500,7 @@ namespace DryIoc.UnitTests
             _ = container.Resolve<AD>();
 
             var scope = (Scope)container.SingletonScope;
-            var anyTracked = scope.GetTrackedDisposables().Any();
+            var anyTracked = scope.GetTrackedDisposableOrAsyncDisposableObjects().Any();
             Assert.IsFalse(anyTracked);
         }
 

@@ -4141,8 +4141,13 @@ public static class Interpreter
             result = serviceExpr.CompileOrInterpretFactoryDelegate(r.Rules.UseInterpretation)(r);
 
         itemRef.Value = result;
-        if (result is IDisposable disp && !ReferenceEquals(disp, scope))
-            scope.AddUnorderedDisposable(disp);
+
+#if SUPPORTS_ASYNC_DISPOSABLE
+        if ((result is IAsyncDisposable || result is IDisposable) && !ReferenceEquals(result, scope))
+#else
+        if (result is IDisposable && !ReferenceEquals(result, scope))
+#endif
+            scope.AddUnorderedDisposable(result);
         return result;
     }
 
@@ -4201,8 +4206,12 @@ public static class Interpreter
             result = serviceExpr.CompileOrInterpretFactoryDelegate(r.Rules.UseInterpretation)(r);
 
         itemRef.Value = result;
-        if (result is IDisposable disp && !ReferenceEquals(disp, scope))
-            scope.AddDisposable(disp, e.DisposalOrder);
+#if SUPPORTS_ASYNC_DISPOSABLE
+        if ((result is IAsyncDisposable || result is IDisposable) && !ReferenceEquals(result, scope))
+#else
+        if (result is IDisposable && !ReferenceEquals(result, scope))
+#endif
+            scope.AddDisposable(result, e.DisposalOrder);
         return result;
     }
 
@@ -4254,8 +4263,12 @@ public static class Interpreter
             result = ((LambdaExpression)lambda).Body.CompileOrInterpretFactoryDelegate(r.Rules.UseInterpretation)(r);
 
         itemRef.Value = result;
-        if (result is IDisposable disp)
-            scope.AddDisposable(disp, TryGetIntConstantValue(args.Argument5));
+#if SUPPORTS_ASYNC_DISPOSABLE
+        if (result is IAsyncDisposable || result is IDisposable)
+#else
+        if (result is IDisposable)
+#endif
+            scope.AddDisposable(result, TryGetIntConstantValue(args.Argument5));
         return result;
     }
 
@@ -5337,6 +5350,12 @@ public static class ResolverContext
     /// <summary>A bit if sugar to track disposable in the current scope or in the singleton scope as a fallback</summary>
     public static T TrackDisposable<T>(this IResolverContext r, T instance, int disposalOrder = 0) where T : IDisposable =>
         (T)r.CurrentOrSingletonScope.TrackDisposable(instance, disposalOrder);
+
+#if SUPPORTS_ASYNC_DISPOSABLE
+    /// <summary>A bit if sugar to track disposable in the current scope or in the singleton scope as a fallback</summary>
+    public static T TrackAsyncDisposable<T>(this IResolverContext r, T instance, int disposalOrder = 0) where T : IAsyncDisposable =>
+        (T)r.CurrentOrSingletonScope.TrackAsyncDisposable(instance, disposalOrder);
+#endif
 }
 
 /// <summary>Adds to Container support for:
@@ -12071,8 +12090,12 @@ public abstract class Factory
                             singleton = setup.WeaklyReferenced ? new WeakReference(singleton) : new HiddenDisposable(singleton); // todo: @perf we don't need it here because because instead of wrapping the item into the non-disposable object we may skip adding it to Disposable items collection - just skipping the AddUnorderedDisposable or AddDisposable calls below
 
                         itemRef.Value = singleton;
-                        if (singleton is IDisposable disp && !ReferenceEquals(disp, singletonScope))
-                            singletonScope.AddDisposable(disp, setup.DisposalOrder);
+#if SUPPORTS_ASYNC_DISPOSABLE
+                        if ((singleton is IAsyncDisposable || singleton is IDisposable) && !ReferenceEquals(singleton, singletonScope))
+#else
+                        if (singleton is IDisposable && !ReferenceEquals(singleton, singletonScope))
+#endif
+                            singletonScope.AddDisposable(singleton, setup.DisposalOrder);
                     }
 
                     if (request.DependencyCount > 0)
@@ -14074,6 +14097,11 @@ public interface IScope : IEnumerable<IScope>, IDisposable
     /// <summary>Tracked item will be disposed with the scope. Smaller <paramref name="disposalOrder"/> will be disposed first.</summary>
     T TrackDisposable<T>(T disposable, int disposalOrder = 0) where T : IDisposable;
 
+#if SUPPORTS_ASYNC_DISPOSABLE
+    /// <summary>Tracked `IAsyncDisposable` item will be disposed with the scope. Smaller <paramref name="disposalOrder"/> will be disposed first.</summary>
+    T TrackAsyncDisposable<T>(T asyncDisposable, int disposalOrder = 0) where T : IAsyncDisposable;
+#endif
+
     ///<summary>Sets or adds the service item directly to the scope services</summary>
     void SetOrAdd(int id, object item);
 
@@ -14149,7 +14177,8 @@ public class Scope : IScope
     public bool IsDisposed => _disposed == 1;
     internal int _disposed;
 
-    internal ImHashMap<int, ImList<IDisposable>> _disposables;
+    // ImList<object> where objct is IAsyncDisposable or IDisposable
+    internal ImHashMap<int, ImList<object>> _disposables;
     internal ImHashMap<Type, object> _used;
 
     internal const int MAP_COUNT = 16;
@@ -14168,7 +14197,7 @@ public class Scope : IScope
     }
 
     // Creates a single entry with an empty list of unordered disposables (the key 0 is reserved for the unordered disposables)
-    private static ImHashMap<int, ImList<IDisposable>> CreateEmptyDisposables() => ImHashMap.Entry(0, ImList<IDisposable>.Empty);
+    private static ImHashMap<int, ImList<object>> CreateEmptyDisposables() => ImHashMap.Entry(0, ImList<object>.Empty);
 
     [MethodImpl((MethodImplOptions)256)]
     internal ImHashMap<int, object>[] CloneMaps() => _maps.CopyNonEmpty();
@@ -14198,7 +14227,7 @@ public class Scope : IScope
     { }
 
     /// <summary>The basic constructor</summary>
-    protected Scope(ImHashMap<int, object>[] maps, ImHashMap<Type, object> used, ImHashMap<int, ImList<IDisposable>> disposables)
+    protected Scope(ImHashMap<int, object>[] maps, ImHashMap<Type, object> used, ImHashMap<int, ImList<object>> disposables)
     {
         _disposables = disposables;
         _used = used;
@@ -14215,7 +14244,7 @@ public class Scope : IScope
             Name = name;
         }
 
-        internal WithParentAndName(IScope parent, object name, ImHashMap<int, object>[] maps, ImHashMap<Type, object> used, ImHashMap<int, ImList<IDisposable>> disposables)
+        internal WithParentAndName(IScope parent, object name, ImHashMap<int, object>[] maps, ImHashMap<Type, object> used, ImHashMap<int, ImList<object>> disposables)
             : base(maps, used, disposables)
         {
             Parent = parent;
@@ -14285,8 +14314,12 @@ public class Scope : IScope
         object result = null;
         itemRef.Value = result = createValue(r);
 
-        if (result is IDisposable disp && !ReferenceEquals(disp, this))
-            AddDisposable(disp, disposalOrder);
+#if SUPPORTS_ASYNC_DISPOSABLE
+        if ((result is IAsyncDisposable || result is IDisposable) && !ReferenceEquals(result, this))
+#else
+        if (result is IDisposable && !ReferenceEquals(result, this))
+#endif
+            AddDisposable(result, disposalOrder);
 
         return result;
     }
@@ -14366,25 +14399,29 @@ public class Scope : IScope
         if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
             Ref.Swap(ref map, itemRef, static (x, i) => x.AddOrUpdateEntry(i));
 
-        if (item is IDisposable disp && !ReferenceEquals(disp, this))
-            AddUnorderedDisposable(disp);
+#if SUPPORTS_ASYNC_DISPOSABLE
+        if ((item is IAsyncDisposable || item is IDisposable) && !ReferenceEquals(item, this))
+#else
+        if (item is IDisposable && !ReferenceEquals(item, this))
+#endif
+            AddUnorderedDisposable(item);
     }
 
-    internal void AddDisposable(IDisposable disposable, int disposalOrder = 0)
+    internal void AddDisposable(object disposable, int disposalOrder = 0)
     {
         if (disposalOrder == 0)
             AddUnorderedDisposable(disposable);
         else
         {
-            var e = _disposables.GetEntryOrDefault(disposalOrder) ?? AddDisposableEntry(disposalOrder);
-            var items = e.Value;
-            if (Interlocked.CompareExchange(ref e.Value, items.Push(disposable), items) != items)
-                Ref.Swap(ref e.Value, disposable, static (x, d) => x.Push(d));
+            var entry = _disposables.GetEntryOrDefault(disposalOrder) ?? AddDisposableEntry(disposalOrder);
+            var items = entry.Value;
+            if (Interlocked.CompareExchange(ref entry.Value, items.Push(disposable), items) != items)
+                Ref.Swap(ref entry.Value, disposable, static (x, d) => x.Push(d));
         }
     }
 
     [MethodImpl((MethodImplOptions)256)]
-    internal void AddUnorderedDisposable(IDisposable disposable)
+    internal void AddUnorderedDisposable(object disposable)
     {
         var e = _disposables.GetEntryOrDefault(0);
         var items = e.Value;
@@ -14392,9 +14429,9 @@ public class Scope : IScope
             Ref.Swap(ref e.Value, disposable, static (x, d) => x.Push(d));
     }
 
-    private ImHashMapEntry<int, ImList<IDisposable>> AddDisposableEntry(int disposableOrder)
+    private ImHashMapEntry<int, ImList<object>> AddDisposableEntry(int disposableOrder)
     {
-        Ref.Swap(ref _disposables, disposableOrder, static (x, o) => x.AddOrKeep(o, ImList<IDisposable>.Empty));
+        Ref.Swap(ref _disposables, disposableOrder, static (x, o) => x.AddOrKeep(o, ImList<object>.Empty));
         return _disposables.GetSurePresent(disposableOrder);
     }
 
@@ -14421,6 +14458,15 @@ public class Scope : IScope
         return item;
     }
 
+#if SUPPORTS_ASYNC_DISPOSABLE
+    /// <summary>Can be used to manually add service for async disposal</summary>
+    public T TrackAsyncDisposable<T>(T item, int disposalOrder = 0) where T : IAsyncDisposable
+    {
+        if (!ReferenceEquals(item, this))
+            AddDisposable(item, disposalOrder);
+        return item;
+    }
+#endif
     // todo: @wip use TrackScoped as in Scope Apply instead of TrackDisposable
     internal static readonly MethodInfo TrackDisposableOpenGenericMethod = typeof(IScope).GetMethod(nameof(IScope.TrackDisposable));
 
@@ -14478,13 +14524,13 @@ public class Scope : IScope
         if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 0)
         {
             var ds = _disposables;
-            if (ds is ImHashMapEntry<int, ImList<IDisposable>> e)
+            if (ds is ImHashMapEntry<int, ImList<object>> e)
                 for (var d = e.Value; d.Tail != null; d = d.Tail)
-                    d.Head.Dispose(); // todo: @check do we need to try-catch the exceptions here?
+                    (d.Head as IDisposable)?.Dispose(); // todo: @check do we need to try-catch the exceptions here?
             else if (!ds.IsEmpty)
                 SafelyDisposeOrderedDisposables(ds);
 
-            _disposables = ImHashMap<int, ImList<IDisposable>>.Empty; // todo: @perf @mem combine used and _factories together
+            _disposables = ImHashMap<int, ImList<object>>.Empty; // todo: @perf @mem combine used and _factories together
             _used = ImHashMap<Type, object>.Empty;
             _maps = _emptyMaps;
         }
@@ -14497,7 +14543,7 @@ public class Scope : IScope
         if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 0)
         {
             var ds = _disposables;
-            if (ds is ImHashMapEntry<int, ImList<IDisposable>> e)
+            if (ds is ImHashMapEntry<int, ImList<object>> e)
                 for (var d = e.Value; d.Tail != null; d = d.Tail)
                 {
                     if (d.Head is IAsyncDisposable asyncDisp)
@@ -14511,20 +14557,20 @@ public class Scope : IScope
                     }
                     else
                     {
-                        d.Head.Dispose();
+                        ((IDisposable)d.Head).Dispose();
                     }
                 }
             else if (!ds.IsEmpty)
                 SafelyDisposeOrderedDisposables(ds);
 
-            _disposables = ImHashMap<int, ImList<IDisposable>>.Empty; // todo: @perf @mem combine used and _factories together
+            _disposables = ImHashMap<int, ImList<object>>.Empty; // todo: @perf @mem combine used and _factories together
             _used = ImHashMap<Type, object>.Empty;
             _maps = _emptyMaps;
         }
         return default;
     }
 
-    private static async ValueTask DisposeRestAsync(ValueTask currentPending, ImList<IDisposable> rest)
+    private static async ValueTask DisposeRestAsync(ValueTask currentPending, ImList<object> rest)
     {
         await currentPending.ConfigureAwait(false);
 
@@ -14536,20 +14582,21 @@ public class Scope : IScope
             }
             else
             {
-                d.Head.Dispose();
+                ((IDisposable)d.Head).Dispose();
             }
         }
     }
 #endif
 
-    private static void SafelyDisposeOrderedDisposables(ImHashMap<int, ImList<IDisposable>> disposables)
+    // todo: @wip #223 implement AsyncDispose for the ordered disposables
+    private static void SafelyDisposeOrderedDisposables(ImHashMap<int, ImList<object>> disposables)
     {
         disposables.ForEach(static (e, _) =>
         {
             try
             {
                 for (var d = e.Value; !d.IsEmpty; d = d.Tail)
-                    d.Head.Dispose();
+                    ((IDisposable)d.Head).Dispose();
             }
             catch (ContainerException)
             {
@@ -14584,12 +14631,14 @@ public class Scope : IScope
     }
 
     /// <summary>Mostly for the testing and the diagnostics reasons</summary>
-    public IEnumerable<IDisposable> GetTrackedDisposables()
+    public IEnumerable<object> GetTrackedDisposableOrAsyncDisposableObjects()
     {
         var dsByOrder = _disposables;
-        if (dsByOrder is ImHashMapEntry<int, ImList<IDisposable>> likelyUnorderedOrSingleOrdered)
+        if (dsByOrder is ImHashMapEntry<int, ImList<object>> likelyUnorderedOrSingleOrdered)
+        {
             for (var d = likelyUnorderedOrSingleOrdered.Value; !d.IsEmpty; d = d.Tail)
                 yield return d.Head;
+        }
         else if (!dsByOrder.IsEmpty)
         {
             foreach (var dOrdered in dsByOrder.Enumerate())
