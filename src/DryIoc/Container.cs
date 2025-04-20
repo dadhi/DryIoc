@@ -14536,6 +14536,22 @@ public class Scope : IScope
         }
     }
 
+    private static void SafelyDisposeOrderedDisposables(ImHashMap<int, ImList<object>> disposables)
+    {
+        disposables.ForEach(static (e, _) =>
+        {
+            try
+            {
+                for (var d = e.Value; !d.IsEmpty; d = d.Tail)
+                    ((IDisposable)d.Head).Dispose();
+            }
+            catch (Exception ex) when (ex is not ContainerException)
+            {
+                // Ignoring non ContainerException's disposing exception, as it is not important to proceed the disposal of other items
+            }
+        });
+    }
+
 #if SUPPORTS_ASYNC_DISPOSABLE
     /// <inheritdoc />
     public ValueTask DisposeAsync()
@@ -14556,12 +14572,10 @@ public class Scope : IScope
                             pendingResult.GetAwaiter().GetResult();
                     }
                     else
-                    {
                         ((IDisposable)d.Head).Dispose();
-                    }
                 }
             else if (!ds.IsEmpty)
-                SafelyDisposeOrderedDisposables(ds);
+                return SafelyDisposeOrderedAsyncDisposables(ds);
 
             _disposables = ImHashMap<int, ImList<object>>.Empty; // todo: @perf @mem combine used and _factories together
             _used = ImHashMap<Type, object>.Empty;
@@ -14577,37 +14591,41 @@ public class Scope : IScope
         for (var d = rest; d.Tail != null; d = d.Tail)
         {
             if (d.Head is IAsyncDisposable asyncDisp)
-            {
                 await asyncDisp.DisposeAsync().ConfigureAwait(false);
-            }
             else
-            {
                 ((IDisposable)d.Head).Dispose();
-            }
         }
     }
-#endif
 
-    // todo: @wip #223 implement AsyncDispose for the ordered disposables
-    private static void SafelyDisposeOrderedDisposables(ImHashMap<int, ImList<object>> disposables)
+    private static ValueTask SafelyDisposeOrderedAsyncDisposables(ImHashMap<int, ImList<object>> disposables)
     {
-        disposables.ForEach(static (e, _) =>
+        foreach (var e in disposables.Enumerate())
         {
             try
             {
                 for (var d = e.Value; !d.IsEmpty; d = d.Tail)
-                    ((IDisposable)d.Head).Dispose();
+                {
+                    if (d.Head is IAsyncDisposable asyncDisp)
+                    {
+                        var pendingResult = asyncDisp.DisposeAsync();
+                        if (!pendingResult.IsCompleted)
+                            return DisposeRestAsync(pendingResult, d.Tail);
+
+                        if (pendingResult.IsFaulted) // rethrow the exception
+                            pendingResult.GetAwaiter().GetResult();
+                    }
+                    else
+                        ((IDisposable)d.Head).Dispose();
+                }
             }
-            catch (ContainerException)
+            catch (Exception ex) when (ex is not ContainerException)
             {
-                throw;
+                // Ignoring non ContainerException's disposing exception, as it is not important to proceed the disposal of other items
             }
-            catch (Exception)
-            {
-                // Ignoring disposing exception, as it is not important to proceed the disposal of other items
-            }
-        });
+        }
+        return default;
     }
+#endif
 
     /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary>
     public override string ToString() =>

@@ -11,6 +11,7 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
+            DisposeAsync_for_the_ordered_Async_implementor().GetAwaiter().GetResult();
             DisposeAsync_for_Async_implementor().GetAwaiter().GetResult();
             DisposeAsync_for_both_Sync_and_Async_implementor().GetAwaiter().GetResult();
 
@@ -22,23 +23,24 @@ namespace DryIoc.IssuesTests
         {
             var c = new Container();
 
-            c.RegisterDelegate<Action<IsAsync>, BothDisposableAndAsyncDisposable>(
+            c.RegisterDelegate<Action<object>, BothDisposableAndAsyncDisposable>(
                 static act => new BothDisposableAndAsyncDisposable(act), Reuse.Scoped);
 
-            var isAsync = IsAsync.Unsure;
+            object asyncDisp = null;
             await using (var scope = c.OpenScope())
             {
-                scope.Use<Action<IsAsync>>(a => isAsync = a);
+                scope.Use<Action<object>>(a => { asyncDisp = a; });
                 _ = scope.Resolve<BothDisposableAndAsyncDisposable>();
             }
-            Assert.AreEqual(IsAsync.Async, isAsync);
+            Assert.IsInstanceOf<BothDisposableAndAsyncDisposable>(asyncDisp);
 
+            object syncDisp = null;
             using (var scope = c.OpenScope())
             {
-                scope.Use<Action<IsAsync>>(a => isAsync = a);
+                scope.Use<Action<object>>(a => { syncDisp = a; });
                 _ = scope.Resolve<BothDisposableAndAsyncDisposable>();
             }
-            Assert.AreEqual(IsAsync.Sync, isAsync);
+            Assert.IsInstanceOf<BothDisposableAndAsyncDisposable>(syncDisp);
         }
 
         [Test]
@@ -46,16 +48,45 @@ namespace DryIoc.IssuesTests
         {
             var c = new Container();
 
-            c.RegisterDelegate<Action<IsAsync>, SomeAsyncDisposable>(
+            c.RegisterDelegate<Action<object>, SomeAsyncDisposable>(
                 static act => new SomeAsyncDisposable(act), Reuse.Scoped);
 
-            var isAsync = IsAsync.Unsure;
+            object justAsync = null;
             await using (var scope = c.OpenScope())
             {
-                scope.Use<Action<IsAsync>>(a => isAsync = a);
+                scope.Use<Action<object>>(a => { justAsync = a; });
                 _ = scope.Resolve<SomeAsyncDisposable>();
             }
-            Assert.AreEqual(IsAsync.Async, isAsync);
+            Assert.IsInstanceOf<SomeAsyncDisposable>(justAsync);
+        }
+
+        [Test]
+        public async Task DisposeAsync_for_the_ordered_Async_implementor()
+        {
+            var c = new Container();
+
+            c.RegisterDelegate<Action<object>, SomeAsyncDisposable>(
+                static act => new SomeAsyncDisposable(act), Reuse.Scoped, setup: Setup.With(disposalOrder: 2));
+            c.RegisterDelegate<Action<object>, BothDisposableAndAsyncDisposable>(
+                static act => new BothDisposableAndAsyncDisposable(act), Reuse.Scoped, setup: Setup.With(disposalOrder: 1));
+
+            var i = 0;
+            object disposedFirst = null;
+            object disposedSecond = null;
+            await using (var scope = c.OpenScope())
+            {
+                scope.Use<Action<object>>(a =>
+                {
+                    if (i == 0) disposedFirst = a;
+                    else if (i == 1) disposedSecond = a;
+                    ++i;
+                });
+
+                _ = scope.Resolve<BothDisposableAndAsyncDisposable>();
+                _ = scope.Resolve<SomeAsyncDisposable>();
+            }
+            Assert.IsInstanceOf<BothDisposableAndAsyncDisposable>(disposedFirst);
+            Assert.IsInstanceOf<SomeAsyncDisposable>(disposedSecond);
         }
 
         // [Test]
@@ -154,32 +185,31 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        public enum IsAsync { Unsure, Async, Sync }
         public class BothDisposableAndAsyncDisposable : IDisposable, IAsyncDisposable
         {
-            private readonly Action<IsAsync> _disposeAction;
+            private readonly Action<object> _disposeAction;
 
-            public BothDisposableAndAsyncDisposable(Action<IsAsync> disposeAction) => _disposeAction = disposeAction;
+            public BothDisposableAndAsyncDisposable(Action<object> disposeAction) => _disposeAction = disposeAction;
 
             public void Dispose() =>
-                _disposeAction(IsAsync.Sync);
+                _disposeAction(this);
 
             public ValueTask DisposeAsync()
             {
-                _disposeAction(IsAsync.Async);
+                _disposeAction(this);
                 return default;
             }
         }
 
         public class SomeAsyncDisposable : IAsyncDisposable
         {
-            private readonly Action<IsAsync> _disposeAction;
+            private readonly Action<object> _disposeAction;
 
-            public SomeAsyncDisposable(Action<IsAsync> disposeAction) => _disposeAction = disposeAction;
+            public SomeAsyncDisposable(Action<object> disposeAction) => _disposeAction = disposeAction;
 
             public ValueTask DisposeAsync()
             {
-                _disposeAction(IsAsync.Async);
+                _disposeAction(this);
                 return default;
             }
         }
