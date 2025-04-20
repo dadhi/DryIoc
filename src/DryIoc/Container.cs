@@ -150,7 +150,7 @@ public partial class Container : IContainer
             currentScope = s;
             return s?.Parent;
         });
-        return currentScope?.DisposeAsync() ?? ValueTask.CompletedTask;
+        return currentScope?.DisposeAsync() ?? default;
     }
 #endif
 
@@ -14491,10 +14491,11 @@ public class Scope : IScope
     }
 
 #if SUPPORTS_ASYNC_DISPOSABLE
+    /// <inheritdoc />
     public ValueTask DisposeAsync()
     {
         if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
-            return ValueTask.CompletedTask;
+            return default;
 
         var ds = _disposables;
         if (ds is ImHashMapEntry<int, ImList<IDisposable>> e)
@@ -14521,7 +14522,7 @@ public class Scope : IScope
         _used = ImHashMap<Type, object>.Empty;
         _maps = _emptyMaps;
 
-        return ValueTask.CompletedTask;
+        return default;
     }
 
     private static async ValueTask DisposeRestAsync(ValueTask currentPending, ImList<IDisposable> rest)
