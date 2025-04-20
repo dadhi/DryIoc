@@ -1,4 +1,4 @@
-#if NET6_0_OR_GREATER
+#if NET5_0_OR_GREATER
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -11,25 +11,32 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            // ShouldDisposeAsyncDisposable().GetAwaiter().GetResult();
+            DisposeAsync_for_both_Sync_and_Async_implementor().GetAwaiter().GetResult();
 
             return 1;
         }
 
-        public async Task ShouldDisposeAsyncDisposable()
+        public async Task DisposeAsync_for_both_Sync_and_Async_implementor()
         {
-            var container = new Container();
-            List<object> disposedObjects = new();
+            var c = new Container();
 
-            container.RegisterDelegate(_ => new SomeAsyncDisposable(disposed => disposedObjects.Add(disposed)), Reuse.Scoped);
+            c.RegisterDelegate<Action<IsAsync>, BothDisposableAndAsyncDisposable>(
+                static act => new BothDisposableAndAsyncDisposable(act), Reuse.Scoped);
 
-            SomeAsyncDisposable asyncDisposable = null;
-            await using (var scope = container.OpenScope())
+            var isAsync = IsAsync.Unsure;
+            await using (var scope = c.OpenScope())
             {
-                asyncDisposable = container.Resolve<SomeAsyncDisposable>();
+                scope.Use<Action<IsAsync>>(a => isAsync = a);
+                _ = scope.Resolve<BothDisposableAndAsyncDisposable>();
             }
+            Assert.AreEqual(IsAsync.Async, isAsync);
 
-            Assert.Contains(asyncDisposable, disposedObjects);
+            using (var scope = c.OpenScope())
+            {
+                scope.Use<Action<IsAsync>>(a => isAsync = a);
+                _ = scope.Resolve<BothDisposableAndAsyncDisposable>();
+            }
+            Assert.AreEqual(IsAsync.Sync, isAsync);
         }
 
         // [Test]
@@ -136,6 +143,23 @@ namespace DryIoc.IssuesTests
             public void Dispose()
             {
                 _disposeAction(this);
+            }
+        }
+
+        public enum IsAsync { Unsure, Async, Sync }
+        public class BothDisposableAndAsyncDisposable : IDisposable, IAsyncDisposable
+        {
+            private readonly Action<IsAsync> _disposeAction;
+
+            public BothDisposableAndAsyncDisposable(Action<IsAsync> disposeAction) => _disposeAction = disposeAction;
+
+            public void Dispose() =>
+                _disposeAction(IsAsync.Sync);
+
+            public ValueTask DisposeAsync()
+            {
+                _disposeAction(IsAsync.Async);
+                return default;
             }
         }
     }

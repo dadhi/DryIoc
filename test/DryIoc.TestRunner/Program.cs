@@ -9,6 +9,7 @@ public class Program
 {
     public static void Main()
     {
+        new GHIssue223_IAsyncDisposable().Run();
         new RegisterAttributeTests().Run();
 
         // new GHIssue678_Scope_is_lost_in_diposable_service().Run();
