@@ -3575,6 +3575,9 @@ public delegate V Update<K, V>(K key, V oldValue, V newValue);
 /// Update handler including the key
 public delegate V Update<K, V, R>(K key, V oldValue, V newValue, ref R result);
 
+/// <summary>Used by `ForEach` to process each item in the map</summary>
+public delegate void ItemRefStateAction<T, S>(T item, int index, ref S state);
+
 /// <summary>Entry containing the Value in addition to the Hash</summary>
 public abstract class ImHashMapEntry<K, V> : ImHashMap<K, V>.Entry
 {
@@ -3595,9 +3598,9 @@ public abstract class ImHashMapEntry<K, V> : ImHashMap<K, V>.Entry
     /// <inheritdoc />
     public sealed override int Count() => 1;
 
-    internal override int ForEach<S>(S state, int startIndex, Action<ImHashMapEntry<K, V>, int, S> handler)
+    internal override int ForEach<S>(ref S state, int startIndex, ItemRefStateAction<ImHashMapEntry<K, V>, S> handler)
     {
-        handler(this, startIndex, state);
+        handler(this, startIndex, ref state);
         return startIndex + 1;
     }
 }
@@ -3788,12 +3791,12 @@ public class ImHashMap<K, V>
     {
 #if DEBUG
         // for the debug purposes we just output the first N keys in array
-        const int n = 50;
+        const int n = 16;
         var count = this.Count();
         var hashes = typeof(K) == typeof(int)
             ? ((ImHashMap<int, V>)(object)this).Enumerate().Take(n).Select(x => x.Hash).ToList()
             : this.Enumerate().Take(n).Select(x => x.Hash).ToList();
-        return $"{{hashes: new int[{(count > n ? $"{n}/{count}" : "" + count)}] {{{(string.Join(", ", hashes))}}}}}";
+        return $"{{hashes:[{(string.Join(", ", hashes))}{(count > n ? ".." : "")}/{count}]";
 #else
         return "{}";
 #endif
@@ -3931,7 +3934,7 @@ public class ImHashMap<K, V>
             return Empty;
         }
 
-        internal abstract int ForEach<S>(S state, int startIndex, Action<ImHashMapEntry<K, V>, int, S> handler);
+        internal abstract int ForEach<S>(ref S state, int startIndex, ItemRefStateAction<ImHashMapEntry<K, V>, S> handler);
     }
 
     /// <summary>The composite containing the list of entries with the same conflicting Hash.</summary>
@@ -4156,11 +4159,11 @@ public class ImHashMap<K, V>
                 : this;
         }
 
-        internal override int ForEach<S>(S state, int startIndex, Action<ImHashMapEntry<K, V>, int, S> handler)
+        internal override int ForEach<S>(ref S state, int startIndex, ItemRefStateAction<ImHashMapEntry<K, V>, S> handler)
         {
             var i = startIndex;
             foreach (var e in Conflicts)
-                handler(e, i++, state);
+                handler(e, i++, ref state);
             return i;
         }
     }
@@ -6768,17 +6771,18 @@ public static class ImHashMap
     /// <summary>Enumerates all the map entries in the hash order.</summary>
     public static Enumerable<K, V> Enumerate<K, V>(this ImHashMap<K, V> map) => new Enumerable<K, V>(map);
 
+    // todo: @perf can we use SmallList4 instead of MapParentStack to avoid allocations for the shallow/little hashmap?
     // todo: @feature I need to have ForEachUntil with the result of `Func<ImMapEntry<V>, int, S, bool> handler` saying when to stop, the implementation will be the same as for FindFirst!
     /// <summary>Depth-first in-order of hash traversal as described in http://en.wikipedia.org/wiki/Tree_traversal.
     /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
     /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
-    public static S ForEach<K, V, S>(this ImHashMap<K, V> map, S state, Action<ImHashMapEntry<K, V>, int, S> handler, MapParentStack parents = null)
+    public static S ForEach<K, V, S>(this ImHashMap<K, V> map, ref S state, ItemRefStateAction<ImHashMapEntry<K, V>, S> handler, MapParentStack parents = null)
     {
         if (map == ImHashMap<K, V>.Empty)
             return state;
         if (map is ImHashMap<K, V>.Entry singleEntry)
         {
-            singleEntry.ForEach(state, 0, handler);
+            singleEntry.ForEach(ref state, 0, handler);
             return state;
         }
         ImHashMap<K, V>.Branch2Plus b21LeftWasEnumerated = null;
@@ -6807,7 +6811,7 @@ public static class ImHashMap
                 ImHashMap<K, V>.Entry pl = null, mid = null;
                 if (b21LeftWasEnumerated != null)
                 {
-                    i = b21LeftWasEnumerated.B.MidEntry.ForEach(state, i, handler);
+                    i = b21LeftWasEnumerated.B.MidEntry.ForEach(ref state, i, handler);
 
                     l511 = (ImHashMap<K, V>.Leaf5PlusPlus)b21LeftWasEnumerated.B.Right;
                     pl = b21LeftWasEnumerated.Plus;
@@ -6833,29 +6837,29 @@ public static class ImHashMap
                 if (l511 != null)
                 {
                     var l = l511.L.L;
-                    ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, p = l511.Plus, pp = l511.L.Plus;
+                    ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, p_ = l511.Plus, pp = l511.L.Plus;
 
                     ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1, ref e2, ref e3, ref e4);
-                    ImHashMap.InsertInOrder(p.Hash, ref p, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp);
-                    ImHashMap.InsertInOrder(pl.Hash, ref pl, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp, ref p);
+                    ImHashMap.InsertInOrder(p_.Hash, ref p_, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp);
+                    ImHashMap.InsertInOrder(pl.Hash, ref pl, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp, ref p_);
 
-                    i = e0.ForEach(state, i, handler);
-                    i = e1.ForEach(state, i, handler);
-                    i = e2.ForEach(state, i, handler);
-                    i = e3.ForEach(state, i, handler);
-                    i = e4.ForEach(state, i, handler);
-                    i = pp.ForEach(state, i, handler);
-                    i = p.ForEach(state, i, handler);
-                    i = pl.ForEach(state, i, handler);
+                    i = e0.ForEach(ref state, i, handler);
+                    i = e1.ForEach(ref state, i, handler);
+                    i = e2.ForEach(ref state, i, handler);
+                    i = e3.ForEach(ref state, i, handler);
+                    i = e4.ForEach(ref state, i, handler);
+                    i = pp.ForEach(ref state, i, handler);
+                    i = p_.ForEach(ref state, i, handler);
+                    i = pl.ForEach(ref state, i, handler);
 
                     if (mid != null)
-                        i = mid.ForEach(state, i, handler);
+                        i = mid.ForEach(ref state, i, handler);
                 }
             }
             if (map is ImHashMap<K, V>.Leaf2 l2)
             {
-                i = l2.Entry0.ForEach(state, i, handler);
-                i = l2.Entry1.ForEach(state, i, handler);
+                i = l2.Entry0.ForEach(ref state, i, handler);
+                i = l2.Entry1.ForEach(ref state, i, handler);
             }
             else if (map is ImHashMap<K, V>.Leaf2Plus l21)
             {
@@ -6864,30 +6868,30 @@ public static class ImHashMap
 
                 ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1);
 
-                i = e0.ForEach(state, i, handler);
-                i = e1.ForEach(state, i, handler);
-                i = pp.ForEach(state, i, handler);
+                i = e0.ForEach(ref state, i, handler);
+                i = e1.ForEach(ref state, i, handler);
+                i = pp.ForEach(ref state, i, handler);
             }
             else if (map is ImHashMap<K, V>.Leaf2PlusPlus l211)
             {
                 var l = l211.L.L;
-                ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, pp = l211.L.Plus, p = l211.Plus;
+                ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, pp = l211.L.Plus, p_ = l211.Plus;
 
                 ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1);
-                ImHashMap.InsertInOrder(p.Hash, ref p, ref e0, ref e1, ref pp);
+                ImHashMap.InsertInOrder(p_.Hash, ref p_, ref e0, ref e1, ref pp);
 
-                i = e0.ForEach(state, i, handler);
-                i = e1.ForEach(state, i, handler);
-                i = pp.ForEach(state, i, handler);
-                i = p.ForEach(state, i, handler);
+                i = e0.ForEach(ref state, i, handler);
+                i = e1.ForEach(ref state, i, handler);
+                i = pp.ForEach(ref state, i, handler);
+                i = p_.ForEach(ref state, i, handler);
             }
             else if (map is ImHashMap<K, V>.Leaf5 l5)
             {
-                i = l5.Entry0.ForEach(state, i, handler);
-                i = l5.Entry1.ForEach(state, i, handler);
-                i = l5.Entry2.ForEach(state, i, handler);
-                i = l5.Entry3.ForEach(state, i, handler);
-                i = l5.Entry4.ForEach(state, i, handler);
+                i = l5.Entry0.ForEach(ref state, i, handler);
+                i = l5.Entry1.ForEach(ref state, i, handler);
+                i = l5.Entry2.ForEach(ref state, i, handler);
+                i = l5.Entry3.ForEach(ref state, i, handler);
+                i = l5.Entry4.ForEach(ref state, i, handler);
             }
             else if (map is ImHashMap<K, V>.Leaf5Plus l51)
             {
@@ -6896,31 +6900,31 @@ public static class ImHashMap
 
                 ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1, ref e2, ref e3, ref e4);
 
-                i = e0.ForEach(state, i, handler);
-                i = e1.ForEach(state, i, handler);
-                i = e2.ForEach(state, i, handler);
-                i = e3.ForEach(state, i, handler);
-                i = e4.ForEach(state, i, handler);
-                i = pp.ForEach(state, i, handler);
+                i = e0.ForEach(ref state, i, handler);
+                i = e1.ForEach(ref state, i, handler);
+                i = e2.ForEach(ref state, i, handler);
+                i = e3.ForEach(ref state, i, handler);
+                i = e4.ForEach(ref state, i, handler);
+                i = pp.ForEach(ref state, i, handler);
             }
             else if (map is ImHashMap<K, V>.Leaf5PlusPlus l511)
             {
                 var l = l511.L.L;
-                ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, p = l511.Plus, pp = l511.L.Plus;
+                ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, p_ = l511.Plus, pp = l511.L.Plus;
 
                 ImHashMap.InsertInOrder(pp.Hash, ref pp, ref e0, ref e1, ref e2, ref e3, ref e4);
-                ImHashMap.InsertInOrder(p.Hash, ref p, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp);
+                ImHashMap.InsertInOrder(p_.Hash, ref p_, ref e0, ref e1, ref e2, ref e3, ref e4, ref pp);
 
-                i = e0.ForEach(state, i, handler);
-                i = e1.ForEach(state, i, handler);
-                i = e2.ForEach(state, i, handler);
-                i = e3.ForEach(state, i, handler);
-                i = e4.ForEach(state, i, handler);
-                i = pp.ForEach(state, i, handler);
-                i = p.ForEach(state, i, handler);
+                i = e0.ForEach(ref state, i, handler);
+                i = e1.ForEach(ref state, i, handler);
+                i = e2.ForEach(ref state, i, handler);
+                i = e3.ForEach(ref state, i, handler);
+                i = e4.ForEach(ref state, i, handler);
+                i = pp.ForEach(ref state, i, handler);
+                i = p_.ForEach(ref state, i, handler);
             }
             else if (map is ImHashMap<K, V>.Entry l1)
-                i = l1.ForEach(state, i, handler);
+                i = l1.ForEach(ref state, i, handler);
 
             if (b21LeftWasEnumerated != null)
                 continue;
@@ -6931,13 +6935,13 @@ public static class ImHashMap
             var b = parents.Get(--count); // otherwise get the parent
             if (b is ImHashMap<K, V>.Branch2Base pb2)
             {
-                i = pb2.MidEntry.ForEach(state, i, handler);
+                i = pb2.MidEntry.ForEach(ref state, i, handler);
                 map = pb2.Right;
             }
             else if (b != _enumerationB3Tombstone)
             {
                 var pb3 = (ImHashMap<K, V>.Branch3Base)b;
-                i = pb3.Entry0.ForEach(state, i, handler);
+                i = pb3.Entry0.ForEach(ref state, i, handler);
                 map = pb3.Middle;
                 parents.Put(_enumerationB3Tombstone, ++count);
                 ++count;
@@ -6945,7 +6949,7 @@ public static class ImHashMap
             else
             {
                 var pb3 = (ImHashMap<K, V>.Branch3Base)parents.Get(--count);
-                i = pb3.Entry1.ForEach(state, i, handler);
+                i = pb3.Entry1.ForEach(ref state, i, handler);
                 map = pb3.Right;
             }
         }
@@ -7149,19 +7153,25 @@ public static class ImHashMap
     /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
     /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
     public static void ForEach<K, V>(this ImHashMap<K, V> map, Action<ImHashMapEntry<K, V>, int> handler, MapParentStack parents = null) =>
-        map.ForEach(handler, static (e, i, r) => r(e, i), parents);
+        map.ForEach(ref handler, static (ImHashMapEntry<K, V> e, int i, ref Action<ImHashMapEntry<K, V>, int> h) => h(e, i), parents);
 
     /// <summary>Collect something for each entry.
     /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
     /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
     public static S Fold<V, S>(this ImHashMap<int, V> map, S state, Func<VEntry<V>, int, S, S> handler, MapParentStack parents = null) =>
-        map.ForEach(St.Rent(state, handler), static (e, i, s) => s.a = s.b(e, i, s.a), parents).ResetButGetA();
+        map.ForEach(St.Rent(state, handler), static (e, i, s) =>
+            s.a = s.b(e, i, s.a), parents
+            ).ResetButGetA();
 
     /// <summary>Collect something for each entry.
     /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
     /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
-    public static S Fold<K, V, S>(this ImHashMap<K, V> map, S state, Func<ImHashMapEntry<K, V>, int, S, S> handler, MapParentStack parents = null) =>
-        map.ForEach(St.Rent(state, handler), static (e, i, s) => s.a = s.b(e, i, s.a), parents).ResetButGetA();
+    public static S Fold<K, V, S>(this ImHashMap<K, V> map, S state, Func<ImHashMapEntry<K, V>, int, S, S> handler, MapParentStack parents = null)
+    {
+        var compound = St.Rent(state, handler);
+        return map.ForEach(ref compound, static (ImHashMapEntry<K, V> e, int i, ref St<S, Func<ImHashMapEntry<K, V>, int, S, S>> s) =>
+            s.a = s.b(e, i, s.a), parents).ResetButGetA();
+    }
 
     /// <summary>Converts the map to an array with the minimum allocations</summary>
     public static S[] ToArray<V, S>(this ImHashMap<int, V> map, Func<VEntry<V>, S> selector) =>
@@ -7169,10 +7179,15 @@ public static class ImHashMap
             map.ForEach(St.Rent(new S[map.Count()], selector), static (e, i, s) => s.a[i] = s.b(e)).ResetButGetA();
     // todo: @perf accept the check for the selector result
     /// <summary>Converts the map to an array with the minimum allocations</summary>
-    public static S[] ToArray<K, V, S>(this ImHashMap<K, V> map, Func<ImHashMapEntry<K, V>, S> selector) =>
-        map == ImHashMap<K, V>.Empty
-            ? ArrayTools.Empty<S>()
-            : map.ForEach(St.Rent(new S[map.Count()], selector), static (e, i, s) => s.a[i] = s.b(e)).ResetButGetA();
+    public static S[] ToArray<K, V, S>(this ImHashMap<K, V> map, Func<ImHashMapEntry<K, V>, S> selector)
+    {
+        if (map == ImHashMap<K, V>.Empty)
+            return ArrayTools.Empty<S>();
+
+        var compound = St.Rent(new S[map.Count()], selector);
+        return map.ForEach(ref compound, static (ImHashMapEntry<K, V> e, int i, ref St<S[], Func<ImHashMapEntry<K, V>, S>> s) =>
+            s.a[i] = s.b(e)).ResetButGetA();
+    }
 
     /// <summary>Converts the map to an array with the minimum allocations</summary>
     public static VEntry<V>[] ToArray<V>(this ImHashMap<int, V> map) =>
@@ -7181,16 +7196,22 @@ public static class ImHashMap
             : map.ForEach(new VEntry<V>[map.Count()], static (e, i, a) => a[i] = e);
 
     /// <summary>Converts the map to an array with the minimum allocations</summary>
-    public static ImHashMapEntry<K, V>[] ToArray<K, V>(this ImHashMap<K, V> map) =>
-        map == ImHashMap<K, V>.Empty
-            ? ArrayTools.Empty<ImHashMapEntry<K, V>>()
-            : map.ForEach(new ImHashMapEntry<K, V>[map.Count()], static (e, i, a) => a[i] = e);
+    public static ImHashMapEntry<K, V>[] ToArray<K, V>(this ImHashMap<K, V> map)
+    {
+        if (map == ImHashMap<K, V>.Empty)
+            return ArrayTools.Empty<ImHashMapEntry<K, V>>();
+        var arr = new ImHashMapEntry<K, V>[map.Count()];
+        return map.ForEach(ref arr, static (ImHashMapEntry<K, V> e, int i, ref ImHashMapEntry<K, V>[] a) => a[i] = e);
+    }
 
     /// <summary>Converts the map to the dictionary</summary>
-    public static Dictionary<K, V> ToDictionary<K, V>(this ImHashMap<K, V> map) =>
-        map == ImHashMap<K, V>.Empty
-            ? new Dictionary<K, V>(0)
-            : map.ForEach(new Dictionary<K, V>(), static (e, _, d) => d.Add(e.Key, e.Value));
+    public static Dictionary<K, V> ToDictionary<K, V>(this ImHashMap<K, V> map)
+    {
+        if (map == ImHashMap<K, V>.Empty)
+            return new Dictionary<K, V>(0);
+        var dict = new Dictionary<K, V>();
+        return map.ForEach(ref dict, static (ImHashMapEntry<K, V> e, int _, ref Dictionary<K, V> d) => d.Add(e.Key, e.Value));
+    }
 
     /// <summary>Converts the map to the dictionary</summary>
     public static Dictionary<int, V> ToDictionary<V>(this ImHashMap<int, V> map) =>
@@ -8157,7 +8178,7 @@ public static class PartitionedHashMap
     /// <summary>Do something for each entry.
     /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
     /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
-    public static S ForEach<K, V, S>(this ImHashMap<K, V>[] parts, S state, Action<ImHashMapEntry<K, V>, int, S> handler, MapParentStack parents = null)
+    public static S ForEach<K, V, S>(this ImHashMap<K, V>[] parts, ref S state, ItemRefStateAction<ImHashMapEntry<K, V>, S> handler, MapParentStack parents = null)
     {
         if (parents == null)
             parents = new MapParentStack();
@@ -8165,7 +8186,7 @@ public static class PartitionedHashMap
         {
             if (map == ImHashMap<K, V>.Empty)
                 continue;
-            state = map.ForEach(state, handler, parents);
+            state = map.ForEach(ref state, handler, parents);
         }
         return state;
     }

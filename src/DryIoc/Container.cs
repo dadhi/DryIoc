@@ -201,7 +201,7 @@ public partial class Container : IContainer
                 if (_ownScopeOrContext is IScope scope)
                     await scope.DisposeAsync().ConfigureAwait(false);
                 else
-                    await DisposeScopeContextCurrentScopeAsync((IScopeContext)_ownScopeOrContext); // todo: @wip do it Async
+                    await DisposeScopeContextCurrentScopeAsync((IScopeContext)_ownScopeOrContext);
             }
             else
             {
@@ -4143,7 +4143,7 @@ public static class Interpreter
         itemRef.Value = result;
 
 #if SUPPORTS_ASYNC_DISPOSABLE
-        if ((result is IAsyncDisposable || result is IDisposable) && !ReferenceEquals(result, scope))
+        if ((result is IAsyncDisposable or IDisposable) && !ReferenceEquals(result, scope))
 #else
         if (result is IDisposable && !ReferenceEquals(result, scope))
 #endif
@@ -4207,7 +4207,7 @@ public static class Interpreter
 
         itemRef.Value = result;
 #if SUPPORTS_ASYNC_DISPOSABLE
-        if ((result is IAsyncDisposable || result is IDisposable) && !ReferenceEquals(result, scope))
+        if ((result is IAsyncDisposable or IDisposable) && !ReferenceEquals(result, scope))
 #else
         if (result is IDisposable && !ReferenceEquals(result, scope))
 #endif
@@ -4264,7 +4264,7 @@ public static class Interpreter
 
         itemRef.Value = result;
 #if SUPPORTS_ASYNC_DISPOSABLE
-        if (result is IAsyncDisposable || result is IDisposable)
+        if (result is IAsyncDisposable or IDisposable)
 #else
         if (result is IDisposable)
 #endif
@@ -14177,8 +14177,9 @@ public class Scope : IScope
     public bool IsDisposed => _disposed == 1;
     internal int _disposed;
 
-    // ImList<object> where objct is IAsyncDisposable or IDisposable
+    // ImList<object> where object is IAsyncDisposable or IDisposable, eh so much for the static typing in C#
     internal ImHashMap<int, ImList<object>> _disposables;
+
     internal ImHashMap<Type, object> _used;
 
     internal const int MAP_COUNT = 16;
@@ -14315,7 +14316,7 @@ public class Scope : IScope
         itemRef.Value = result = createValue(r);
 
 #if SUPPORTS_ASYNC_DISPOSABLE
-        if ((result is IAsyncDisposable || result is IDisposable) && !ReferenceEquals(result, this))
+        if ((result is IAsyncDisposable or IDisposable) && !ReferenceEquals(result, this))
 #else
         if (result is IDisposable && !ReferenceEquals(result, this))
 #endif
@@ -14431,7 +14432,7 @@ public class Scope : IScope
 
     private ImHashMapEntry<int, ImList<object>> AddDisposableEntry(int disposableOrder)
     {
-        Ref.Swap(ref _disposables, disposableOrder, static (x, o) => x.AddOrKeep(o, ImList<object>.Empty));
+        Ref.Swap(ref _disposables, disposableOrder, static (x, o) => x.AddOrKeep(o, ImList<object>.Empty)); // todo: @wip @perf CompareExchange first
         return _disposables.GetSurePresent(disposableOrder);
     }
 
@@ -14553,29 +14554,43 @@ public class Scope : IScope
     }
 
 #if SUPPORTS_ASYNC_DISPOSABLE
-    /// <inheritdoc />
+    /// <summary>Disposes all IAsyncDisposable and all IDisposable as well tracked by the scope.</summary>
     public ValueTask DisposeAsync()
     {
         if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 0)
         {
             var ds = _disposables;
+
+            // If the the disposables have a single entry it means two possible things: 
+            // it contains unordered disposables only (with the conventional order 0 as a key)
+            // or it contains disposables with a single order specified whatever it is (the actual order value does not matter in this case)
             if (ds is ImHashMapEntry<int, ImList<object>> e)
                 for (var d = e.Value; d.Tail != null; d = d.Tail)
                 {
-                    if (d.Head is IAsyncDisposable asyncDisp)
+                    try
                     {
-                        var pendingResult = asyncDisp.DisposeAsync();
-                        if (!pendingResult.IsCompleted)
-                            return DisposeRestAsync(pendingResult, d.Tail);
+                        if (d.Head is IAsyncDisposable asyncDisp)
+                        {
+                            var disposalTask = asyncDisp.DisposeAsync();
+                            if (!disposalTask.IsCompleted)
+                                return d.Tail.Tail == null ? disposalTask : DisposeSingleOrderRestAsync(disposalTask, d.Tail);
 
-                        if (pendingResult.IsFaulted) // rethrow the exception
-                            pendingResult.GetAwaiter().GetResult();
+                            if (disposalTask.IsFaulted) // rethrow the exception
+                                disposalTask.GetAwaiter().GetResult();
+                        }
+                        else
+                            ((IDisposable)d.Head).Dispose();
                     }
-                    else
-                        ((IDisposable)d.Head).Dispose();
+                    catch (Exception ex) when (ex is not ContainerException)
+                    {
+                        // Ignoring non ContainerException's disposing exception, to proceed the disposal of the rest and avoid leaking the resources
+                    }
                 }
             else if (!ds.IsEmpty)
-                return SafelyDisposeOrderedAsyncDisposables(ds);
+            {
+                // In case there multiple orders of disposables and therefore a multiple entries in the disposables hashmap
+                return SafelyDisposeOrderedAsyncOrNoDisposables(ds);
+            }
 
             _disposables = ImHashMap<int, ImList<object>>.Empty; // todo: @perf @mem combine used and _factories together
             _used = ImHashMap<Type, object>.Empty;
@@ -14584,47 +14599,104 @@ public class Scope : IScope
         return default;
     }
 
-    private static async ValueTask DisposeRestAsync(ValueTask currentPending, ImList<object> rest)
+    private static async ValueTask DisposeSingleOrderRestAsync(ValueTask firstDisposalTask, ImList<object> rest)
     {
-        await currentPending.ConfigureAwait(false);
+        await firstDisposalTask.ConfigureAwait(false);
 
         for (var d = rest; d.Tail != null; d = d.Tail)
         {
-            if (d.Head is IAsyncDisposable asyncDisp)
-                await asyncDisp.DisposeAsync().ConfigureAwait(false);
-            else
-                ((IDisposable)d.Head).Dispose();
+            try
+            {
+                if (d.Head is IAsyncDisposable asyncDisp)
+                    await asyncDisp.DisposeAsync().ConfigureAwait(false);
+                else
+                    ((IDisposable)d.Head).Dispose();
+            }
+            catch (Exception ex) when (ex is not ContainerException)
+            {
+                // Ignoring non ContainerException's disposing exception, to proceed the disposal of the rest and avoid leaking the resources
+            }
         }
     }
 
-    private static ValueTask SafelyDisposeOrderedAsyncDisposables(ImHashMap<int, ImList<object>> disposables)
+    private static ValueTask SafelyDisposeOrderedAsyncOrNoDisposables(ImHashMap<int, ImList<object>> disposables)
     {
-        foreach (var e in disposables.Enumerate())
-        {
-            try
+        // Collect disposables in order defined by their key into the list, hopefully fully on stack
+        SmallList4<ImList<object>> orderedDisposables = default;
+        disposables.ForEach(ref orderedDisposables,
+            static (ImHashMapEntry<int, ImList<object>> e, int _, ref SmallList4<ImList<object>> disps) =>
             {
-                for (var d = e.Value; !d.IsEmpty; d = d.Tail)
+                disps.Add(e.Value);
+            });
+
+        for (var i = 0; i < orderedDisposables.Count; i++)
+        {
+            ref var ds = ref orderedDisposables.GetSurePresentItemRef(i);
+            for (var d = ds; d.Tail != null; d = d.Tail)
+            {
+                // Guard the disposal of the individual service, so that fail in one doesnot leak the rest
+                try
                 {
                     if (d.Head is IAsyncDisposable asyncDisp)
                     {
-                        var pendingResult = asyncDisp.DisposeAsync();
-                        if (!pendingResult.IsCompleted)
-                            return DisposeRestAsync(pendingResult, d.Tail);
+                        var disposalTask = asyncDisp.DisposeAsync();
+                        if (!disposalTask.IsCompleted)
+                        {
+                            // If the tail of the current order is not empty, update the order stack with its tail pending to be disposed
+                            if (d.Tail.Tail != null)
+                            {
+                                ds = d.Tail;
+                                return DisposeRestAsync(disposalTask, orderedDisposables, i);
+                            }
+                            //.. otherwise, if there are orders to process, go to the next order stack by incrementing the index to start from
+                            if (i + 1 < orderedDisposables.Count)
+                            {
+                                return DisposeRestAsync(disposalTask, orderedDisposables, i + 1);
+                            }
+                            //.. otherwise, return the last pending disposable
+                            return disposalTask;
+                        }
 
-                        if (pendingResult.IsFaulted) // rethrow the exception
-                            pendingResult.GetAwaiter().GetResult();
+                        if (disposalTask.IsFaulted) // rethrow the exception
+                            disposalTask.GetAwaiter().GetResult();
                     }
                     else
                         ((IDisposable)d.Head).Dispose();
                 }
-            }
-            catch (Exception ex) when (ex is not ContainerException)
-            {
-                // Ignoring non ContainerException's disposing exception, as it is not important to proceed the disposal of other items
+                catch (Exception ex) when (ex is not ContainerException)
+                {
+                    // Ignoring non ContainerException's disposing exception, to proceed the disposal of the rest and avoid leaking the resources
+                }
             }
         }
+
         return default;
     }
+
+    private static async ValueTask DisposeRestAsync(ValueTask firstDisposalTask, SmallList4<ImList<object>> restDisposables, int restStartIndex)
+    {
+        await firstDisposalTask.ConfigureAwait(false);
+
+        for (var i = restStartIndex; i < restDisposables.Count; ++i)
+        {
+            var ds = restDisposables[i];
+            for (var d = ds; d.Tail != null; d = d.Tail)
+            {
+                try
+                {
+                    if (d.Head is IAsyncDisposable asyncDisp)
+                        await asyncDisp.DisposeAsync().ConfigureAwait(false);
+                    else
+                        ((IDisposable)d.Head).Dispose();
+                }
+                catch (Exception ex) when (ex is not ContainerException)
+                {
+                    // Ignoring non ContainerException's disposing exception, to proceed the disposal of the rest and avoid leaking the resources
+                }
+            }
+        }
+    }
+
 #endif
 
     /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary>
