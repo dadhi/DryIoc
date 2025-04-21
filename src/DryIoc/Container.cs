@@ -14624,10 +14624,7 @@ public class Scope : IScope
         // Collect disposables in order defined by their key into the list, hopefully fully on stack
         SmallList4<ImList<object>> orderedDisposables = default;
         disposables.ForEach(ref orderedDisposables,
-            static (ImHashMapEntry<int, ImList<object>> e, int _, ref SmallList4<ImList<object>> disps) =>
-            {
-                disps.Add(e.Value);
-            });
+            static (ImHashMapEntry<int, ImList<object>> e, int _, ref SmallList4<ImList<object>> disps) => disps.Add(e.Value));
 
         var lastIndex = orderedDisposables.Count - 1;
         for (var i = 0; i <= lastIndex; ++i)

@@ -228,6 +228,30 @@ public static class St
     }
 }
 
+/// <summary>Pair of the mutable values on stack.
+/// Designed to pass A and B together by ref, then read the new values afterwards</summary>
+public struct Vals<A, B>
+{
+    /// <summary>A</summary>
+    public A a;
+    /// <summary>B</summary>
+    public B b;
+    /// <summary>Construct a mutable pair of values</summary>
+    public Vals(A a, B b)
+    {
+        this.a = a;
+        this.b = b;
+    }
+}
+
+/// <summary>Utility methods for the MutValues</summary>
+public static class Vals
+{
+    /// <summary>Creates the mutable pair of values</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static Vals<A, B> Of<A, B>(A a, B b) => new Vals<A, B>(a, b);
+}
+
 /// <summary>Methods to work with immutable arrays and some sugar.</summary>
 public static class ArrayTools
 {
@@ -6776,14 +6800,14 @@ public static class ImHashMap
     /// <summary>Depth-first in-order of hash traversal as described in http://en.wikipedia.org/wiki/Tree_traversal.
     /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
     /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
-    public static S ForEach<K, V, S>(this ImHashMap<K, V> map, ref S state, ItemRefStateAction<ImHashMapEntry<K, V>, S> handler, MapParentStack parents = null)
+    public static void ForEach<K, V, S>(this ImHashMap<K, V> map, ref S state, ItemRefStateAction<ImHashMapEntry<K, V>, S> handler, MapParentStack parents = null)
     {
         if (map == ImHashMap<K, V>.Empty)
-            return state;
+            return;
         if (map is ImHashMap<K, V>.Entry singleEntry)
         {
             singleEntry.ForEach(ref state, 0, handler);
-            return state;
+            return;
         }
         ImHashMap<K, V>.Branch2Plus b21LeftWasEnumerated = null;
         int count = 0, i = 0;
@@ -6953,7 +6977,6 @@ public static class ImHashMap
                 map = pb3.Right;
             }
         }
-        return state;
     }
 
     /// <summary>Depth-first in-order of hash traversal as described in http://en.wikipedia.org/wiki/Tree_traversal.
@@ -7168,9 +7191,10 @@ public static class ImHashMap
     /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
     public static S Fold<K, V, S>(this ImHashMap<K, V> map, S state, Func<ImHashMapEntry<K, V>, int, S, S> handler, MapParentStack parents = null)
     {
-        var compound = St.Rent(state, handler);
-        return map.ForEach(ref compound, static (ImHashMapEntry<K, V> e, int i, ref St<S, Func<ImHashMapEntry<K, V>, int, S, S>> s) =>
-            s.a = s.b(e, i, s.a), parents).ResetButGetA();
+        var vals = Vals.Of(a: state, b: handler);
+        map.ForEach(ref vals, static (ImHashMapEntry<K, V> e, int i, ref Vals<S, Func<ImHashMapEntry<K, V>, int, S, S>> s) =>
+            s.a = s.b(e, i, s.a), parents);
+        return vals.a;
     }
 
     /// <summary>Converts the map to an array with the minimum allocations</summary>
@@ -7184,9 +7208,11 @@ public static class ImHashMap
         if (map == ImHashMap<K, V>.Empty)
             return ArrayTools.Empty<S>();
 
-        var compound = St.Rent(new S[map.Count()], selector);
-        return map.ForEach(ref compound, static (ImHashMapEntry<K, V> e, int i, ref St<S[], Func<ImHashMapEntry<K, V>, S>> s) =>
-            s.a[i] = s.b(e)).ResetButGetA();
+        var arr = new S[map.Count()];
+        var vals = Vals.Of(a: arr, b: selector);
+        map.ForEach(ref vals, static (ImHashMapEntry<K, V> e, int i, ref Vals<S[], Func<ImHashMapEntry<K, V>, S>> s) =>
+            s.a[i] = s.b(e));
+        return arr;
     }
 
     /// <summary>Converts the map to an array with the minimum allocations</summary>
@@ -7201,7 +7227,8 @@ public static class ImHashMap
         if (map == ImHashMap<K, V>.Empty)
             return ArrayTools.Empty<ImHashMapEntry<K, V>>();
         var arr = new ImHashMapEntry<K, V>[map.Count()];
-        return map.ForEach(ref arr, static (ImHashMapEntry<K, V> e, int i, ref ImHashMapEntry<K, V>[] a) => a[i] = e);
+        map.ForEach(ref arr, static (ImHashMapEntry<K, V> e, int i, ref ImHashMapEntry<K, V>[] a) => a[i] = e);
+        return arr;
     }
 
     /// <summary>Converts the map to the dictionary</summary>
@@ -7210,7 +7237,8 @@ public static class ImHashMap
         if (map == ImHashMap<K, V>.Empty)
             return new Dictionary<K, V>(0);
         var dict = new Dictionary<K, V>();
-        return map.ForEach(ref dict, static (ImHashMapEntry<K, V> e, int _, ref Dictionary<K, V> d) => d.Add(e.Key, e.Value));
+        map.ForEach(ref dict, static (ImHashMapEntry<K, V> e, int _, ref Dictionary<K, V> d) => d.Add(e.Key, e.Value));
+        return dict;
     }
 
     /// <summary>Converts the map to the dictionary</summary>
@@ -8178,7 +8206,7 @@ public static class PartitionedHashMap
     /// <summary>Do something for each entry.
     /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
     /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
-    public static S ForEach<K, V, S>(this ImHashMap<K, V>[] parts, ref S state, ItemRefStateAction<ImHashMapEntry<K, V>, S> handler, MapParentStack parents = null)
+    public static void ForEach<K, V, S>(this ImHashMap<K, V>[] parts, ref S state, ItemRefStateAction<ImHashMapEntry<K, V>, S> handler, MapParentStack parents = null)
     {
         if (parents == null)
             parents = new MapParentStack();
@@ -8186,9 +8214,8 @@ public static class PartitionedHashMap
         {
             if (map == ImHashMap<K, V>.Empty)
                 continue;
-            state = map.ForEach(ref state, handler, parents);
+            map.ForEach(ref state, handler, parents);
         }
-        return state;
     }
 }
 
