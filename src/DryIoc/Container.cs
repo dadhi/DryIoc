@@ -14629,7 +14629,8 @@ public class Scope : IScope
                 disps.Add(e.Value);
             });
 
-        for (var i = 0; i < orderedDisposables.Count; i++)
+        var lastIndex = orderedDisposables.Count - 1;
+        for (var i = 0; i <= lastIndex; ++i)
         {
             ref var ds = ref orderedDisposables.GetSurePresentItemRef(i);
             for (var d = ds; d.Tail != null; d = d.Tail)
@@ -14642,19 +14643,19 @@ public class Scope : IScope
                         var disposalTask = asyncDisp.DisposeAsync();
                         if (!disposalTask.IsCompleted)
                         {
-                            // If the tail of the current order is not empty, update the order stack with its tail pending to be disposed
-                            if (d.Tail.Tail != null)
-                            {
-                                ds = d.Tail;
-                                return DisposeRestAsync(disposalTask, orderedDisposables, i);
-                            }
-                            //.. otherwise, if there are orders to process, go to the next order stack by incrementing the index to start from
-                            if (i + 1 < orderedDisposables.Count)
-                            {
-                                return DisposeRestAsync(disposalTask, orderedDisposables, i + 1);
-                            }
-                            //.. otherwise, return the last pending disposable
-                            return disposalTask;
+                            // Processing the last in the current order and the rest of the orders (if any)
+                            if (d.Tail.Tail == null)
+                                return i == lastIndex ? disposalTask
+                                    : i + 1 == lastIndex ? DisposeSingleOrderRestAsync(disposalTask, orderedDisposables[lastIndex])
+                                    : DisposeRestAsync(disposalTask, orderedDisposables, i + 1);
+
+                            // Processing the rest of the current (and the last) order
+                            if (i == lastIndex)
+                                return DisposeSingleOrderRestAsync(disposalTask, d.Tail);
+
+                            // Processing the rest of the orders, after updating the current one with the remaining tail
+                            ds = d.Tail;
+                            return DisposeRestAsync(disposalTask, orderedDisposables, i);
                         }
 
                         if (disposalTask.IsFaulted) // rethrow the exception
