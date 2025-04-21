@@ -59,7 +59,7 @@ store resolved services of non-Transient reuse.
 Scope implements `IDisposable` and when disposed will dispose reused disposable services. You may prevent service disposal 
 via [setup option](ReuseAndScopes.md#prevent-disposal-of-reused-service).
 
-__Note:__ Service disposal is always taken in the reverse registration order.
+__Note:__ Service disposal is always taken in the reverse resolution order - resolved first will be disposed the last.
 
 
 ## Reuse.Transient

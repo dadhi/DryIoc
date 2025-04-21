@@ -60,7 +60,7 @@ store resolved services of non-Transient reuse.
 Scope implements `IDisposable` and when disposed will dispose reused disposable services. You may prevent service disposal 
 via [setup option](ReuseAndScopes.md#prevent-disposal-of-reused-service).
 
-__Note:__ Service disposal is always taken in the reverse registration order.
+__Note:__ Service disposal is always taken in the reverse resolution order - resolved first will be disposed the last.
 
 
 ## Reuse.Transient
@@ -615,7 +615,8 @@ In the example above `SubDependency` has a reuse `Reuse.ScopedToService<Foo>()`:
 ```cs md*/
 public class Scoped_to_service_reuse
 {
-    [Test] public void Example()
+    [Test]
+    public void Example()
     {
         var container = new Container();
 
@@ -676,7 +677,8 @@ The de-sugared code also tells that the scope may be opened manually without the
 ```cs md*/
 public class Emulating_openResolutionScope_setup
 {
-    [Test] public void Example()
+    [Test]
+    public void Example()
     {
         var container = new Container();
 
@@ -731,7 +733,8 @@ When the parent scope or container with singletons is disposed - the resolutions
 ```cs md*/
 public class Scoped_to_service_reuse_with_dispose
 {
-    [Test] public void Example()
+    [Test]
+    public void Example()
     {
         var container = new Container();
 
@@ -771,7 +774,8 @@ and then dispose it manually.
 ```cs md*/
 public class Own_the_resolution_scope_disposal
 {
-    [Test] public void Example()
+    [Test]
+    public void Example()
     {
         var container = new Container(rules => rules
             .WithTrackingDisposableTransients() // we need this to allow disposable transient Foo
@@ -782,9 +786,9 @@ public class Own_the_resolution_scope_disposal
         container.Register<Dependency>(Reuse.ScopedToService<Foo>());
 
         var foo = container.Resolve<Foo>();
-        
+
         // Disposing the foo will dispose its scope and its scoped dependencies down the tree
-        foo.Dispose(); 
+        foo.Dispose();
 
         Assert.IsTrue(foo.Dep.IsDisposed);
     }
@@ -793,8 +797,8 @@ public class Own_the_resolution_scope_disposal
     {
         public Dependency Dep { get; }
         private readonly IResolverContext _scope;
-        public Foo(Dependency dep, IResolverContext scope) 
-        { 
+        public Foo(Dependency dep, IResolverContext scope)
+        {
             Dep = dep;
             _scope = scope;
         }
