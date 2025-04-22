@@ -94,7 +94,7 @@ public partial class Container : IContainer
     [MethodImpl((MethodImplOptions)256)]
     public static IScope NewSingletonScope() => Scope.Of("<singletons>");
 
-    /// <summary>Pretty prints the container info including the open scope details if any.</summary> 
+    /// <summary>Pretty prints the container info including the open scope details if any.</summary>
     public override string ToString()
     {
         var s = _ownScopeOrContext is IScopeContext scopeContext
@@ -178,7 +178,7 @@ public partial class Container : IContainer
                 _registry.Swap(Registry.Default);
                 Rules = Rules.Default;
                 _singletonScope.Dispose(); // will also dispose any tracked scopes
-                _ownScopeOrContext?.Dispose();
+                (_ownScopeOrContext as IDisposable)?.Dispose();
             }
         }
     }
@@ -208,7 +208,14 @@ public partial class Container : IContainer
                 _registry.Swap(Registry.Default);
                 Rules = Rules.Default;
                 await _singletonScope.DisposeAsync().ConfigureAwait(false); // will also dispose any tracked scopes
-                _ownScopeOrContext?.Dispose(); // todo: @wip do it Async
+                var ctx = _ownScopeOrContext;
+                if (ctx != null)
+                {
+                    if (ctx is IAsyncDisposable asyncDisp)
+                        await asyncDisp.DisposeAsync();
+                    else
+                        ((IDisposable)ctx).Dispose();
+                }
             }
         }
     }
@@ -300,7 +307,7 @@ public partial class Container : IContainer
     /// <summary>
     /// Resolves service with the <see cref="IfUnresolved.ReturnDefaultIfNotRegistered"/> policy,
     /// enabling the fallback resolution for not registered services (default MS convention).
-    /// For diagnostics reasons, you may globally set the rule <see cref="DryIoc.Rules.ServiceProviderGetServiceShouldThrowIfUnresolved"/> to alter the behavior. 
+    /// For diagnostics reasons, you may globally set the rule <see cref="DryIoc.Rules.ServiceProviderGetServiceShouldThrowIfUnresolved"/> to alter the behavior.
     /// It may help to highlight the issues by throwing the original rich <see cref="ContainerException"/> instead of just returning the `null`.
     /// </summary>
     object IServiceProvider.GetService(Type serviceType) =>
@@ -335,7 +342,7 @@ public partial class Container : IContainer
             }
 
             // Cached expression cannot be ConstantExpression because we unwrap the constant and put its value in the cache instead.
-            // Also the expression is already normalized via NormalizeExpression before put into cache, 
+            // Also the expression is already normalized via NormalizeExpression before put into cache,
             // that's why will call CompileOrInterpretFactoryDelegate
             var useInterpretation = Rules.UseInterpretation;
             while (entry.Value is Expression cachedExpr)
@@ -369,7 +376,7 @@ public partial class Container : IContainer
         if (this.TryGetUsedInstance((Scope)scope, (Scope)_singletonScope, serviceTypeHash, serviceType, out var used))
             return used;
 
-        // todo: @perf Should we in the first place create the request here, or later in CreateExpression because it may be faster for the root service without dependency or with the delegate factory? 
+        // todo: @perf Should we in the first place create the request here, or later in CreateExpression because it may be faster for the root service without dependency or with the delegate factory?
         var request = Request.CreateFromServiceType(this, serviceType, ifUnresolved);
         var factory = ResolveFactory(request); // note: ResolveFactory may mutate request, but it should be safe because it is not shared between threads.
 
@@ -826,7 +833,7 @@ public partial class Container : IContainer
             }
     }
 
-    /// <summary>Setting the factory directly to scope for resolution</summary> 
+    /// <summary>Setting the factory directly to scope for resolution</summary>
     public void Use(Type serviceType, object instance)
     {
         var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
@@ -883,8 +890,13 @@ public partial class Container : IContainer
                 registry = Ref.Of((ImHashMap<Type, object>)new Registry.AndCache(registryOrServices, null, null, null, isChangePermitted));
         }
 
-        return new Container(rules ?? Rules, registry, singletonScope ?? NewSingletonScope(),
-            currentScope ?? scopeContext ?? _ownScopeOrContext, _disposed, _disposeStackTrace, parent ?? _parent);
+        return new Container(
+            rules ?? Rules,
+            registry, 
+            singletonScope ?? NewSingletonScope(),
+            currentScope ?? scopeContext ?? _ownScopeOrContext,
+            _disposed, _disposeStackTrace, 
+            parent ?? _parent);
     }
 
     /// <inheritdoc />
@@ -1122,7 +1134,7 @@ public partial class Container : IContainer
                 return null;
             }
 
-            // normal keys from the service Resolve or Injection, and not from the ResolveMany/GetArrayExpression 
+            // normal keys from the service Resolve or Injection, and not from the ResolveMany/GetArrayExpression
             var multipleSameServiceKeySupport = Rules.HasMultipleSameServiceKeyForTheServiceType;
             if (multipleSameServiceKeySupport && serviceKey is not UniqueRegisteredServiceKey)
             {
@@ -1297,7 +1309,7 @@ public partial class Container : IContainer
         var matchedFactories = factories.Match(request, details, static (r, d, x) => r.MatchFactoryConditionAndMetadata(d, x.Value));
         if (matchedFactories.Length > 1 && rules.ImplicitCheckForReuseMatchingScope)
         {
-            // Check for the matching scopes. Only for more than one factory, 
+            // Check for the matching scopes. Only for more than one factory,
             // for the single factory the check will be down the road (BBIssue #175)
             matchedFactories = matchedFactories.Match(request, static (r, x) => r.MatchFactoryReuse(x.Value));
             // Add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition (BBIssue #382)
@@ -1617,7 +1629,7 @@ public partial class Container : IContainer
             return true;
         var r = _registry.Value as Registry;
         var wrappers = r != null ? r.Wrappers : WrappersSupport.Wrappers;
-        return wrappers.GetValueOrDefault(serviceType) != null // todo: @perf reorder things to get faster results for the open-generic wrappers - for the rest perf won't change 
+        return wrappers.GetValueOrDefault(serviceType) != null // todo: @perf reorder things to get faster results for the open-generic wrappers - for the rest perf won't change
             || openGenericServiceType != null && wrappers.GetValueOrDefault(openGenericServiceType) != null;
     }
 
@@ -1870,8 +1882,8 @@ public partial class Container : IContainer
 
     internal readonly Ref<ImHashMap<Type, object>> _registry; // either map of Services or the Registry class
     private readonly IScope _singletonScope;
-    private readonly IDisposable _ownScopeOrContext; // null, or IScope or IScopeContext
-    private readonly IResolverContext _parent; // if (_parent is not null) then _ownScopeOrContext is not null for sure, but it can only be a ScopeContext or null for the parent-less container, think about it 
+    private readonly object _ownScopeOrContext; // is null or IScope or IScopeContext or IDisposable or IAsyncDisposable
+    private readonly IResolverContext _parent; // if (_parent is not null) then _ownScopeOrContext is not null for sure, but it can only be a ScopeContext or null for the parent-less container, think about it
     private StackTrace _disposeStackTrace;
     private int _disposed;
 
@@ -2220,7 +2232,7 @@ public partial class Container : IContainer
         public static readonly ImHashMap<Type, object> Default = ImHashMap<Type, object>.Empty;
 
         public readonly ImHashMap<Type, object> Services;
-        public virtual ImHashMap<Type, object> Wrappers => WrappersSupport.Wrappers; // value is Factory 
+        public virtual ImHashMap<Type, object> Wrappers => WrappersSupport.Wrappers; // value is Factory
         public virtual ImHashMap<Type, object> Decorators => ImHashMap<Type, object>.Empty; // value is Factory[]  // todo: @perf make it Factory or Factory[]
 
         internal const int CACHE_SLOT_COUNT = 16; // todo: @perf using the fixed array buffer on stack
@@ -2913,7 +2925,7 @@ public partial class Container : IContainer
                                 ? n.SetValue((oldImplFacsEntry ?? FactoriesEntry.Empty.WithDefault(oldFactory)).WithDefault(fac))
                                 : o;
                         }
-                        return o; // return the old entry unless the implementation type is new 
+                        return o; // return the old entry unless the implementation type is new
 
                     default: // IfAlreadyRegisteredKeepDefaultService
                         return o.Value is FactoriesEntry oldFacsEntry && oldFacsEntry.LastDefaultKey == null
@@ -3158,7 +3170,7 @@ public partial class Container : IContainer
     }
 
     private Container(Rules rules, Ref<ImHashMap<Type, object>> registry, IScope singletonScope,
-        IDisposable ownScopeOrContext = null,
+        object ownScopeOrContext = null, // is IScope or IScopeContext
         int disposed = 0, StackTrace disposeStackTrace = null,
         IResolverContext parent = null)
     {
@@ -3218,7 +3230,7 @@ public sealed class ServiceKeyAndRequiredOpenGenericType : IConvertibleToExpress
     private static readonly ConstructorInfo _ctor = typeof(ServiceKeyAndRequiredOpenGenericType).GetConstructors()[0];
 }
 
-///<summary>Hides/wraps object with disposable interface.</summary> 
+///<summary>Hides/wraps object with disposable interface.</summary>
 public sealed class HiddenDisposable
 {
     internal static ConstructorInfo Ctor = typeof(HiddenDisposable).GetConstructors()[0];
@@ -3248,23 +3260,23 @@ public static class Interpreter
             //
             // So we may:
             // - Assume that the exception happened in the scoped item resolution.
-            // - Set the exception in the `Scope.NoItem` entry for the exceptional dependency 
+            // - Set the exception in the `Scope.NoItem` entry for the exceptional dependency
             //   (which is optimistically set before resolving the dependency),
             //   so that exception will be re-thrown on the next resolution.
             //
             // Let's copy the current scope item maps to get the view on the items excluding the future service additions.
-            // (It is fine because MapEntry reference is stable and will not change in the future and won't become stale, 
+            // (It is fine because MapEntry reference is stable and will not change in the future and won't become stale,
             // and we will be operating with its Value only).
             //
             // Then traverse the scope items and find the first NoItem entry for the exceptional dependency.
             // The first NoItem entry will be the one for the exception because Scope is
             // not supposed to be modified concurrently - so only one NoItem entry is expected. Read-on for more the details.
-            // 
-            // If found, then try to set the exception into the entry Value, 
+            //
+            // If found, then try to set the exception into the entry Value,
             // if we were interrupted (by some other thread setting the exception, right?), then lookup for the next NoItem entry.
             // If not found in the current scope, go to the parent scope and repeat.
             //
-            // In worse case scenario we will set the wrong item entry, 
+            // In worse case scenario we will set the wrong item entry,
             // but it is not a problem, because it will be overriden by the successful resolution - right?
             // Or if unsuccessful, we may get the wrong exception, but it is even more unlikely the case.
             // It is unlikely in the first place because the majority of cases the scope access is not concurrent.
@@ -4576,7 +4588,7 @@ public static class ContainerTools
     public static TService InjectPropertiesAndFields<TService>(this IResolverContext r, TService instance) =>
         r.InjectPropertiesAndFields<TService>(instance, null);
 
-    /// <summary>For given instance resolves and sets properties and fields. You may specify what 
+    /// <summary>For given instance resolves and sets properties and fields. You may specify what
     /// properties and fields.</summary>
     public static TService InjectPropertiesAndFields<TService>(this IResolverContext r, TService instance,
         params string[] propertyAndFieldNames)
@@ -4586,7 +4598,7 @@ public static class ContainerTools
     }
 
     // todo: @unclear does it OK to share the singletons though despite the promise of not affecting the original container?
-    /// <summary>Creates service using container for injecting parameters without registering anything in <paramref name="container"/> if the TYPE is not registered yet. 
+    /// <summary>Creates service using container for injecting parameters without registering anything in <paramref name="container"/> if the TYPE is not registered yet.
     /// The note is that container will share the singletons though.</summary>
     public static object New(this IContainer container, Type concreteType, Setup setup, Made made = null,
         RegistrySharing registrySharing = RegistrySharing.CloneButKeepCache)
@@ -4614,7 +4626,7 @@ public static class ContainerTools
     /// <summary>Creates service using container for injecting parameters without registering anything in <paramref name="container"/>.</summary>
     /// <param name="container">Container to use for type creation and injecting its dependencies.</param>
     /// <param name="concreteType">Type to instantiate. Wrappers (Func, Lazy, etc.) is also supported.</param>
-    /// <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters, 
+    /// <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters,
     /// properties and fields.</param>
     /// <param name="registrySharing">The default is <see cref="RegistrySharing.CloneButKeepCache"/></param>
     /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
@@ -4752,9 +4764,9 @@ public static class ContainerTools
     public static bool DefaultValidateCondition(ServiceRegistrationInfo reg) => !reg.ServiceType.IsOpenGeneric();
 
     // todo: @vNext instead of `condition` we may use a transformer to close the open-generic types. But may be having `roots` parameters covers it as well.
-    /// <summary>Helps to find potential problems in service registration setup. Method tries to resolve the specified registrations, collects exceptions, 
+    /// <summary>Helps to find potential problems in service registration setup. Method tries to resolve the specified registrations, collects exceptions,
     /// and returns them to user. Does not create any actual service objects. You must specify <paramref name="condition"/> to define your resolution roots,
-    /// otherwise container will try to resolve the registrations marked with `Setup.With(asResolutionRoot: true)` 
+    /// otherwise container will try to resolve the registrations marked with `Setup.With(asResolutionRoot: true)`
     /// or the all registrations (which usually is not realistic case to validate).</summary>
     public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container, Func<ServiceRegistrationInfo, bool> condition = null)
     {
@@ -4766,14 +4778,14 @@ public static class ContainerTools
                 Throw.It(Error.FoundNoRootsToValidate, container);
 
             // We try to find the registrations marked by `Setup.With(asResolutionRoot: true)` and if nothing found, fallback to the all found.
-            // This allow to make asResolutionRoot marking to be optional for validate, but if used - provide the convenient validation by convention. 
+            // This allow to make asResolutionRoot marking to be optional for validate, but if used - provide the convenient validation by convention.
             roots = allNonGenericRegistrations.Match(static r => r.Factory.Setup.AsResolutionRoot);
             if (roots.Length == 0)
                 roots = allNonGenericRegistrations;
         }
         else
         {
-            // condition overrides whatever resolution roots are marked in registrations 
+            // condition overrides whatever resolution roots are marked in registrations
             roots = container.GetServiceRegistrations().Match(condition, static (cond, r) => cond(r) && DefaultValidateCondition(r)).ToArrayOrSelf();
             if (roots.Length == 0)
                 Throw.It(Error.FoundNoRootsToValidate, container);
@@ -4781,7 +4793,7 @@ public static class ContainerTools
         return container.Validate(roots.Map(static r => r.ToServiceInfo()));
     }
 
-    /// <summary>Helps to find potential problems in service registration setup by trying to resolve the <paramref name="serviceTypes"/> and 
+    /// <summary>Helps to find potential problems in service registration setup by trying to resolve the <paramref name="serviceTypes"/> and
     /// returning the found errors. This method does not throw the errors but collects and returns them.</summary>
     public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container, params Type[] serviceTypes)
     {
@@ -4790,7 +4802,7 @@ public static class ContainerTools
         return container.Validate(serviceTypes.Map(static t => ServiceInfo.Of(t)));
     }
 
-    /// <summary>Helps to find potential problems in service registration setup by trying to resolve the <paramref name="roots"/> and 
+    /// <summary>Helps to find potential problems in service registration setup by trying to resolve the <paramref name="roots"/> and
     /// returning the found errors. This method does not throw the errors but collects and returns them.</summary>
     public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container, params ServiceInfo[] roots) =>
         container.Validate(roots);
@@ -4893,7 +4905,7 @@ public static class ContainerTools
         FactoryType? factoryType = null, object serviceKey = null) =>
         container.ClearCache(serviceType, factoryType, serviceKey);
 
-    /// <summary>Setting the factory directly to scope for resolution</summary> 
+    /// <summary>Setting the factory directly to scope for resolution</summary>
     public static void Use(this IContainer container, Type serviceType, Func<IResolverContext, object> factory) =>
         container.Use(serviceType, factory);
 
@@ -4956,8 +4968,8 @@ public static class ContainerTools
                             // Here is the parallel thread may set the Value or exception.
                             // For the Value - it is fine, because the thread knows exact set reference, and we are here just wandering around.
                             // Therefore the entry is likely not our exception culprit. Let's proceed the search.
-                            // The problem is when we are faster than the parallel thread and set the exception first. 
-                            // The solution to that is slow down before setting the exception and give other thread time to complete 
+                            // The problem is when we are faster than the parallel thread and set the exception first.
+                            // The solution to that is slow down before setting the exception and give other thread time to complete
                             // (via the timeout or spin wait).
                             // It is wrong to put the responsibility on the other thread to check for exception in the entry,
                             // because the other thread has no way to notify us here of the wrong, because we are done already.
@@ -4976,9 +4988,9 @@ public static class ContainerTools
 
     ///<summary>
     /// A similar thing to the `Interpreter.TryInterpretAndUnwrapContainerException` but for the compiled delegate,
-    /// It rethrows the Container exception right away, but stores the other User exceptions into the Scoped item entry, 
+    /// It rethrows the Container exception right away, but stores the other User exceptions into the Scoped item entry,
     /// to be re-thrown on the next resolution and to prevent the futile wait for the empty item entry.
-    ///</summary> 
+    ///</summary>
     internal static object TryInvokeFactoryDelegateAndStoreNonContainerExceptionInScope(this IResolverContext r, Func<IResolverContext, object> factoryDelegate)
     {
         try
@@ -5056,7 +5068,7 @@ public sealed class DefaultDynamicKey : IConvertibleToExpression
     public Expression ToExpression<S>(S state, Func<S, object, Expression> fallbackConverter) =>
         Call(_ofMethod, ConstantInt(RegistrationOrder));
 
-    /// <summary>Returns next dynamic key with increased <see cref="RegistrationOrder"/>.</summary> 
+    /// <summary>Returns next dynamic key with increased <see cref="RegistrationOrder"/>.</summary>
     public DefaultDynamicKey Next() => Of(RegistrationOrder + 1);
 
     /// <summary>Compares key's IDs. The null (default) key is considered equal!</summary>
@@ -5084,7 +5096,7 @@ public interface IResolverContext : IResolver, IDisposable
     /// <summary>True if container is disposed.</summary>
     bool IsDisposed { get; }
 
-    /// <summary>Usually the disposal stack trace (if supported) to add the error message 
+    /// <summary>Usually the disposal stack trace (if supported) to add the error message
     /// to identify the place and possible reason of disposal. The `null` otherwise</summary>
     object DisposeInfo { get; }
 
@@ -5103,7 +5115,7 @@ public interface IResolverContext : IResolver, IDisposable
     /// <summary>Current opened scope. May return the current scope from <see cref="ScopeContext"/> if context is not null.</summary>
     IScope CurrentScope { get; }
 
-    /// <summary>This property exist mostly for the performance reasons to have single virtual call instead of 
+    /// <summary>This property exist mostly for the performance reasons to have single virtual call instead of
     /// `CurrentScope ?? SingletonScope`</summary>
     IScope CurrentOrSingletonScope { get; }
 
@@ -5263,7 +5275,7 @@ public static class ResolverContext
     /// <summary>Opens scope with optional name and optional tracking of new scope in a parent scope.</summary>
     /// <param name="r">Parent context to use.</param>
     /// <param name="name">(optional)</param>
-    /// <param name="trackInParent">(optional) Instructs to additionally store the opened scope in parent, 
+    /// <param name="trackInParent">(optional) Instructs to additionally store the opened scope in parent,
     /// so it will be disposed when parent is disposed. If no parent scope is available the scope will be tracked by Singleton scope.
     /// Used to dispose a resolution scope.</param>
     /// <returns>Scoped resolver context.</returns>
@@ -5633,7 +5645,7 @@ public static class WrappersSupport
         var container = request.Container;
         if (!container.Rules.FuncAndLazyWithoutRegistration)
         {
-            // Here we need to know if Lazy is resolvable, 
+            // Here we need to know if Lazy is resolvable,
             // by resolving the factory we are checking that the service itself is registered...
             // But what about its dependencies. In order to check on them we need to get the expression,
             // but avoid the creation of singletons on the way (and materializing the types) - because "lazy".
@@ -5680,7 +5692,7 @@ public static class WrappersSupport
 
         var container = request.Container;
 
-        // Special case for the Factory delegate of Func<IResolverContext, ?>, 
+        // Special case for the Factory delegate of Func<IResolverContext, ?>,
         // so we may avoid using the InputArgs and use the result expression directly
         if (!isAction & argCount == 1 && argTypes[0] == typeof(IResolverContext))
         {
@@ -6029,10 +6041,10 @@ internal sealed class UniqueRegisteredServiceKey : IPrintable, IConvertibleToExp
 public sealed class ServiceKeyToTypeIndex
 {
     // Logically, it is a mapping of ServiceKey to the List of pairs of { ServiceType, Count of the ServiceType registration with this key }
-    // Practically, it is the map where Key is ServiceKey and the Value is Type | string | (KV<object, int> where object is Type | String) | (object[] where object is one of the mentioned before) 
+    // Practically, it is the map where Key is ServiceKey and the Value is Type | string | (KV<object, int> where object is Type | String) | (object[] where object is one of the mentioned before)
     private ImHashMap<object, object> _index = ImHashMap<object, object>.Empty;
 
-    /// <summary>Stores the key with respective type in the index map, 
+    /// <summary>Stores the key with respective type in the index map,
     /// incrementing type count for multiple registrations with same key and type.</summary>
     public object EnsureUniqueServiceKey(object serviceTypeOrName, object serviceKey) =>
         EnsureUniqueServiceKey(ref _index, serviceTypeOrName, serviceKey);
@@ -6121,7 +6133,7 @@ public sealed class Rules
         _default = _default.WithoutUseInterpretation();
 
     // Logically, it is a mapping of ServiceKey to the List of pairs of { ServiceType, Count of the ServiceType registration with this key }
-    // Practically, it is the map where Key is ServiceKey and the Value is Type | string | (KV<object, int> where object is Type | String) | (object[] where object is one of the mentioned before) 
+    // Practically, it is the map where Key is ServiceKey and the Value is Type | string | (KV<object, int> where object is Type | String) | (object[] where object is one of the mentioned before)
     private ImHashMap<object, object> _serviceKeyToTypeIndex;
 
     /// <summary>Mapping between service key and all the types registered with it.</summary>
@@ -6134,7 +6146,7 @@ public sealed class Rules
 
     /// <summary>Retrieves types and their count used with specified <paramref name="serviceKey"/>.</summary>
     /// <param name="serviceKey">Service key to get info.</param>
-    /// <returns>Types and their count for the specified key, if Type is only one then returns just the Type without count 
+    /// <returns>Types and their count for the specified key, if Type is only one then returns just the Type without count
     /// if key is not stored - returns null.</returns>
     [MethodImpl((MethodImplOptions)256)]
     public object GetServiceTypesByServiceKeyOrDefault(object serviceKey) =>
@@ -6161,7 +6173,7 @@ public sealed class Rules
         return newRules;
     }
 
-    /// <summary>Returns the basic rules for the Microsoft.Extension.DependencyInjection 
+    /// <summary>Returns the basic rules for the Microsoft.Extension.DependencyInjection
     /// EXCEPT for ParameterSelector for the keyed services, which should be provided as parameter.
     /// That's why you should use the `DryIocAdapter.WithMicrosoftDependencyInjectionRules` instead.</summary>
     [Obsolete("Please use DryIoc.Microsoft.DependencyInjection.DryIocAdapter.MicrosoftDependencyInjectionRules")]
@@ -6194,19 +6206,19 @@ public sealed class Rules
             (_settings & Settings.VariantGenericTypesInResolvedCollection) == 0;
     }
 
-    /// <summary>Create the basic rules for the Microsoft.Extension.DependencyInjection 
+    /// <summary>Create the basic rules for the Microsoft.Extension.DependencyInjection
     /// EXCEPT for ParameterSelector for the keyed services, which should be provided as parameter.
     /// That's why you should use the `DryIocAdapter.WithMicrosoftDependencyInjectionRules` instead.</summary>
     [Obsolete("Please use DryIoc.Microsoft.DependencyInjection.DryIocAdapter.WithMicrosoftDependencyInjectionRules")]
     public Rules WithMicrosoftDependencyInjectionRules() =>
         WithBaseMicrosoftDependencyInjectionRules(null);
 
-    /// <summary>Creates the rules for the Microsoft.Extension.DependencyInjection 
+    /// <summary>Creates the rules for the Microsoft.Extension.DependencyInjection
     /// together with the ParameterSelector for the keyed services, which should be provided as parameter</summary>
     public Rules WithBaseMicrosoftDependencyInjectionRules(ParameterSelector parameters) =>
         WithMicrosoftDependencyInjectionRules(this, parameters);
 
-    /// <summary>By default the `IServiceProvider.GetService` is returning `null` if service is not resolved. 
+    /// <summary>By default the `IServiceProvider.GetService` is returning `null` if service is not resolved.
     /// So you need to call the `GetRequiredService` extension method which in turn requires the implementation of `ISupportRequiredService` underneath.
     /// To help with this mess you may use this rule to force the `GetService` to throw an exception the same as calling `GetRequiredService`.
     /// This may help to diagnose the problems in debug or in tests, or in some custom setup.</summary>
@@ -6225,7 +6237,7 @@ public sealed class Rules
     /// the dependency count threshold set to 3:
     ///
     /// `x = new X(new Y(A, new B(K), new C(new L(), new M())), new Z())`
-    /// 
+    ///
     /// The tree is resolved from the left to the right in the depth-first order:
     /// A; then K, B (at this point Y is already has 3 dependencies but is not fully resolved until C is resolved);
     /// then L, M, C (here Y is fully resolved with 6 dependencies) so we can split it only on 6 dependencies instead of 3.
@@ -6310,7 +6322,7 @@ public sealed class Rules
         return rules;
     }
 
-    /// <summary>Defines single factory selector delegate. 
+    /// <summary>Defines single factory selector delegate.
     /// The only one of the passed parameters `singleDefaultFactory` or `orManyDefaultAndKeyedFactories` is not `null`</summary>
     /// <returns>Single selected factory or null if unable to select.</returns>
     public delegate Factory FactorySelectorRule(Request request, Factory singleDefaultFactory, KV<object, Factory>[] orManyDefaultAndKeyedFactories);
@@ -6465,16 +6477,16 @@ public sealed class Rules
     public Rules WithDynamicRegistrations(params DynamicRegistrationProvider[] rules) =>
         WithDynamicRegistrations(DefaultDynamicRegistrationFlags, rules);
 
-    /// <summary>Only services and no decorators as it will greatly affect the performance, 
+    /// <summary>Only services and no decorators as it will greatly affect the performance,
     /// calling the provider for every resolved service</summary>
     public static readonly DynamicRegistrationFlags DefaultDynamicRegistrationFlags = DryIoc.DynamicRegistrationFlags.Service;
 
-    /// <summary>Returns the new rules with the passed dynamic registration rules appended. 
+    /// <summary>Returns the new rules with the passed dynamic registration rules appended.
     /// The rules applied only when no normal registrations found!</summary>
     public Rules WithDynamicRegistrationsAsFallback(params DynamicRegistrationProvider[] rules) =>
         WithDynamicRegistrations(DefaultDynamicRegistrationFlags | DryIoc.DynamicRegistrationFlags.AsFallback, rules);
 
-    /// <summary>Returns the new rules with the passed dynamic registration rules appended. 
+    /// <summary>Returns the new rules with the passed dynamic registration rules appended.
     /// The rules applied only when no normal registrations found!</summary>
     public Rules WithDynamicRegistrations(DynamicRegistrationFlags flags, params DynamicRegistrationProvider[] rules)
     {
@@ -6498,7 +6510,7 @@ public sealed class Rules
         return DynamicRegistrationFlags.Append(newFlags);
     }
 
-    /// <summary>Returns the new rules with the passed dynamic registration rules appended. 
+    /// <summary>Returns the new rules with the passed dynamic registration rules appended.
     /// The rules applied only when no normal registrations found!</summary>
     public Rules WithDynamicRegistrationsAsFallback(DynamicRegistrationFlags flags, params DynamicRegistrationProvider[] rules) =>
         WithDynamicRegistrations(flags | DryIoc.DynamicRegistrationFlags.AsFallback, rules);
@@ -6597,7 +6609,7 @@ public sealed class Rules
 
     /// <summary>Rule to automatically resolves non-registered service type which is: nor interface, nor abstract, nor registered wrapper type.
     /// For constructor selection we are using automatic constructor selection.
-    /// Pass `IfUnresolved.ReturnDefault` or `IfUnresolved.ReturnDefaultIfNotRegistered` to `ifConcreteTypeIsUnresolved` 
+    /// Pass `IfUnresolved.ReturnDefault` or `IfUnresolved.ReturnDefaultIfNotRegistered` to `ifConcreteTypeIsUnresolved`
     /// to allow fallback to the next rule.</summary>
     public static DynamicRegistrationProvider ConcreteTypeDynamicRegistrations(
         IfUnresolved ifConcreteTypeIsUnresolved,
@@ -6612,7 +6624,7 @@ public sealed class Rules
         WithDynamicRegistrationsAsFallback(ConcreteTypeDynamicRegistrations(condition, reuse));
 
     /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.
-    /// Pass `IfUnresolved.ReturnDefault` or `IfUnresolved.ReturnDefaultIfNotRegistered` to `ifConcreteTypeIsUnresolved` 
+    /// Pass `IfUnresolved.ReturnDefault` or `IfUnresolved.ReturnDefaultIfNotRegistered` to `ifConcreteTypeIsUnresolved`
     /// to allow fallback to the next rule.</summary>
     public Rules WithConcreteTypeDynamicRegistrations(IfUnresolved ifConcreteTypeIsUnresolved, Func<Type, object, bool> condition = null, IReuse reuse = null) =>
         WithDynamicRegistrationsAsFallback(ConcreteTypeDynamicRegistrations(ifConcreteTypeIsUnresolved, condition, reuse));
@@ -6753,7 +6765,7 @@ public sealed class Rules
     ///
     /// The storing disposable transients in the singleton scope means that they won't be disposed until
     /// the whole container is disposed. That may pose a problem similar to the "memory leak" because more and more transients
-    /// will be created and stored never disposed until whole container is disposed. Therefore you 
+    /// will be created and stored never disposed until whole container is disposed. Therefore you
     /// need to think if you really need the disposable to be the Transient. Whatever, just be aware of it.
     /// </summary>
     public Rules WithTrackingDisposableTransients() =>
@@ -6764,7 +6776,7 @@ public sealed class Rules
         (_settings & Settings.EagerCachingSingletonForFasterAccess) != 0;
 
     /// <summary>
-    /// The opposite of <see cref="WithTrackingDisposableTransients" /> removing the tracking, 
+    /// The opposite of <see cref="WithTrackingDisposableTransients" /> removing the tracking,
     /// which maybe helpful e.g. for undoing the rule from the Microsoft.DependencyInjection conforming rules.
     /// </summary>
     public Rules WithoutTrackingDisposableTransients() =>
@@ -6789,7 +6801,7 @@ public sealed class Rules
                     | Settings.UsedForExpressionGeneration
                     | (allowRuntimeState ? 0 : Settings.ThrowIfRuntimeStateRequired);
 
-    /// <summary>Specifies to generate ResolutionCall dependency creation expression and stores the result 
+    /// <summary>Specifies to generate ResolutionCall dependency creation expression and stores the result
     /// in the-per rules collection.</summary>
     public Rules WithExpressionGeneration(bool allowRuntimeState = false)
     {
@@ -6861,7 +6873,7 @@ public sealed class Rules
     public Rules WithoutVariantGenericTypesInResolve() =>
         WithSettings(_settings & ~Settings.VariantGenericTypesInResolve);
 
-    /// <summary>Says if there a support the multiple same service keys for the same service type. 
+    /// <summary>Says if there a support the multiple same service keys for the same service type.
     /// Note, that this setting will work even with <seealso cref="IfAlreadyRegistered.AppendNotKeyed"/>.</summary>
     public bool HasMultipleSameServiceKeyForTheServiceType =>
         _serviceKeyToTypeIndex != null;
@@ -6877,7 +6889,7 @@ public sealed class Rules
         return newRules;
     }
 
-    /// <summary>If the dependency factory is not found (including the dynamic factories) generate the `Resolve` call for it, 
+    /// <summary>If the dependency factory is not found (including the dynamic factories) generate the `Resolve` call for it,
     /// so it may be resolved from the compile-time registrations</summary>
     public bool GenerateResolutionCallForMissingDependency =>
         (_settings & Settings.GenerateResolutionCallForMissingDependency) != 0;
@@ -6950,11 +6962,11 @@ public sealed class Rules
     public bool UseInterpretationForTheFirstResolution =>
         (_settings & Settings.UseInterpretationForTheFirstResolution) != 0;
 
-    ///<summary>Compile service expression on the first resolution. 
-    /// By default the first resolution is interpreted to avoid time spend on the compilation process 
+    ///<summary>Compile service expression on the first resolution.
+    /// By default the first resolution is interpreted to avoid time spend on the compilation process
     /// (especially in case if you have only one resolution for the application lifetime).
     /// If you need more resolutions then it make sense to compile to trade for the faster resolution times.
-    /// Note: un-setting this effectively means the same as `WithoutUseInterpretation`, 
+    /// Note: un-setting this effectively means the same as `WithoutUseInterpretation`,
     /// otherwise it would be strange to compile the first resolution but then throw it away and start interpreting the rest.</summary>
     public Rules WithoutInterpretationForTheFirstResolution() => WithoutUseInterpretation();
 
@@ -6966,7 +6978,7 @@ public sealed class Rules
     public Rules WithUseInterpretation() =>
         WithSettings(_settings | Settings.UseInterpretationForTheFirstResolution | Settings.UseInterpretation);
 
-    /// <summary>Un-setting this thing means that DryIoc will always use Compilation, even in the first resolution cycle, 
+    /// <summary>Un-setting this thing means that DryIoc will always use Compilation, even in the first resolution cycle,
     /// so it means as well the `WithoutInterpretationForTheFirstResolution`.</summary>
     public Rules WithoutUseInterpretation() =>
         WithSettings(_settings & ~Settings.UseInterpretationForTheFirstResolution & ~Settings.UseInterpretation);
@@ -7109,7 +7121,7 @@ public sealed class Rules
         AutoConcreteTypeResolution = 1 << 14, // informational flag // todo: @clarify consider for the obsoleting
         SelectLastRegisteredFactory = 1 << 15,// informational flag
         UsedForExpressionGeneration = 1 << 16,
-        // UseFastExpressionCompilerIfPlatformSupported = 1 << 17, // todo: @wip @remove the default in V5 without opt-out because of complexity, but the System.Compile(preferInterpretation?) is still used as a fallback  
+        // UseFastExpressionCompilerIfPlatformSupported = 1 << 17, // todo: @wip @remove the default in V5 without opt-out because of complexity, but the System.Compile(preferInterpretation?) is still used as a fallback
         UseInterpretationForTheFirstResolution = 1 << 18,
         UseInterpretation = 1 << 19,
         UseDecorateeReuseForDecorators = 1 << 20,
@@ -7367,7 +7379,7 @@ public class FactoryMethod
 
     internal virtual Delegate FactoryFunc => null;
 
-    ///<summary> Contains resolved parameter expressions found when looking for most resolvable constructor</summary> 
+    ///<summary> Contains resolved parameter expressions found when looking for most resolvable constructor</summary>
     internal virtual Expression[] ResolvedParameterExpressions => null;
 
     /// <summary>Just creates a thingy from the constructor</summary>
@@ -7498,7 +7510,7 @@ public class FactoryMethod
         if (throwIfCtorNotFound)
             request = request.WithIfUnresolved(IfUnresolved.ReturnDefault);
 
-        // Consider the constructor with the maximum number of parameters first, 
+        // Consider the constructor with the maximum number of parameters first,
         // If there are more than one constructor with the same number of parameters,
         // then we should consider the one with most of passed input arguments and custom values provided
         var firstCtorParams = firstCtor.GetParameters();
@@ -7912,7 +7924,7 @@ public class Made
             parameters, propertiesAndFields, implMemberDependsOnRequest: true);
 
     /// <summary>Defines how to select constructor from implementation type.
-    /// Where <paramref name="getConstructor"/> is delegate taking implementation type as input 
+    /// Where <paramref name="getConstructor"/> is delegate taking implementation type as input
     /// and returning selected constructor info.</summary>
     public static Made Of(Func<Type, ConstructorInfo> getConstructor,
         ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
@@ -8093,7 +8105,7 @@ public class Made
             var argExpr = argExprs[i];
 
             // If the parameter expression passed from the lambda argument, e.g. for the static and extension methods,
-            // Then we will be using the argument factory info as a parameter info, 
+            // Then we will be using the argument factory info as a parameter info,
             // so for the extension method `f => f.Create()` the factory info for the `f` will be used for the parameter `f` in `Exts.Create(f)`.
             if (argExpr is System.Linq.Expressions.ParameterExpression paramExpr)
             {
@@ -8368,7 +8380,7 @@ public static class Registrator
         if (resolutionKey == null)
             return registeredKey is DefaultKey | registeredKey is DefaultDynamicKey;
 
-        // now, the keys should match exactly for the resolution key already wrapped in the a... wrapper, 
+        // now, the keys should match exactly for the resolution key already wrapped in the a... wrapper,
         // which probably come here from the collection or other wrapper
         if (resolutionKey is UniqueRegisteredServiceKey resolutionUniqueKey)
         {
@@ -8392,7 +8404,7 @@ public static class Registrator
             if (anyResolutionKey.ResolutionKey != null)
                 return registeredKey is Registrator.AnyServiceKey;
 
-            // otherwise it's enough to be non-default to match with Any resolution key 
+            // otherwise it's enough to be non-default to match with Any resolution key
             return registeredKey is not DefaultKey & registeredKey is not DefaultDynamicKey;
         }
 
@@ -8454,7 +8466,7 @@ public static class Registrator
         registrator.Register<TService, TService>(made, reuse, setup, ifAlreadyRegistered, serviceKey);
 
     /// <summary>
-    /// Registers the instance creating a "normal" DryIoc registration so you can check it via `IsRegistered`, 
+    /// Registers the instance creating a "normal" DryIoc registration so you can check it via `IsRegistered`,
     /// apply wrappers and decorators, etc.
     /// Additionally, if instance is `IDisposable`, then it tracks it in a singleton scope.
     /// Look at the `Use` method to put instance directly into current or singleton scope,
@@ -8485,7 +8497,7 @@ public static class Registrator
     }
 
     /// <summary>
-    /// Registers the instance creating a "normal" DryIoc registration so you can check it via `IsRegistered`, 
+    /// Registers the instance creating a "normal" DryIoc registration so you can check it via `IsRegistered`,
     /// apply wrappers and decorators, etc.
     /// Additionally, if instance is `IDisposable`, then it tracks it in a singleton scope.
     /// Look at the `Use` method to put instance directly into current or singleton scope,
@@ -8496,7 +8508,7 @@ public static class Registrator
         registrator.RegisterInstance(false, serviceType, instance, ifAlreadyRegistered, setup, serviceKey);
 
     /// <summary>
-    /// Registers the instance creating a "normal" DryIoc registration so you can check it via `IsRegistered`, 
+    /// Registers the instance creating a "normal" DryIoc registration so you can check it via `IsRegistered`,
     /// apply wrappers and decorators, etc.
     /// Additionally, if instance is `IDisposable`, then it tracks it in a singleton scope.
     /// Look at the `Use` method to put instance directly into current or singleton scope,
@@ -8507,8 +8519,8 @@ public static class Registrator
         registrator.RegisterInstance(true, typeof(T), instance, ifAlreadyRegistered, setup, serviceKey);
 
     /// <summary>
-    /// Registers the instance with possible multiple service types creating a "normal" DryIoc registration 
-    /// so you can check it via `IsRegistered` for each service type, 
+    /// Registers the instance with possible multiple service types creating a "normal" DryIoc registration
+    /// so you can check it via `IsRegistered` for each service type,
     /// apply wrappers and decorators, etc.
     /// Additionally, if instance is `IDisposable`, then it tracks it in a singleton scope.
     /// Look at the `Use` method to put instance directly into current or singleton scope,
@@ -8538,8 +8550,8 @@ public static class Registrator
     }
 
     /// <summary>
-    /// Registers the instance with possible multiple service types creating a "normal" DryIoc registration 
-    /// so you can check it via `IsRegistered` for each service type, 
+    /// Registers the instance with possible multiple service types creating a "normal" DryIoc registration
+    /// so you can check it via `IsRegistered` for each service type,
     /// apply wrappers and decorators, etc.
     /// Additionally, if instance is `IDisposable`, then it tracks it in a singleton scope.
     /// Look at the `Use` method to put instance directly into current or singleton scope,
@@ -8552,8 +8564,8 @@ public static class Registrator
             nonPublicServiceTypes, ifAlreadyRegistered, setup, serviceKey);
 
     /// <summary>
-    /// Registers the instance with possible multiple service types creating a "normal" DryIoc registration 
-    /// so you can check it via `IsRegistered` for each service type, 
+    /// Registers the instance with possible multiple service types creating a "normal" DryIoc registration
+    /// so you can check it via `IsRegistered` for each service type,
     /// apply wrappers and decorators, etc.
     /// Additionally, if instance is `IDisposable`, then it tracks it in a singleton scope.
     /// Look at the `Use` method to put instance directly into current or singleton scope,
@@ -9185,7 +9197,7 @@ public static class Registrator
                 : Setup.DecoratorWith(condition, useDecorateeReuse: true));
     }
 
-    /// <summary>Adding the factory directly to scope for resolution</summary> 
+    /// <summary>Adding the factory directly to scope for resolution</summary>
     public static void Use<TService>(this IResolverContext r, Func<IResolverContext, TService> factory) =>
         r.Use(typeof(TService), (Func<IResolverContext, object>)factory.ToFactoryDelegate);
 
@@ -9199,7 +9211,7 @@ public static class Registrator
     /// <summary>Adding the instance directly to the scope for resolution</summary>
     public static void Use(this IResolverContext r, Type serviceType, object instance) => r.Use(serviceType, instance);
 
-    /// <summary>Adding the instance directly to the scope for resolution</summary> 
+    /// <summary>Adding the instance directly to the scope for resolution</summary>
     public static void Use<TService>(this IResolverContext r, TService instance) => r.Use(typeof(TService), instance);
 
     /// <summary>Adding the factory directly to the scope for resolution</summary>
@@ -9214,18 +9226,18 @@ public static class Registrator
     /// <summary>Adding the instance directly to scope for resolution</summary>
     public static void Use(this IRegistrator r, Type serviceType, object instance) => r.Use(serviceType, instance);
 
-    /// <summary>Adding the instance directly to scope for resolution</summary> 
+    /// <summary>Adding the instance directly to scope for resolution</summary>
     public static void Use<TService>(this IRegistrator r, TService instance) => r.Use(typeof(TService), instance);
 
-    /// <summary>Adding the factory directly to scope for resolution</summary> 
+    /// <summary>Adding the factory directly to scope for resolution</summary>
     public static void Use<TService>(this IContainer c, Func<IResolverContext, TService> factory) =>
         ((IResolverContext)c).Use(typeof(TService), factory);
 
-    /// <summary>Adding the factory directly to scope for resolution</summary> 
+    /// <summary>Adding the factory directly to scope for resolution</summary>
     public static void Use<TService>(this IContainer c, Func<IResolverContext, object> factory) =>
         ((IResolverContext)c).Use(typeof(TService), factory);
 
-    /// <summary>Adding the factory directly to scope for resolution</summary> 
+    /// <summary>Adding the factory directly to scope for resolution</summary>
     public static void Use(this IContainer c, Type serviceType, Func<IResolverContext, object> factory) =>
         ((IResolverContext)c).Use(serviceType, factory);
 
@@ -9238,9 +9250,9 @@ public static class Registrator
         ((IResolverContext)c).Use(typeof(TService), instance);
 
     /// <summary>
-    /// Registers initializing action that will be called after service is resolved 
+    /// Registers initializing action that will be called after service is resolved
     /// just before returning it to the caller. You can register multiple initializers for a single service.
-    /// Or you can register initializer for the <see cref="Object"/> type to be applied 
+    /// Or you can register initializer for the <see cref="Object"/> type to be applied
     /// for all services and use <paramref name="condition"/> to specify the target services.
     /// Note: The initializer action has the same reuse as a initialized (decorated) service.
     /// </summary>
@@ -9249,9 +9261,9 @@ public static class Registrator
         registrator.RegisterInitializer<TTarget>(initialize, null, condition);
 
     /// <summary>
-    /// Registers initializing action that will be called after service is resolved 
+    /// Registers initializing action that will be called after service is resolved
     /// just before returning it to the caller. You can register multiple initializers for a single service.
-    /// Or you can register initializer for the <see cref="Object"/> type to be applied 
+    /// Or you can register initializer for the <see cref="Object"/> type to be applied
     /// for all services and use <paramref name="condition"/> to specify the target services.
     /// Note: You may specify a <paramref name="reuse"/> different from the initialized object enabling the
     /// <paramref name="initialize"/> action to run once (Singleton), run once-per-scope (Scoped), run always (Transient).
@@ -9273,7 +9285,7 @@ public static class Registrator
                 condition == null
                     ? static r => r.FactoryType != FactoryType.Wrapper && typeof(TTarget).IsAssignableFrom(r.ServiceType)
                     : r => r.FactoryType != FactoryType.Wrapper && typeof(TTarget).IsAssignableFrom(r.ServiceType) && condition(r),
-                useDecorateeReuse: true, // issue BitBucket #230 - ensures the initialization to happen once on construction 
+                useDecorateeReuse: true, // issue BitBucket #230 - ensures the initialization to happen once on construction
                 preventDisposal: true)); // issue #215 - ensures that the initialized / decorated object does not added for the disposal twice
     }
 
@@ -9538,7 +9550,7 @@ public static class Resolver
         resolver.Resolve(typeof(TService), ifUnresolvedReturnDefault);
 
     /// <summary>Returns instance of <paramref name="serviceType"/> searching for <paramref name="requiredServiceType"/>.
-    /// In case of <paramref name="serviceType"/> being generic wrapper like Func, Lazy, IEnumerable, etc. 
+    /// In case of <paramref name="serviceType"/> being generic wrapper like Func, Lazy, IEnumerable, etc.
     /// <paramref name="requiredServiceType"/> allow you to specify wrapped service type.</summary>
     /// <example><code lang="cs"><![CDATA[
     ///     container.Register<IService, Service>();
@@ -9549,7 +9561,7 @@ public static class Resolver
         resolver.Resolve(serviceType, serviceKey, ifUnresolved, requiredServiceType, Request.Empty, args);
 
     /// <summary>Returns instance of <typeparamref name="TService"/> searching for <paramref name="requiredServiceType"/>.
-    /// In case of <typeparamref name="TService"/> being generic wrapper like Func, Lazy, IEnumerable, etc. 
+    /// In case of <typeparamref name="TService"/> being generic wrapper like Func, Lazy, IEnumerable, etc.
     /// <paramref name="requiredServiceType"/> allow you to specify wrapped service type.</summary>
     /// <example><code lang="cs"><![CDATA[
     ///     container.Register<IService, Service>();
@@ -9561,7 +9573,7 @@ public static class Resolver
         (TService)resolver.Resolve(typeof(TService), serviceKey, ifUnresolved, requiredServiceType, Request.Empty, args);
 
     /// <summary>Returns instance of <typeparamref name="TService"/> searching for <typeparamref name="TRequiredService"/>.
-    /// In case of <typeparamref name="TService"/> being generic wrapper like Func, Lazy, IEnumerable, etc. 
+    /// In case of <typeparamref name="TService"/> being generic wrapper like Func, Lazy, IEnumerable, etc.
     /// <typeparamref name="TRequiredService"/> allow you to specify wrapped service type.</summary>
     /// <example><code lang="cs"><![CDATA[
     ///     container.Register<IService, Service>();
@@ -9595,7 +9607,7 @@ public static class Resolver
         object[] args = null) =>
         (TService)resolver.Resolve(typeof(TService), serviceKey, ifUnresolved, requiredServiceType, Request.Empty, args);
 
-    /// <summary>Resolves the service supplying all or some of its dependencies 
+    /// <summary>Resolves the service supplying all or some of its dependencies
     /// (including nested) with the <paramref name="args"/>. The rest of dependencies is injected from
     /// container.</summary>
     public static object Resolve(this IResolver resolver, Type serviceType, object[] args,
@@ -9603,7 +9615,7 @@ public static class Resolver
         object serviceKey = null) =>
         resolver.Resolve(serviceType, serviceKey, ifUnresolved, requiredServiceType, Request.Empty, args);
 
-    /// <summary>Resolves the service supplying all or some of its dependencies 
+    /// <summary>Resolves the service supplying all or some of its dependencies
     /// (including nested) with the <paramref name="args"/>. The rest of dependencies is injected from
     /// container.</summary>
     public static TService Resolve<TService>(this IResolver resolver, object[] args,
@@ -9614,7 +9626,7 @@ public static class Resolver
     /// <summary>Returns all registered services instances including all keyed and default registrations.
     /// Use <paramref name="behavior"/> to return either all registered services at the moment of resolve (dynamic fresh view) or
     /// the same services that were returned with first <see cref="ResolveMany{TService}"/> call (fixed view).</summary>
-    /// <typeparam name="TService">Return collection item type. 
+    /// <typeparam name="TService">Return collection item type.
     /// It denotes registered service type if <paramref name="requiredServiceType"/> is not specified.</typeparam>
     /// <remarks>The same result could be achieved by directly calling:
     /// <code lang="cs"><![CDATA[
@@ -9704,8 +9716,8 @@ public static class Resolver
     {
         if (generateResolutionCallForMissingDependency)
         {
-            // Store `null` as expression to indicate that the dependency resolution call is not generated, 
-            // and the registration for the dependency should be provided. 
+            // Store `null` as expression to indicate that the dependency resolution call is not generated,
+            // and the registration for the dependency should be provided.
             // This information will help compile-time container to output message the the runtime registration is required.
             var requestCopy = request.IsolateRequestChain();
             request.Container.Rules.DependencyResolutionCallExprs.Swap(requestCopy, (x, req) => x.AddOrUpdate(req, null));
@@ -9713,7 +9725,7 @@ public static class Resolver
         else
         {
             // Actually calls nested Resolve and stores produced expression in collection inside the container Rules.
-            // Stops on recursive dependency, e.g. 
+            // Stops on recursive dependency, e.g.
             // `new A(new Lazy<B>(r => r.Resolve<B>())` and `new B(new A())`
             for (var p = request.DirectParent; !p.IsEmpty; p = p.DirectParent)
                 if (p.FactoryID == request.FactoryID)
@@ -9733,7 +9745,7 @@ public static class Resolver
             if (factoryExpr == null)
                 return;
 
-            // we need to isolate request when stored in the key, 
+            // we need to isolate request when stored in the key,
             // otherwise it maybe reused and the key content will be overriden with the new request, leading to the soup pure! see GHIssue101
             var requestCopy = request.IsolateRequestChain();
             request.Container.Rules.DependencyResolutionCallExprs.Swap(
@@ -10239,7 +10251,7 @@ public class ParameterServiceInfo : ServiceInfo
     public static ParameterServiceInfo Of(ParameterInfo parameter, Type serviceType, ServiceDetails details) =>
         new Typed.WithDetails(parameter, serviceType, details);
 
-    /// <summary>Represents the failing selector without the fallback, 
+    /// <summary>Represents the failing selector without the fallback,
     /// in order to skip all further attempts to resolve the parameter, e.g. parameter is marked with attribute which does not match the correst resolution request</summary>
     public static readonly ParameterServiceInfo DefinitelyUnresolvedParameter =
         new ParameterServiceInfo(null);
@@ -10549,7 +10561,7 @@ public sealed class Request : IEnumerable<Request>, IPrintable
     public ConstructorInfo SelectedConstructor { get; internal set; }
 
     // based on the parent(s) and current request FactoryID
-    private int _hashCode; // todo: @perf do we need to calculate and store the hash code if it is not used 
+    private int _hashCode; // todo: @perf do we need to calculate and store the hash code if it is not used
 
     /// <summary>Type of factory: Service, Wrapper, or Decorator.</summary>
     public FactoryType FactoryType { get; private set; }
@@ -10728,7 +10740,7 @@ public sealed class Request : IEnumerable<Request>, IPrintable
     }
 
     /// <summary>Creates new request with provided info, and links current request as a parent.
-    /// Allows to set some additional flags. Existing/parent request should be resolved to 
+    /// Allows to set some additional flags. Existing/parent request should be resolved to
     /// factory via `WithResolvedFactory` before pushing info into it.</summary>
     public Request Push(ServiceInfo info, RequestFlags additionalFlags = default)
     {
@@ -10747,7 +10759,7 @@ public sealed class Request : IEnumerable<Request>, IPrintable
     }
 
     /// <summary>Creates new request with provided parameter info, and links the current request as a parent.
-    /// Allows to set some additional flags. Existing/parent request should be resolved to 
+    /// Allows to set some additional flags. Existing/parent request should be resolved to
     /// factory via `WithResolvedFactory` before pushing info into it.</summary>
     public Request Push(ParameterInfo parameter, RequestFlags additionalFlags = default)
     {
@@ -10774,7 +10786,7 @@ public sealed class Request : IEnumerable<Request>, IPrintable
     }
 
     /// <summary>Creates new request with provided info, and links current request as a parent.
-    /// Allows to set some additional flags. Existing/parent request should be resolved to 
+    /// Allows to set some additional flags. Existing/parent request should be resolved to
     /// factory via `WithResolvedFactory` before pushing info into it.</summary>
     public Request PushServiceType(Type serviceType, RequestFlags additionalFlags = default)
     {
@@ -11226,7 +11238,7 @@ public sealed class Request : IEnumerable<Request>, IPrintable
             || (DirectParent != null && DirectParent.EqualsWithoutParent(other.DirectParent)));
 
     // todo: Seems like Equals and GetHashCode are not used anymore - can we remove them
-    // todo: Should we include InputArgs and DecoratedFactoryID and what about flags? 
+    // todo: Should we include InputArgs and DecoratedFactoryID and what about flags?
     // todo: Should we add and rely on Equals of ServiceInfo and Reuse?
     // todo: The equals calculated differently comparing to HashCode, may be we can use FactoryID for Equals as well?
     /// <summary>Compares self properties but not the parents.</summary>
@@ -11429,7 +11441,7 @@ public abstract class Setup
     /// instead of: <c><![CDATA[new Dependency(...)]]></c></summary>
     public bool AsResolutionCall => (_settings & Settings.AsResolutionCall) != 0;
 
-    /// <summary>Setup with the only setting of `AsResolutionCall</summary>` 
+    /// <summary>Setup with the only setting of `AsResolutionCall</summary>`
     public static readonly Setup AsResolutionCallSetup =
         new ServiceSetup { _settings = Settings.AsResolutionCall };
 
@@ -11529,7 +11541,7 @@ public abstract class Setup
                 _settings |= Settings.AllowDisposableTransient;
             else
             {
-                // if the value is provided and it is false, then we should not track the transients, 
+                // if the value is provided and it is false, then we should not track the transients,
                 // nor allow to register transients at all
                 _settings &= ~Settings.AllowDisposableTransient;
                 _settings &= ~Settings.TrackDisposableTransient;
@@ -11612,7 +11624,7 @@ public abstract class Setup
     // todo: rename to WrapperOf
     /// <summary>Returns generic wrapper setup.
     /// Default for <paramref name="wrappedServiceTypeArgIndex" /> is -1 for generic wrapper with single type argument.
-    /// Index need to be set for multiple type arguments. <paramref name="alwaysWrapsRequiredServiceType" /> need to be set 
+    /// Index need to be set for multiple type arguments. <paramref name="alwaysWrapsRequiredServiceType" /> need to be set
     /// when generic wrapper type arguments should be ignored.</summary>
     public static Setup WrapperWith(int wrappedServiceTypeArgIndex = -1,
         bool alwaysWrapsRequiredServiceType = false, Func<Type, Type> unwrap = null,
@@ -11749,7 +11761,7 @@ public abstract class Setup
 
         /// <summary>Returns generic wrapper setup.
         /// Default for <paramref name="wrappedServiceTypeArgIndex" /> is -1 for generic wrapper with single type argument.
-        /// Index need to be set for multiple type arguments. <paramref name="alwaysWrapsRequiredServiceType" /> need to be set 
+        /// Index need to be set for multiple type arguments. <paramref name="alwaysWrapsRequiredServiceType" /> need to be set
         /// when generic wrapper type arguments should be ignored.</summary>
         public WrapperSetup(int wrappedServiceTypeArgIndex, bool alwaysWrapsRequiredServiceType, Func<Type, Type> unwrap,
             Func<Request, bool> condition,
@@ -11818,8 +11830,8 @@ public abstract class Setup
         /// <summary>Default setup.</summary>
         public DecoratorSetup() { }
 
-        /// <summary>Creates decorator setup with optional condition. <paramref name="condition" /> applied to 
-        /// decorated service to find that service is the decorator target. <paramref name="order" /> specifies 
+        /// <summary>Creates decorator setup with optional condition. <paramref name="condition" /> applied to
+        /// decorated service to find that service is the decorator target. <paramref name="order" /> specifies
         /// relative decorator position in decorators chain. Greater number means further from decoratee -
         /// specify negative number to stay closer. Decorators without order (Order is 0) or with equal order
         /// are applied in registration order - first registered are closer decoratee.</summary>
@@ -11847,7 +11859,7 @@ public enum FactoryFlags : byte
     Default = 0,
     /// <summary>Prevents DryIoc to set `DoNotCache`</summary>
     PleaseDontSetDoNotCache = 1,
-    /// <summary>If set, the expression won't be cached</summary> 
+    /// <summary>If set, the expression won't be cached</summary>
     DoNotCache = 1 << 1,
     /// <summary>If set then as resolution cache, it is for the internal use complementing the Setup.IsResolutionCall</summary>
     AsResolutionCall = 1 << 2
@@ -11922,10 +11934,10 @@ public abstract class Factory
     /// <summary>Factory expression should be the resolution call</summary>
     public bool AsResolutionCall => (Flags & FactoryFlags.AsResolutionCall) != 0 || Setup.AsResolutionCall;
 
-    ///<summary>Closed generic factories</summary> 
+    ///<summary>Closed generic factories</summary>
     public virtual ImHashMap<KV<Type, object>, ReflectionFactory> GeneratedFactories => null; // todo: @perf use struct for the key
 
-    ///<summary>Open-generic parent factory</summary> 
+    ///<summary>Open-generic parent factory</summary>
     public virtual ReflectionFactory GeneratorFactory => null;
 
     /// <summary>Returns the closed-generic generated factory or `null`</summary>
@@ -12063,9 +12075,9 @@ public abstract class Factory
                     var newMap = oldMap.AddOrKeepEntry(itemRef);
 
                     // If the `newMap` is the same as an `oldMap` it means there is item already in the map.
-                    // The check before the CAS operation is only here for Singleton and not for the scope 
-                    // because the race for the Singletons and the situation where singleton is already create in parallel 
-                    // is far more likely and the race for the Scoped services is almost non-existent 
+                    // The check before the CAS operation is only here for Singleton and not for the scope
+                    // because the race for the Singletons and the situation where singleton is already create in parallel
+                    // is far more likely and the race for the Scoped services is almost non-existent
                     // (because Scoped is almost equal to the single thread or the single invocation flow)
                     if (newMap == oldMap)
                     {
@@ -12253,7 +12265,7 @@ public static class Parameters
         : other == null || other == Of ? source
         : req => paramInfo => other(req)?.Invoke(paramInfo) ?? source(req)?.Invoke(paramInfo);
 
-    /// <summary>Overrides source parameter rules with specific parameter details. 
+    /// <summary>Overrides source parameter rules with specific parameter details.
     /// If it is not your parameter just return null.</summary>
     /// <param name="source">Original parameters rules</param>
     /// <param name="getDetailsOrNull">Should return specific details or null.</param>
@@ -12375,7 +12387,7 @@ public static partial class PropertiesAndFields
     /// because it says the constuctor is reponsible for the setting of required properties.</summary>
     public static PropertiesAndFieldsSelector RequiredProperties() => _requiredProperties;
 
-    // We are keeping it as the field internally 
+    // We are keeping it as the field internally
     // and still using the public accessor method to be consistent with the rest of the PropertiesAndFields API.
     private static readonly PropertiesAndFieldsSelector _requiredProperties = req =>
     {
@@ -12672,7 +12684,7 @@ public class ReflectionFactory : Factory
         if (made == null & setup == null)
             return Of(implementationType, reuse);
 
-        if (made == null) // also means `setup != null` 
+        if (made == null) // also means `setup != null`
         {
             ValidateImplementationType(implementationType);
             return IsFactoryGenerator(implementationType)
@@ -13728,7 +13740,7 @@ public class WrapperExpressionFactory : Factory
     internal sealed class OfContainer : WrapperExpressionFactory
     {
         // Despite the name, this setup prevents the wrapping of the expression into HiddenDisposable,
-        // instead it will allow to keep the Transient reuse when cheking WithResolvedFactory 
+        // instead it will allow to keep the Transient reuse when cheking WithResolvedFactory
         public override Setup Setup => Setup.WrapperWithPreventDisposal;
         public OfContainer(Func<Request, Factory, Expression> getServiceExpression)
             : base(getServiceExpression) { }
@@ -13798,7 +13810,7 @@ public class InstanceFactory : Factory
             Setup = setup.WithAsResolutionCallForGeneratedExpression();
     }
 
-    /// Simplified specially for the register instance 
+    /// Simplified specially for the register instance
     internal override bool ValidateAndNormalizeRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules, bool throwIfInvalid)
     {
         if (isStaticallyChecked)
@@ -14111,7 +14123,7 @@ public interface IScope : IEnumerable<IScope>, IDisposable
     /// <summary>Try to retrieve factory or instance (wrapped in factory) via the Use method.</summary>
     bool TryGetUsed(int hash, Type type, out object instance);
 
-    /// <summary>Replaces all used instances map with the new one. Use with caution. 
+    /// <summary>Replaces all used instances map with the new one. Use with caution.
     /// It is safe to use when you've created the scope to pre-initialize it with the used instances,
     /// before returning it to the outside world</summary>
     void InitializeUsed(ImHashMap<Type, object> all);
@@ -14129,7 +14141,7 @@ public interface IScope : IEnumerable<IScope>, IDisposable
 public static class ScopeTools
 {
     [MethodImpl((MethodImplOptions)256)]
-    internal static IScope AsScopeOrNull(this IDisposable scopeOrContextOrNull) =>
+    internal static IScope AsScopeOrNull(this object scopeOrContextOrNull) =>
         scopeOrContextOrNull as IScope ?? (scopeOrContextOrNull as IScopeContext)?.GetCurrentOrDefault();
 
     /// <summary>The method will clone the scope factories and already created services, including the tracked disposables</summary>
@@ -14432,7 +14444,10 @@ public class Scope : IScope
 
     private ImHashMapEntry<int, ImList<object>> AddDisposableEntry(int disposableOrder)
     {
-        Ref.Swap(ref _disposables, disposableOrder, static (x, o) => x.AddOrKeep(o, ImList<object>.Empty)); // todo: @wip @perf CompareExchange first
+        var oldDisps = _disposables;
+        var newDisps = oldDisps.AddOrKeep(disposableOrder, ImList<object>.Empty);
+        if (Interlocked.CompareExchange(ref _disposables, newDisps, oldDisps) != oldDisps)
+            Ref.Swap(ref _disposables, disposableOrder, static (x, o) => x.AddOrKeep(o, ImList<object>.Empty));
         return _disposables.GetSurePresent(disposableOrder);
     }
 
@@ -14561,7 +14576,7 @@ public class Scope : IScope
         {
             var ds = _disposables;
 
-            // If the the disposables have a single entry it means two possible things: 
+            // If the the disposables have a single entry it means two possible things:
             // it contains unordered disposables only (with the conventional order 0 as a key)
             // or it contains disposables with a single order specified whatever it is (the actual order value does not matter in this case)
             if (ds is ImHashMapEntry<int, ImList<object>> e)
@@ -15226,7 +15241,7 @@ public interface IScopeName
     bool Match(object scopeName);
 }
 
-/// <summary>Custom name matcher via the provided function. 
+/// <summary>Custom name matcher via the provided function.
 /// It may be used as a negative check, e.g. to avoid cirtain scopes and proceed to search for the specific parent scope.</summary>
 public sealed class ScopeName : IScopeName
 {
@@ -15328,16 +15343,16 @@ public static class Reuse
     /// <summary>Scoped to the any scope - either with or without the name.</summary>
     public static readonly IReuse Scoped = new CurrentScopeReuse();
 
-    /// <summary>Scoped to the scope with the specified name only. 
+    /// <summary>Scoped to the scope with the specified name only.
     /// The `name` may be null, so the service will be scoped to any scope.</summary>
     public static IReuse ScopedTo(object name) => new CurrentScopeReuse(name);
 
-    /// <summary>Scoped to the scope with the specified name only. 
+    /// <summary>Scoped to the scope with the specified name only.
     /// The `name` may be null, so the service will be scoped to any scope. Specifies all the scope details</summary>
     public static IReuse ScopedTo(object name, bool scopedOrSingleton, int lifespan) =>
         new CurrentScopeReuse(name, scopedOrSingleton, lifespan);
 
-    /// <summary>Scoped to the closest scope (in scope parent hierarchy) with the name from the specified names list. 
+    /// <summary>Scoped to the closest scope (in scope parent hierarchy) with the name from the specified names list.
     /// The `names` should no contain the `null`</summary>
     public static IReuse ScopedTo(params object[] names) =>
         names.IsNullOrEmpty() ? Scoped : names.Length == 1 ? ScopedTo(names[0]) : new CurrentScopeReuse(CompositeScopeName.Of(names));
@@ -15373,7 +15388,7 @@ public static class Reuse
     /// Note: The usage of the named scopes is the less performant than the unnamed ones. e.g. ASP.NET Core does not use the named scope.</summary>
     public static string WebRequestScopeName = "~WebRequestScopeName";
 
-    /// <summary>Obsolete: please prefer using `Scoped` without name instead. 
+    /// <summary>Obsolete: please prefer using `Scoped` without name instead.
     /// The usage of the named scopes is the less performant than the unnamed ones. e.g. ASP.NET Core does not use the named scope.</summary>
     public static readonly IReuse InWebRequest = ScopedTo(WebRequestScopeName);
 }
@@ -15391,7 +15406,7 @@ public enum IfUnresolved : byte
     ReturnDefaultIfNotRegistered,
 }
 
-/// <summary>Declares minimal API for service resolution. 
+/// <summary>Declares minimal API for service resolution.
 /// Resolve default and keyed is separated because of optimization for faster resolution of the former.</summary>
 public interface IResolver : IServiceProvider
 {
@@ -15539,12 +15554,12 @@ public interface IRegistrator
     /// False may be in case of <see cref="IfAlreadyRegistered.Keep"/> setting and already existing factory.</returns>
     void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered, bool isStaticallyChecked);
 
-    /// <summary>Register without validating factory and its implementation type against 
+    /// <summary>Register without validating factory and its implementation type against
     /// the passed <paramref name="serviceType"/> and <paramref name="serviceKey"/></summary>
     void RegisterWithoutValidation(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered);
 
     /// <summary>Returns true if expected factory is registered with specified service key and type.
-    /// Not provided or <c>null</c> <paramref name="serviceKey"/> means to check the <paramref name="serviceType"/> 
+    /// Not provided or <c>null</c> <paramref name="serviceKey"/> means to check the <paramref name="serviceType"/>
     /// alone with any service key.</summary>
     bool IsRegistered(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition);
 
@@ -15596,7 +15611,7 @@ public interface IContainer : IRegistrator, IResolverContext
 
     /// <summary>Helps to find potential problems when resolving the <paramref name="roots"/>.
     /// Method will collect the exceptions when resolving or injecting the specific root. Does not create any actual service objects.
-    /// You must specify <paramref name="roots"/> to define your resolution roots, otherwise container will try to resolve all registrations, 
+    /// You must specify <paramref name="roots"/> to define your resolution roots, otherwise container will try to resolve all registrations,
     /// which usually is not realistic case to validate.</summary>
     KeyValuePair<ServiceInfo, ContainerException>[] Validate(IEnumerable<ServiceInfo> roots);
 
@@ -15736,7 +15751,7 @@ public sealed class LazyEnumerable<TService> : IEnumerable<TService>
     /// <summary>Wraps lazy resolved items.</summary> <param name="items">Lazy resolved items.</param>
     public LazyEnumerable(IEnumerable<TService> items) => Items = items.ThrowIfNull();
 
-    /// <summary>Return items enumerator.</summary> 
+    /// <summary>Return items enumerator.</summary>
     public IEnumerator<TService> GetEnumerator() => Items.GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
@@ -16277,7 +16292,7 @@ public static class Throw
     public static void Many(int error, params ContainerException[] errors) =>
         throw new ContainerException(error, errors);
 
-    /// <summary>Throws the exception with info about the disposed scope and 
+    /// <summary>Throws the exception with info about the disposed scope and
     /// the dispose stack trace if it is supported by resolver context.</summary>
     public static void ScopeIsDisposed(IScope scope, IResolverContext r) =>
         It(Error.ScopeIsDisposed, scope.ToString(), r?.DisposeInfo ?? "<not available>");
@@ -16516,7 +16531,7 @@ public static class ReflectionTools
         if (sourceType == typeof(object) | targetType == typeof(object))
             return null;
 
-        // conversion operators should be declared as static and public 
+        // conversion operators should be declared as static and public
         var methods = type.GetMethods(BindingFlags.Static | BindingFlags.Public);
         foreach (var m in methods)
             if (m.IsSpecialName && m.ReturnType == targetType)
@@ -16762,7 +16777,7 @@ public static class ReflectionTools
         return false;
     }
 
-    /// <summary>Return either <see cref="PropertyInfo.PropertyType"/>, or <see cref="FieldInfo.FieldType"/>, 
+    /// <summary>Return either <see cref="PropertyInfo.PropertyType"/>, or <see cref="FieldInfo.FieldType"/>,
     /// <see cref="MethodInfo.ReturnType"/>.</summary>
     public static Type GetReturnTypeOrDefault(this MemberInfo member) =>
         member is ConstructorInfo ? member.DeclaringType
@@ -16948,7 +16963,7 @@ public enum DisposableTracking : byte
     TrackDisposableTransient
 }
 
-/// <summary>Base registration attribute, 
+/// <summary>Base registration attribute,
 /// there may be descendant predefined and custom attributes simplifying the registration setup.</summary>
 public class RegisterAttribute : Attribute
 {
