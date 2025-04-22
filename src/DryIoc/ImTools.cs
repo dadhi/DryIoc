@@ -230,14 +230,14 @@ public static class St
 
 /// <summary>Pair of the mutable values on stack.
 /// Designed to pass A and B together by ref, then read the new values afterwards</summary>
-public struct Vals<A, B>
+public struct StVal<A, B>
 {
     /// <summary>A</summary>
     public A a;
     /// <summary>B</summary>
     public B b;
     /// <summary>Construct a mutable pair of values</summary>
-    public Vals(A a, B b)
+    public StVal(A a, B b)
     {
         this.a = a;
         this.b = b;
@@ -245,11 +245,11 @@ public struct Vals<A, B>
 }
 
 /// <summary>Utility methods for the MutValues</summary>
-public static class Vals
+public static class StVal
 {
     /// <summary>Creates the mutable pair of values</summary>
     [MethodImpl((MethodImplOptions)256)]
-    public static Vals<A, B> Of<A, B>(A a, B b) => new Vals<A, B>(a, b);
+    public static StVal<A, B> Of<A, B>(A a, B b) => new StVal<A, B>(a, b);
 }
 
 /// <summary>Methods to work with immutable arrays and some sugar.</summary>
@@ -7191,8 +7191,8 @@ public static class ImHashMap
     /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
     public static S Fold<K, V, S>(this ImHashMap<K, V> map, S state, Func<ImHashMapEntry<K, V>, int, S, S> handler, MapParentStack parents = null)
     {
-        var vals = Vals.Of(a: state, b: handler);
-        map.ForEach(ref vals, static (ImHashMapEntry<K, V> e, int i, ref Vals<S, Func<ImHashMapEntry<K, V>, int, S, S>> s) =>
+        var vals = StVal.Of(a: state, b: handler);
+        map.ForEach(ref vals, static (ImHashMapEntry<K, V> e, int i, ref StVal<S, Func<ImHashMapEntry<K, V>, int, S, S>> s) =>
             s.a = s.b(e, i, s.a), parents);
         return vals.a;
     }
@@ -7201,6 +7201,7 @@ public static class ImHashMap
     public static S[] ToArray<V, S>(this ImHashMap<int, V> map, Func<VEntry<V>, S> selector) =>
         map == ImHashMap<int, V>.Empty ? ArrayTools.Empty<S>() :
             map.ForEach(St.Rent(new S[map.Count()], selector), static (e, i, s) => s.a[i] = s.b(e)).ResetButGetA();
+
     // todo: @perf accept the check for the selector result
     /// <summary>Converts the map to an array with the minimum allocations</summary>
     public static S[] ToArray<K, V, S>(this ImHashMap<K, V> map, Func<ImHashMapEntry<K, V>, S> selector)
@@ -7209,8 +7210,8 @@ public static class ImHashMap
             return ArrayTools.Empty<S>();
 
         var arr = new S[map.Count()];
-        var vals = Vals.Of(a: arr, b: selector);
-        map.ForEach(ref vals, static (ImHashMapEntry<K, V> e, int i, ref Vals<S[], Func<ImHashMapEntry<K, V>, S>> s) =>
+        var vals = StVal.Of(a: arr, b: selector);
+        map.ForEach(ref vals, static (ImHashMapEntry<K, V> e, int i, ref StVal<S[], Func<ImHashMapEntry<K, V>, S>> s) =>
             s.a[i] = s.b(e));
         return arr;
     }
