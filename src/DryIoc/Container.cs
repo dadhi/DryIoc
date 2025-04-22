@@ -892,10 +892,10 @@ public partial class Container : IContainer
 
         return new Container(
             rules ?? Rules,
-            registry, 
+            registry,
             singletonScope ?? NewSingletonScope(),
             currentScope ?? scopeContext ?? _ownScopeOrContext,
-            _disposed, _disposeStackTrace, 
+            _disposed, _disposeStackTrace,
             parent ?? _parent);
     }
 
@@ -14614,9 +14614,9 @@ public class Scope : IScope
         return default;
     }
 
-    private static async ValueTask DisposeSingleOrderRestAsync(ValueTask firstDisposalTask, ImList<object> rest)
+    private static async ValueTask DisposeSingleOrderRestAsync(ValueTask currDisposing, ImList<object> rest)
     {
-        await firstDisposalTask.ConfigureAwait(false);
+        await currDisposing.ConfigureAwait(false);
 
         for (var d = rest; d.Tail != null; d = d.Tail)
         {
@@ -14686,9 +14686,9 @@ public class Scope : IScope
         return default;
     }
 
-    private static async ValueTask DisposeRestAsync(ValueTask firstDisposalTask, SmallList4<ImList<object>> restDisposables, int restStartIndex)
+    private static async ValueTask DisposeRestAsync(ValueTask currDisposing, SmallList4<ImList<object>> restDisposables, int restStartIndex)
     {
-        await firstDisposalTask.ConfigureAwait(false);
+        await currDisposing.ConfigureAwait(false);
 
         for (var i = restStartIndex; i < restDisposables.Count; ++i)
         {
@@ -14759,6 +14759,9 @@ public delegate IScope SetCurrentScopeHandler(IScope oldScope);
 /// <summary>Provides ambient current scope and optionally scope storage for container,
 /// examples are HttpContext storage, Execution context, Thread local.</summary>
 public interface IScopeContext : IDisposable
+#if SUPPORTS_ASYNC_DISPOSABLE
+    , IAsyncDisposable
+#endif
 {
     /// <summary>Returns current scope or null if no ambient scope available at the moment.</summary>
     /// <returns>Current scope or null.</returns>
@@ -14771,6 +14774,34 @@ public interface IScopeContext : IDisposable
     /// Make it predictable by removing any side effects.</remarks>
     /// <returns>New current scope. So it is convenient to use method in "using (var newScope = ctx.SetCurrent(...))".</returns>
     IScope SetCurrent(SetCurrentScopeHandler setCurrentScope);
+}
+
+/// <summary>Uitilities to work with IScopeContext and help its possible implementations</summary>
+public static class ScopeContextTools
+{
+#if SUPPORTS_ASYNC_DISPOSABLE
+    /// <summary>DisposeAsync after the currDisposing scope found to be not completed yet</summary>
+    public static async ValueTask DisposeScopesRestAsync(ValueTask currDisposing, IScope remainingParent, IList<IScope> rest, int restStartIndex)
+    {
+        await currDisposing.ConfigureAwait(false);
+
+        for (var s = remainingParent; s != null;)
+        {
+            var parent = s.Parent;
+            await s.DisposeAsync().ConfigureAwait(false);
+            s = parent;
+        }
+
+        if (rest != null)
+            for (var i = restStartIndex; i < rest.Count; ++i)
+                for (var s = rest[i]; s != null;)
+                {
+                    var parent = s.Parent;
+                    await s.DisposeAsync().ConfigureAwait(false);
+                    s = parent;
+                }
+    }
+#endif
 }
 
 /// <summary>Tracks one current scope per thread, so the current scope in different tread would be different or null,
@@ -14806,6 +14837,29 @@ public sealed class ThreadScopeContext : IScopeContext
         }
     }
 
+#if SUPPORTS_ASYNC_DISPOSABLE
+    /// <summary>Disposes the scopes in sync until the pending async disposal, then returns the task to dispose the remaining scopes.</summary>
+    public ValueTask DisposeAsync()
+    {
+        var scopes = _scope.Values;
+        var lastScopeIndex = scopes.Count - 1;
+        for (var i = 0; i <= lastScopeIndex; ++i)
+            for (var s = scopes[i]; s != null;)
+            {
+                var parent = s.Parent; // save the parent before scope disposal, because after disposal the parent link may be nullified
+
+                var currDisposing = s.DisposeAsync();
+                if (!currDisposing.IsCompleted)
+                    return ScopeContextTools.DisposeScopesRestAsync(currDisposing, parent, scopes, i + 1);
+
+                if (currDisposing.IsFaulted) // rethrow the exception
+                    currDisposing.GetAwaiter().GetResult();
+
+                s = parent;
+            }
+        return default;
+    }
+#endif
 }
 
 /// <summary>Simplified scope agnostic reuse abstraction. More easy to implement,
@@ -17121,6 +17175,11 @@ public sealed class AsyncExecutionFlowScopeContext : IScopeContext
 
     /// <summary>Nothing to dispose.</summary>
     public void Dispose() { }
+
+#if SUPPORTS_ASYNC_DISPOSABLE
+    /// <summary>Nothing to dispose because... todo: @wip explain</summary>
+    public ValueTask DisposeAsync() => default;
+#endif
 }
 #endif
 

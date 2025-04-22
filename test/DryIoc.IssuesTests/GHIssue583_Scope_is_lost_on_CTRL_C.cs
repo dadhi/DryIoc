@@ -1,5 +1,3 @@
-using NUnit.Framework;
-
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -51,9 +49,12 @@ namespace DryIoc.IssuesTests
         public IScope GetCurrentOrDefault() => scope;
 
         public IScope SetCurrent(SetCurrentScopeHandler changeCurrentScope) => scope = changeCurrentScope(GetCurrentOrDefault());
-
         public void Dispose()
         {
         }
+
+#if NET5_0_OR_GREATER
+        public ValueTask DisposeAsync() => default;
+#endif
     }
 }
