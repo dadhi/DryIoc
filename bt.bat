@@ -6,7 +6,7 @@ set started_at=%time%
 set /a started_at_ms=1%started_at:~0,2%*24*60*100-100+%started_at:~3,2%*60*100+%started_at:~6,2%*100+%started_at:~9,2%
 
 echo:
-echo:# Build and Run TestRunner for .NET 9.0
+echo:# Build and Run TestRunner with .NET 9.0
 echo:[started at %started_at%]
 echo:
 

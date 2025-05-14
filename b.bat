@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableDelayedExpansion
 
-set "LatestSupportedNet=net8.0"
+set "LatestSupportedNet=net9.0"
 
 rem Calculate start time
 set started_at=%time%
@@ -9,7 +9,7 @@ set /a started_at_ms=1%started_at:~0,2%*24*60*100-100+%started_at:~3,2%*60*100+%
 
 echo:[STARTED AT %started_at%]
 echo:
-echo:# Build and Run TestRunners for %LatestSupportedNet% and .NET FRAMEWORK 4.7.2
+echo:# Build and Run TestRunners with %LatestSupportedNet% and .NET FRAMEWORK 4.7.2
 echo:
 echo:## %LatestSupportedNet%
 dotnet run -v:minimal -c:Release -f:net9.0 -p:LatestSupportedNet=net9.0 --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
