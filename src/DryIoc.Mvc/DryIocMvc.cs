@@ -122,7 +122,7 @@ namespace DryIoc.Mvc
         /// <param name="filterProviders">Original filter providers.</param>
         public static void SetFilterAttributeFilterProvider(this IContainer container, Collection<IFilterProvider> filterProviders = null)
         {
-            filterProviders = filterProviders ?? FilterProviders.Providers;
+            filterProviders ??= FilterProviders.Providers;
             var filterProvidersSnapshot = filterProviders.OfType<FilterAttributeFilterProvider>().ToArray();
             foreach (var provider in filterProvidersSnapshot)
                 filterProviders.Remove(provider);
@@ -185,11 +185,10 @@ namespace DryIoc.Mvc
     [ComVisible(false)]
     public class DryIocFilterAttributeFilterProvider : FilterAttributeFilterProvider
     {
+        private readonly IContainer _container;
+
         /// <summary>Creates filter provider.</summary> <param name="container"></param>
-        public DryIocFilterAttributeFilterProvider(IContainer container)
-        {
-            _container = container;
-        }
+        public DryIocFilterAttributeFilterProvider(IContainer container) => _container = container;
 
         /// <summary> Aggregates the filters from all of the filter providers into one collection. </summary>
         /// <returns> The collection filters from all of the filter providers. </returns>
@@ -197,12 +196,11 @@ namespace DryIoc.Mvc
         public override IEnumerable<Filter> GetFilters(ControllerContext controllerContext, ActionDescriptor actionDescriptor)
         {
             var filters = base.GetFilters(controllerContext, actionDescriptor).ToArray();
-            for (var i = 0; i < filters.Length; i++)
-                _container.InjectPropertiesAndFields(filters[i].Instance);
+            foreach (var f in filters)
+                if (f.Instance != null) // see, #684
+                    _container.InjectPropertiesAndFields(f.Instance);
             return filters;
         }
-
-        private readonly IContainer _container;
     }
 
     /// <summary>Provides a model validator and injects <see cref="IServiceProvider"/> 

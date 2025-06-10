@@ -14733,7 +14733,7 @@ public class Scope : IScope
         return items.ToArray();
     }
 
-    /// <summary>Mostly for the testing and the diagnostics reasons</summary>
+    /// <summary>Used for testing and diagnostics reasons</summary>
     public IEnumerable<object> GetTrackedDisposableOrAsyncDisposableObjects()
     {
         var dsByOrder = _disposables;
@@ -14753,7 +14753,7 @@ public class Scope : IScope
 
 /// <summary>Delegate to get new scope from old/existing current scope.</summary>
 /// <param name="oldScope">Old/existing scope to change.</param>
-/// <returns>New scope or old if do not want to change current scope.</returns>
+/// <returns>New scope or old without changing current scope.</returns>
 public delegate IScope SetCurrentScopeHandler(IScope oldScope);
 
 /// <summary>Provides ambient current scope and optionally scope storage for container,
@@ -14763,24 +14763,24 @@ public interface IScopeContext : IDisposable
     , IAsyncDisposable
 #endif
 {
-    /// <summary>Returns current scope or null if no ambient scope available at the moment.</summary>
+    /// <summary>Returns current scope or null if no ambient scope available.</summary>
     /// <returns>Current scope or null.</returns>
     IScope GetCurrentOrDefault();
 
     /// <summary>Changes current scope using provided delegate. Delegate receives current scope as input and
-    /// should return new current scope.</summary>
+    /// returns new current scope.</summary>
     /// <param name="setCurrentScope">Delegate to change the scope.</param>
-    /// <remarks>Important: <paramref name="setCurrentScope"/> may be called multiple times in concurrent environment.
+    /// <remarks>Important: <paramref name="setCurrentScope"/> Can be called multiple times in concurrent environment.
     /// Make it predictable by removing any side effects.</remarks>
-    /// <returns>New current scope. So it is convenient to use method in "using (var newScope = ctx.SetCurrent(...))".</returns>
+    /// <returns>New current scope. It is convenient to use method in "using (var newScope = ctx.SetCurrent(...))".</returns>
     IScope SetCurrent(SetCurrentScopeHandler setCurrentScope);
 }
 
-/// <summary>Uitilities to work with IScopeContext and help its possible implementations</summary>
+/// <summary>Uitilities for implementation and working with IScopeContext</summary>
 public static class ScopeContextTools
 {
 #if SUPPORTS_ASYNC_DISPOSABLE
-    /// <summary>DisposeAsync after the currDisposing scope found to be not completed yet</summary>
+    /// <summary>DisposeAsync if the currDisposing scope disposal is not completed yet todo: rewrite the summary</summary>
     public static async ValueTask DisposeScopesRestAsync(ValueTask currDisposing, IScope remainingParent, IList<IScope> rest, int restStartIndex)
     {
         await currDisposing.ConfigureAwait(false);
@@ -14804,11 +14804,11 @@ public static class ScopeContextTools
 #endif
 }
 
-/// <summary>Tracks one current scope per thread, so the current scope in different tread would be different or null,
-/// if not yet tracked. Context actually stores scope references internally, so it should be disposed to free them.</summary>
+/// <summary>Tracks one current scope per thread, so that the current scope in different tread would be different or null,
+/// if not yet tracked. Context stores scope references internally, so it should be disposed to free them.</summary>
 public sealed class ThreadScopeContext : IScopeContext
 {
-    /// <summary>Provides static name for context. It is OK because its constant.</summary>
+    /// <summary>Provides static name for context. It is OK because it is constant.</summary>
     public static readonly string ScopeContextName = "ThreadScopeContext";
 
     private ThreadLocal<IScope> _scope = new ThreadLocal<IScope>(true);
@@ -14817,11 +14817,11 @@ public sealed class ThreadScopeContext : IScopeContext
     public IScope GetCurrentOrDefault() =>
         _scope.Value;
 
-    /// <summary>Change current scope for the calling Thread.</summary>
+    /// <summary>Changes current scope for the caller Thread.</summary>
     public IScope SetCurrent(SetCurrentScopeHandler setCurrentScope) =>
         _scope.Value = setCurrentScope(_scope.Value);
 
-    /// <summary>Disposes the scopes and empties internal scope storage.</summary>
+    /// <summary>Disposes scopes and empties internal scope storage.</summary>
     public void Dispose()
     {
         var scopes = _scope.Values;
@@ -14838,7 +14838,7 @@ public sealed class ThreadScopeContext : IScopeContext
     }
 
 #if SUPPORTS_ASYNC_DISPOSABLE
-    /// <summary>Disposes the scopes in sync until the pending async disposal, then returns the task to dispose the remaining scopes.</summary>
+    /// <summary>Disposes scopes in sync until the pending async disposal,and then returns the task to dispose the remaining scopes.</summary>
     public ValueTask DisposeAsync()
     {
         var scopes = _scope.Values;
@@ -14846,7 +14846,7 @@ public sealed class ThreadScopeContext : IScopeContext
         for (var i = 0; i <= lastScopeIndex; ++i)
             for (var s = scopes[i]; s != null;)
             {
-                var parent = s.Parent; // save the parent before scope disposal, because after disposal the parent link may be nullified
+                var parent = s.Parent; // save the parent before scope disposal, because after disposal the parent link can be nullified
 
                 var currDisposing = s.DisposeAsync();
                 if (!currDisposing.IsCompleted)
@@ -14862,18 +14862,18 @@ public sealed class ThreadScopeContext : IScopeContext
 #endif
 }
 
-/// <summary>Simplified scope agnostic reuse abstraction. More easy to implement,
-///  and more powerful as can be based on other storage beside reuse.</summary>
+/// <summary>Simplified scope agnostic reuse abstraction. Easier to implement
+///  and more powerful as it can be based on other storage beside reuse.</summary>
 public interface IReuse : IConvertibleToExpression
 {
-    /// <summary>Relative to other reuses lifespan value.</summary>
+    /// <summary>Relative value to lifespan of other reuses.</summary>
     int Lifespan { get; }
 
-    /// <summary>Optional name. Use to find matching scope by the name.
-    /// It also may be interpreted as object[] Names for matching with multiple scopes </summary>
+    /// <summary>Optional name. Use to find matching scope.
+    /// It also can be interpreted as object[] Names for matching with multiple scopes </summary>
     object Name { get; }
 
-    /// <summary>Returns true if reuse can be applied: may check if scope or other reused item storage is present.</summary>
+    /// <summary>Returns true if reuse can be applied: can check if scope or other reused item storage is present.</summary>
     bool CanApply(Request request);
 
     /// <summary>Returns composed expression.</summary>

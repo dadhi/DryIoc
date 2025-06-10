@@ -429,6 +429,7 @@ public class Program
             new GHIssue659_Can_I_inspect_a_scope_for_all_the_dependencies_resolved_in_the_scope(),
             new GHIssue669_Unable_to_resolve_type_with_optional_arguments_with_both_MefAttributedModel_and_MS_DI(),
             new GHIssue678_Scope_is_lost_in_diposable_service(),
+            new GHIssue685_Creating_scopes_via_funcs_is_not_threadsafe_and_fails_sporadically_with_NullRef_exception(),
         };
 
         var totalPassed = 0;
