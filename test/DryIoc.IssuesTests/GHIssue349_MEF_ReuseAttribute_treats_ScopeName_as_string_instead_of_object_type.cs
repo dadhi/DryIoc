@@ -42,12 +42,12 @@ namespace DryIoc.IssuesTests
             scope1.Resolve<MultiService>();
         }
 
-        class ScopeMarker {}
+        class ScopeMarker { }
 
         [Reuse(ReuseType.Scoped, typeof(ScopeMarker))]
-        class Service {}
+        class Service { }
 
         [Reuse(ReuseType.Scoped, typeof(ScopeMarker), "ScopeMarker", 42)]
-        class MultiService {}
+        class MultiService { }
     }
 }

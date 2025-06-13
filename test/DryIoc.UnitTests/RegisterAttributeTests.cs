@@ -30,7 +30,7 @@ namespace DryIoc.UnitTests
             Assert.IsTrue(((AD)ad).IsDisposed);
         }
 
-        [Register<ID, AD, TransientReuse>(TrackDisposableTransient = DisposableTracking.TrackDisposableTransient)]
+        [Register<ID, AD>(TrackDisposableTransient = DisposableTracking.TrackDisposableTransient)]
         public static class Registrations { }
 
         public interface ID { }
@@ -50,8 +50,8 @@ namespace DryIoc.UnitTests
             public B(IA a) => A = a;
         }
 
-        [Register<IA, A, SingletonReuse>()]
-        [Register<B, CurrentScopeReuse>()]
+        [Register<IA, A>(ReuseAs.Singleton)]
+        [Register<B>(ReuseAs = ReuseAs.Scoped)]
         public static class DiConfig { }
 
         [Test]

@@ -9470,6 +9470,7 @@ public static class Registrator
     {
         var attrs = registrationAttributesTarget.GetCustomAttributes<RegisterAttribute>(inherit: true);
         var regCount = 0;
+
         foreach (var a in attrs)
         {
             var factory = CreateFactory(a);
@@ -9484,25 +9485,27 @@ public static class Registrator
 
     internal static ReflectionFactory CreateFactory(RegisterAttribute attr)
     {
-        var reuse = GetReuse(attr);
+        var reuse = TryGetReuse(attr);
         var made = Made.Default;  // todo: @wip add features later
         var setup = GetSetup(attr);
         return ReflectionFactory.Of(attr.ImplementationType, reuse, made, setup);
     }
 
-    internal static IReuse GetReuse(RegisterAttribute attr) =>
-        attr.ReuseType switch
+    internal static IReuse TryGetReuse(RegisterAttribute attr) =>
+        attr.ReuseAs switch
         {
-            var t when t == typeof(TransientReuse) => Reuse.Transient,
-            var t when t == typeof(SingletonReuse) => Reuse.Singleton,
-            var t when t == typeof(CurrentScopeReuse) =>
+            ReuseAs.ContainerRulesDefaultReuse => null, // default container reuse
+            ReuseAs.Transient => Reuse.Transient,
+            ReuseAs.Singleton => Reuse.Singleton,
+            ReuseAs.Scoped =>
                 attr.ReuseScopeName == null & attr.ReuseScopeNames == null ? Reuse.Scoped :
-                attr.ReuseScopeName != null ? Reuse.ScopedTo(attr.ReuseScopeName) : Reuse.ScopedTo(attr.ReuseScopeNames),
-            // todo: @wip support this stuff later
-            // ScopedToServiceType;
-            // ScopedToServiceKey;
-            // ScopedOrSingleton;
-            var t => Throw.For<IReuse>(Error.RegisterAttributedUnsupportedReuseType, t)
+                attr.ReuseScopeNames != null ? Reuse.ScopedTo(attr.ReuseScopeNames) : Reuse.ScopedTo(attr.ReuseScopeName),
+            ReuseAs.ScopedToService =>
+                Reuse.ScopedToService(attr.ScopedToServiceType, attr.ScopedToServiceKey),
+            ReuseAs.ScopedOrSingleton =>
+                attr.ReuseScopeName == null & attr.ReuseScopeNames == null ? Reuse.ScopedOrSingleton :
+                attr.ReuseScopeNames != null ? Reuse.ScopedTo(attr.ReuseScopeNames, true) : Reuse.ScopedTo(attr.ReuseScopeName, true),
+            var r => Throw.For<IReuse>(Error.RegisterAttributedUnsupportedReuseType, r)
         };
 
     internal static Setup GetSetup(RegisterAttribute attr)
@@ -15347,7 +15350,9 @@ public sealed class CompositeScopeName : IScopeName
     private readonly object[] _names;
 }
 
-/// <summary>Holds the name for the resolution scope.</summary>
+/// <summary>Represents the name of the resolution scope, 
+/// a scope created for registration with setup option `openResolutionScope: true`.
+/// A scope name targeted by the `Reuse.ScopedToService`</summary>
 public sealed class ResolutionScopeName : IScopeName
 {
     /// <summary>Creates scope with specified service type and key</summary>
@@ -15411,8 +15416,8 @@ public static class Reuse
 
     /// <summary>Scoped to the scope with the specified name only.
     /// The `name` may be null, so the service will be scoped to any scope. Specifies all the scope details</summary>
-    public static IReuse ScopedTo(object name, bool scopedOrSingleton, int lifespan) =>
-        new CurrentScopeReuse(name, scopedOrSingleton, lifespan);
+    public static IReuse ScopedTo(object name, bool scopedOrSingleton, int? lifespan = null) =>
+        new CurrentScopeReuse(name, scopedOrSingleton, lifespan.HasValue ? lifespan.Value : CurrentScopeReuse.DefaultLifespan);
 
     /// <summary>Scoped to the closest scope (in scope parent hierarchy) with the name from the specified names list.
     /// The `names` should no contain the `null`</summary>
@@ -15421,7 +15426,7 @@ public static class Reuse
 
     /// <summary>Scoped to the scope created by the service with the specified type and optional key</summary>
     public static IReuse ScopedToService(Type serviceType = null, object serviceKey = null) =>
-        serviceType == null && serviceKey == null ? Scoped
+        serviceType == null & serviceKey == null ? Scoped
         : new CurrentScopeReuse(ResolutionScopeName.Of(serviceType, serviceKey));
 
     /// <summary>Scoped to the scope created by the service with the specified `TService` type and `serviceKey`,
@@ -15801,8 +15806,21 @@ public interface ICompileTimeContainer
 }
 
 /// <summary>Tools to generate the object graph for the specified roots/registrations</summary>
-public static class CompileTimeContainerExtensions
+public static class CompileTimeContainerGeneration
 {
+    static string TrimUsings(string source, string[] usings)
+    {
+        source = source.Replace("DryIoc.", "");
+        // todo: @wip remove unnecessary usings that's are System.Collections.Generic for KeyValuePair, etc.
+        foreach (var x in usings)
+            source = source.Replace(x + ".", "");
+        return source;
+    }
+
+    /// <summary>Trims `typeof` and namespaces included in usings</summary>
+    static string TypeOnlyCode(Type type, string[] usings) =>
+        TrimUsings(type.ToCode(printGenericTypeArgs: true), usings);
+
     /// <summary>
     /// Generates C# code for the compile-time container the provided container registrations.
     /// The `roots` and `getRoots` specify what services will be included into the top-level TryResolve methon in the comp-time container.
@@ -15827,27 +15845,15 @@ public static class CompileTimeContainerExtensions
             : getRoots == null ? container.GenerateResolutionExpressions(_ => roots, allowRuntimeState)
             : container.GenerateResolutionExpressions(all => all.SelectMany(reg => getRoots(reg).EmptyIfNull()).Concat(roots), allowRuntimeState);
 
-        string TrimUsings(string source)
-        {
-            source = source.Replace("DryIoc.", "");
-            // todo: @wip remove unnecessary usings that's are System.Collections.Generic for KeyValuePair, etc.
-            foreach (var x in namespaceUsings)
-                source = source.Replace(x + ".", "");
-            return source;
-        }
-
         string Code(object x, int lineIndent = 0) =>
-            x == null ? "null" :
-            x is Expression e ? TrimUsings(e.ToCSharpString(new StringBuilder(), lineIndent).ToString()) :
-            x is Request r ? Code(container.GetRequestExpression(r), lineIndent) :
-            Code(container.GetConstantExpression(x, x.GetType(), true), lineIndent);
+           x == null ? "null" :
+           x is Expression e ? TrimUsings(e.ToCSharpString(new StringBuilder(), lineIndent).ToString(), namespaceUsings) :
+           x is Request r ? Code(container.GetRequestExpression(r), lineIndent) :
+           Code(container.GetConstantExpression(x, x.GetType(), true), lineIndent);
 
-        // trim `typeof` and namespaces included in usings
-        string TypeOnlyCode(Type type) => TrimUsings(type.ToCode(printGenericTypeArgs: true));
+        static string GetTypeNameOnly(string typeName) => typeName.Split('`').First().Split('.').Last();
 
-        string GetTypeNameOnly(string typeName) => typeName.Split('`').First().Split('.').Last();
-
-        string CommaOptArg(string arg) => arg == "null" ? "" : ", " + arg;
+        static string CommaOptArg(string arg) => arg == "null" ? "" : ", " + arg;
 
         var methodsBodyLineIdent = 8;
 
@@ -15856,7 +15862,7 @@ public static class CompileTimeContainerExtensions
             {
                 r.Key.ServiceType,
                 ServiceTypeCode = Code(r.Key.ServiceType),
-                ServiceTypeOnlyCode = TypeOnlyCode(r.Key.ServiceType),
+                ServiceTypeOnlyCode = TypeOnlyCode(r.Key.ServiceType, namespaceUsings),
                 ServiceKeyCode = Code(r.Key.ServiceKey),
                 RequiredServiceTypeCode = Code(r.Key.Details.RequiredServiceType),
                 ExpressionCode = Code(r.Value.Body, methodsBodyLineIdent),
@@ -15870,7 +15876,7 @@ public static class CompileTimeContainerExtensions
             {
                 r.Key.ServiceType,
                 ServiceTypeCode = Code(r.Key.ServiceType),
-                ServiceTypeOnlyCode = TypeOnlyCode(r.Key.ServiceType),
+                ServiceTypeOnlyCode = TypeOnlyCode(r.Key.ServiceType, namespaceUsings),
                 ServiceKeyCode = Code(r.Key.ServiceKey),
                 r.Key.ServiceKey,
                 ExpressionCode = Code(r.Value, methodsBodyLineIdent),
@@ -17454,13 +17460,30 @@ public enum DisposableTracking : byte
     TrackDisposableTransient
 }
 
+/// <summary>Type of the Reuse specified in the `RegisterAttribute`</summary>
+public enum ReuseAs : byte
+{
+    /// <summary>Default reuse type is to use the container rules</summary>
+    ContainerRulesDefaultReuse = 0,
+    /// <summary>Reuse as Transient</summary>
+    Transient,
+    /// <summary>Reuse as Singleton</summary>
+    Singleton,
+    /// <summary>Reuse as Scoped</summary>
+    Scoped,
+    /// <summary>Reuse as Scoped to the service type, and optionally a service key</summary>
+    ScopedToService,
+    /// <summary>Reuse or Singleton when no open Scope</summary>
+    ScopedOrSingleton,
+}
+
 /// <summary>Base registration attribute,
 /// there may be descendant predefined and custom attributes simplifying the registration setup.</summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
     AllowMultiple = true, Inherited = true)]
 public class RegisterAttribute : Attribute
 {
-    /// <summary>By default no, because the attribute operates on the</summary>
+    /// <summary>By default no when the attribute operates on the specified srevice and implementation runtime types</summary>
     public virtual bool TypesAreStaticallyChecked => false;
 
     /// <summary>A service type</summary>
@@ -17470,17 +17493,21 @@ public class RegisterAttribute : Attribute
     public Type ImplementationType;
 
     /// <summary>One of the IReuse implementation types.</summary>
-    public Type ReuseType;
+    public ReuseAs ReuseAs;
 
-    /// <summary>Optional name of the bound scope for the Scoped reuse</summary>
-    public string ReuseScopeName;
+    /// <summary>Optional name of the bound scope for the `ReuseType.Scoped`</summary>
+    public object ReuseScopeName;
 
-    /// <summary>Optional names of the bound scopes fore the Scoped reuse. Maybe overridden by <see cref="ReuseScopeName"/></summary>
+    /// <summary>Optional names of the bound scopes fore the Scoped reuse. 
+    /// Overrides the `ReuseScopeName`</summary>
     public object[] ReuseScopeNames;
+    /// <summary>Valid for `ReuseType.ScopedToService`.
+    /// Overrides `ReuseScopeNames` and `ReuseScopeName`</summary>
+    public Type ScopedToServiceType;
 
-    // public Type ScopedToServiceType;
-    // public Type ScopedToServiceKey;
-    // public bool ScopedOrSingleton;
+    /// <summary>Optional and valid for `ReuseType.ScopedToService`.
+    /// Overrides `ReuseScopeNames` and `ReuseScopeName`</summary>
+    public object ScopedToServiceKey;
 
     /// <summary>A service key</summary>
     public object ServiceKey;
@@ -17488,10 +17515,20 @@ public class RegisterAttribute : Attribute
     /// <summary>Uses the global container rules by default</summary>
     public IfAlreadyRegistered? IfAlreadyRegistered;
 
+    // todo: @wip
     // public Made Made;
 
     /// <summary>How to track the disposable transient</summary>
     public DisposableTracking TrackDisposableTransient;
+
+    /// <summary>Creates the registration attribute with the minimal configuration</summary>
+    public RegisterAttribute(Type serviceType, Type implementationType,
+        ReuseAs reuseAs = ReuseAs.ContainerRulesDefaultReuse)
+    {
+        ServiceType = serviceType;
+        ImplementationType = implementationType;
+        ReuseAs = reuseAs;
+    }
 }
 
 // todo: @feature @wip implement the Register via attributes
@@ -17501,37 +17538,27 @@ public class RegisterAttribute : Attribute
 /// <summary>A single registration attribute</summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
     AllowMultiple = true, Inherited = true)]
-public sealed class RegisterAttribute<TService, TImplementation, TReuse> : RegisterAttribute
-    where TReuse : IReuse
+public sealed class RegisterAttribute<TService, TImplementation> : RegisterAttribute
 {
     /// <summary>In this case there are compile-time type constraints for the Implementation and Service types</summary>
     public override bool TypesAreStaticallyChecked => true;
 
     /// <summary>Creates the registration attribute</summary>
-    public RegisterAttribute()
-    {
-        ServiceType = typeof(TService);
-        ImplementationType = typeof(TImplementation);
-        ReuseType = typeof(TReuse);
-    }
+    public RegisterAttribute(ReuseAs reuseAs = ReuseAs.ContainerRulesDefaultReuse)
+        : base(typeof(TService), typeof(TImplementation), reuseAs) { }
 }
 
 /// <summary>Register with `TImplementation` the same as `TService`</summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
     AllowMultiple = true, Inherited = true)]
-public sealed class RegisterAttribute<TImplementation, TReuse> : RegisterAttribute
-    where TReuse : IReuse
+public sealed class RegisterAttribute<TImplementation> : RegisterAttribute
 {
     /// <summary>In this case there are compile-time type constraints for the Implementation and Service types</summary>
     public override bool TypesAreStaticallyChecked => true;
 
     /// <summary>Creates the registration attribute</summary>
-    public RegisterAttribute()
-    {
-        ServiceType = typeof(TImplementation);
-        ImplementationType = typeof(TImplementation);
-        ReuseType = typeof(TReuse);
-    }
+    public RegisterAttribute(ReuseAs reuseAs = ReuseAs.ContainerRulesDefaultReuse)
+        : base(typeof(TImplementation), typeof(TImplementation), reuseAs) { }
 }
 
 /// <summary>Ports some methods from .Net 4.0/4.5</summary>
