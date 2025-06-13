@@ -15805,6 +15805,62 @@ public interface ICompileTimeContainer
     IEnumerable<ResolveManyResult> ResolveMany(IResolverContext r, Type serviceType);
 }
 
+/// <summary>Combines multiple compile-time containers into one composite.</summary>
+public sealed class MultiCompileTimeContainer : ICompileTimeContainer
+{
+    /// <summary>Array of compile-time containers to use for resolution</summary>
+    public readonly ICompileTimeContainer[] Containers;
+
+    /// <summary>Creates a new instance with the specified containers.</summary>
+    public MultiCompileTimeContainer(params ICompileTimeContainer[] containers) => Containers = containers;
+
+    /// <inheritdoc/>
+    public bool IsRegistered(Type serviceType)
+    {
+        foreach (var container in Containers)
+            if (container.IsRegistered(serviceType))
+                return true;
+        return false;
+    }
+
+    /// <inheritdoc/>
+    public bool IsRegistered(Type serviceType, object serviceKey)
+    {
+        foreach (var container in Containers)
+            if (container.IsRegistered(serviceType, serviceKey))
+                return true;
+        return false;
+    }
+
+    /// <inheritdoc/>
+    public bool TryResolve(out object service, IResolverContext r, Type serviceType)
+    {
+        foreach (var container in Containers)
+            if (container.TryResolve(out service, r, serviceType))
+                return true;
+        service = null;
+        return false;
+    }
+
+    /// <inheritdoc/>
+    public bool TryResolve(out object service, IResolverContext r, Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args)
+    {
+        foreach (var container in Containers)
+            if (container.TryResolve(out service, r, serviceType, serviceKey, requiredServiceType, preRequestParent, args))
+                return true;
+        service = null;
+        return false;
+    }
+
+    /// <inheritdoc/>
+    public IEnumerable<ResolveManyResult> ResolveMany(IResolverContext r, Type serviceType)
+    {
+        foreach (var container in Containers)
+            foreach (var result in container.ResolveMany(r, serviceType))
+                yield return result;
+    }
+}
+
 /// <summary>Tools to generate the object graph for the specified roots/registrations</summary>
 public static class CompileTimeContainerGeneration
 {
