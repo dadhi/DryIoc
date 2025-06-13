@@ -931,8 +931,11 @@ public partial class Container : IContainer
     public GeneratedExpressions GenerateResolutionExpressions(
         Func<IEnumerable<ServiceRegistrationInfo>, IEnumerable<ServiceInfo>> getRoots = null, bool allowRuntimeState = false)
     {
-        var generatingContainer = this.WithExpressionGeneration(allowRuntimeState);
-        var regs = generatingContainer.GetServiceRegistrations();
+        var genContainer = this.Rules.UsedForExpressionGenerationWithTheSameAllowRuntimeState(allowRuntimeState)
+            ? this
+            : this.WithExpressionGeneration(allowRuntimeState);
+
+        var regs = genContainer.GetServiceRegistrations();
         var roots = getRoots != null ? getRoots(regs) : regs.Select(static r => r.ToServiceInfo());
 
         var result = new GeneratedExpressions();
@@ -940,8 +943,8 @@ public partial class Container : IContainer
         {
             try
             {
-                var request = Request.Create(generatingContainer, root);
-                var expr = generatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
+                var request = Request.Create(genContainer, root);
+                var expr = genContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
                 if (expr == null)
                     continue;
                 result.Roots.Add(root.Pair(expr.WrapInFactoryExpressionWithoutNormalization()));
@@ -952,7 +955,7 @@ public partial class Container : IContainer
             }
         }
 
-        var depExprs = generatingContainer.Rules.DependencyResolutionCallExprs.Value;
+        var depExprs = genContainer.Rules.DependencyResolutionCallExprs.Value;
         result.ResolveDependencies.AddRange(depExprs.Enumerate().Select(static r => r.Key.Pair(r.Value)));
         return result;
     }
@@ -6792,6 +6795,11 @@ public sealed class Rules
     /// <summary>Indicates that container is used for generation purposes, so it should use less runtime state</summary>
     public bool UsedForExpressionGeneration => (_settings & Settings.UsedForExpressionGeneration) != 0;
 
+    /// <summary>Indicates that container is used for generation purposes with the same `allowRuntimeState` setting</summary>
+    public bool UsedForExpressionGenerationWithTheSameAllowRuntimeState(bool allowRuntimeState) =>
+        (_settings & Settings.UsedForExpressionGeneration) != 0 &
+        (_settings & Settings.ThrowIfRuntimeStateRequired) == (allowRuntimeState ? Settings.ThrowIfRuntimeStateRequired : 0);
+
     private Settings GetSettingsForExpressionGeneration(bool allowRuntimeState = false) =>
         _settings & ~Settings.EagerCachingSingletonForFasterAccess
                     & ~Settings.ImplicitCheckForReuseMatchingScope
@@ -9462,12 +9470,12 @@ public static class Registrator
     {
         var attrs = registrationAttributesTarget.GetCustomAttributes<RegisterAttribute>(inherit: true);
         var regCount = 0;
-        foreach (var attr in attrs)
+        foreach (var a in attrs)
         {
-            var factory = CreateFactory(attr);
+            var factory = CreateFactory(a);
 
-            registrator.Register(factory, attr.ServiceType, attr.ServiceKey, attr.IfAlreadyRegistered,
-                isStaticallyChecked: attr.TypesAreStaticallyChecked);
+            registrator.Register(factory, a.ServiceType, a.ServiceKey, a.IfAlreadyRegistered,
+                isStaticallyChecked: a.TypesAreStaticallyChecked);
 
             ++regCount;
         }
@@ -15447,8 +15455,6 @@ public static class Reuse
     public static readonly IReuse InWebRequest = ScopedTo(WebRequestScopeName);
 }
 
-
-
 /// <summary>Policy to handle unresolved service.</summary>
 public enum IfUnresolved : byte
 {
@@ -15792,6 +15798,437 @@ public interface ICompileTimeContainer
 
     /// <summary>Resolve many services or none at all (if no registerations found)</summary>
     IEnumerable<ResolveManyResult> ResolveMany(IResolverContext r, Type serviceType);
+}
+
+/// <summary>Tools to generate the object graph for the specified roots/registrations</summary>
+public static class CompileTimeContainerExtensions
+{
+    /// <summary>
+    /// Generates C# code for the compile-time container the provided container registrations.
+    /// The `roots` and `getRoots` specify what services will be included into the top-level TryResolve methon in the comp-time container.
+    /// The optional `namespaceUsings` will be added to the generated code as `using` statements and the respective service Types will be trimmed to the Name.
+    /// </summary>
+    public static IContainer GenerateCompileTimeContainerCSharpCode(this IContainer container,
+        StringBuilder resultCode,
+        bool allowRuntimeState = false,
+        ServiceInfo[] roots = null,
+        Func<ServiceRegistrationInfo, ServiceInfo[]> getRoots = null,
+        string[] namespaceUsings = null,
+        string genCompileTimeContainerClassName = "CompileTimeContainer")
+    {
+        Debug.Assert(resultCode != null, "resultCode StringBuilder should not be null");
+
+        roots ??= [];
+        namespaceUsings ??= [];
+
+        // `GenerateResolutionExpressions` is taking care of ensuring the container has a proper settings for the Generation
+        var genExprs =
+            roots.Length == 0 & getRoots == null ? container.GenerateResolutionExpressions(allowRuntimeState: allowRuntimeState)
+            : getRoots == null ? container.GenerateResolutionExpressions(_ => roots, allowRuntimeState)
+            : container.GenerateResolutionExpressions(all => all.SelectMany(reg => getRoots(reg).EmptyIfNull()).Concat(roots), allowRuntimeState);
+
+        string TrimUsings(string source)
+        {
+            source = source.Replace("DryIoc.", "");
+            // todo: @wip remove unnecessary usings that's are System.Collections.Generic for KeyValuePair, etc.
+            foreach (var x in namespaceUsings)
+                source = source.Replace(x + ".", "");
+            return source;
+        }
+
+        string Code(object x, int lineIndent = 0) =>
+            x == null ? "null" :
+            x is Expression e ? TrimUsings(e.ToCSharpString(new StringBuilder(), lineIndent).ToString()) :
+            x is Request r ? Code(container.GetRequestExpression(r), lineIndent) :
+            Code(container.GetConstantExpression(x, x.GetType(), true), lineIndent);
+
+        // trim `typeof` and namespaces included in usings
+        string TypeOnlyCode(Type type) => TrimUsings(type.ToCode(printGenericTypeArgs: true));
+
+        string GetTypeNameOnly(string typeName) => typeName.Split('`').First().Split('.').Last();
+
+        string CommaOptArg(string arg) => arg == "null" ? "" : ", " + arg;
+
+        var methodsBodyLineIdent = 8;
+
+        var rootCodes = genExprs.Roots.Select((r, i) =>
+            new
+            {
+                r.Key.ServiceType,
+                ServiceTypeCode = Code(r.Key.ServiceType),
+                ServiceTypeOnlyCode = TypeOnlyCode(r.Key.ServiceType),
+                ServiceKeyCode = Code(r.Key.ServiceKey),
+                RequiredServiceTypeCode = Code(r.Key.Details.RequiredServiceType),
+                ExpressionCode = Code(r.Value.Body, methodsBodyLineIdent),
+                CreateMethodName = "Get_" + GetTypeNameOnly(r.Key.ServiceType.Name) + "_" + i
+            }).ToArray();
+
+        var defaultRoots = rootCodes.Match(f => f.ServiceKeyCode == "null");
+
+        var depCodes = genExprs.ResolveDependencies.Select((r, i) =>
+            new
+            {
+                r.Key.ServiceType,
+                ServiceTypeCode = Code(r.Key.ServiceType),
+                ServiceTypeOnlyCode = TypeOnlyCode(r.Key.ServiceType),
+                ServiceKeyCode = Code(r.Key.ServiceKey),
+                r.Key.ServiceKey,
+                ExpressionCode = Code(r.Value, methodsBodyLineIdent),
+                Expression = r.Value,
+                RequiredServiceTypeCode = Code(r.Key.RequiredServiceType),
+                PreResolveParentCode = Code(r.Key.Parent, methodsBodyLineIdent + 8),
+                PreResolveParent = r.Key.Parent,
+                CreateMethodName = "GetDependency_" + GetTypeNameOnly(r.Key.ServiceType.Name) + "_" + i
+            }).ToArray();
+
+        var includeVariants = container.Rules.VariantGenericTypesInResolvedCollection;
+
+        var sb = resultCode;
+
+        sb.Append(
+            """
+            // <auto-generated/>
+            /*
+            The MIT License (MIT)
+
+            Copyright (c) 2016-2025 Maksim Volkau
+
+            Permission is hereby granted, free of charge, to any person obtaining a copy
+            of this software and associated documentation files (the "Software"), to deal
+            in the Software without restriction, including without limitation the rights
+            to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+            copies of the Software, and to permit persons to whom the Software is
+            furnished to do so, subject to the following conditions:
+
+            The above copyright notice and this permission notice shall be included in
+            all copies or substantial portions of the Software.
+
+            THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+            IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+            FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+            AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+            LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+            OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+            THE SOFTWARE.
+
+            =================================================================================================
+            The code below is generated at compile-time and changes here will be lost on the next generation.
+            =================================================================================================
+            """);
+
+        var errCount = genExprs.Errors.Count;
+        if (errCount != 0)
+        {
+            sb.Append(
+                $"""
+
+                There are {errCount} generation ERRORS:
+                
+                
+                """);
+
+            var eNum = 0;
+            foreach (var e in genExprs.Errors)
+                sb.Append(
+                    $"""
+
+                    {++eNum}. {e.Key}:
+                    {e.Value.Message}
+
+
+                    """);
+        }
+
+        var notResolvedDeps = 0;
+        foreach (var dc in depCodes)
+            if (dc.Expression == null)
+            {
+                if (notResolvedDeps++ == 0)
+                    sb.Append(
+                        """
+
+                        WARNINGS: Some dependencies are missing. Register them at runtime or add to the compile-time registrations.
+
+
+                        """);
+
+                // todo: @wip remove unnecessary info from the output
+                sb.Append(
+                    $"""
+
+                    `{dc.ServiceTypeOnlyCode}` {(dc.ServiceKey == null ? "" : $"with key {dc.ServiceKeyCode} ")}in {dc.PreResolveParent}
+                    
+                    """);
+            }
+
+        if (notResolvedDeps > 0)
+            depCodes = depCodes.Match(static d => d.Expression != null);
+
+        sb.Append(
+            """
+            --------------------------------------------------------------------------------------------------------
+            */
+
+            namespace DryIoc; // todo: @wip can we use User namespace here?
+
+            using System;
+            using System.Collections.Generic;
+            using System.Threading;
+            using DryIoc.ImTools;
+
+            """);
+
+        if (namespaceUsings.Length == 0)
+            sb.Append(
+                """
+
+                // No User-specified namespaces.
+
+                """);
+        else
+        {
+            sb.Append(
+                """
+
+                // User-specified namespaces:
+
+                """);
+            foreach (var ns in namespaceUsings)
+                sb.Append(
+                $"""
+
+                using {ns};
+                
+                """);
+        }
+        sb.Append(
+            $$"""
+
+            ///<summary>The container provides access to the object graph generated using the DryIoc own tools at compile-time</summary>
+            public sealed class {{genCompileTimeContainerClassName}} : ICompileTimeContainer
+            {
+                ///<summary>The instance if generated compile-time container.</summary>
+                public static readonly {{genCompileTimeContainerClassName}} Instance = new {{genCompileTimeContainerClassName}}();
+
+                // todo: @wip tbd
+                /// <inheritdoc/>
+                public bool IsRegistered(Type serviceType) => false;
+
+                /// <inheritdoc/>
+                public bool IsRegistered(Type serviceType, object serviceKey) => false;
+
+                /// <inheritdoc/>
+                public bool TryResolve(out object service, IResolverContext r, Type serviceType)
+                {
+            """);
+        for (var i = 0; i < defaultRoots.Length; ++i)
+            sb.Append(
+                $$"""
+
+                        {{(i > 0 ? "else " : "")}}if (serviceType == {{defaultRoots[i].ServiceTypeCode}})
+                        {
+                            service = {{defaultRoots[i].CreateMethodName}}(r);
+                            return true;
+                        }
+                """);
+        sb.Append(
+            """
+
+                    service = null;
+                    return false;
+                }
+
+            """);
+
+
+        sb.Append(
+            """
+
+                /// <inheritdoc/>
+                public bool TryResolve(out object service, IResolverContext r,
+                    Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args)
+                {
+            """);
+
+        var index = 0;
+        foreach (var rootGroup in rootCodes.Where(x => x.ServiceKeyCode != "null").GroupBy(x => x.ServiceType))
+        {
+            sb.Append(
+                $$"""
+
+                        {{(index++ > 0 ? "else " : "")}}if (serviceType == {{rootGroup.Key}})
+                        {
+                """);
+            var innerIndex = 0;
+            foreach (var root in rootGroup)
+            {
+                sb.Append(
+                    $$"""
+
+                                {{(innerIndex++ > 0 ? "else " : "")}}if ({{root.ServiceKeyCode}}.Equals(serviceKey))
+                                {
+                                    service = {{root.CreateMethodName}}(r);
+                                    return true;
+                                }
+                    """);
+            }
+            sb.Append(
+                """
+
+                        }
+                """);
+        }
+
+        index = 0;
+        foreach (var depGroup in depCodes.GroupBy(x => x.ServiceType))
+        {
+            sb.Append(
+                $$"""
+
+                        {{(index++ > 0 ? "else " : "")}}if (serviceType == {{depGroup.Key}})
+                        {
+                """);
+
+
+            var innerIndex = 0;
+            foreach (var dep in depGroup)
+            {
+                sb.Append(
+                    $$"""
+
+                                {{(innerIndex++ > 0 ? "else " : "")}}if ({{(dep.ServiceKey == null ? "serviceKey == null" :
+                                        dep.ServiceKey is DefaultKey ? "(serviceKey == null || " + dep.ServiceKeyCode + ".Equals(serviceKey))" :
+                                        dep.ServiceKeyCode + ".Equals(serviceKey)")}} &&
+                                    requiredServiceType == {{dep.RequiredServiceTypeCode}} &&
+                                    Equals(preRequestParent, {{dep.PreResolveParentCode}}))
+                                {
+                                    service = {{dep.CreateMethodName}}(r);
+                                    return true;
+                                }
+                    """);
+            }
+            sb.Append(
+                """
+
+                        }
+                """);
+        }
+
+        sb.Append(
+            """
+
+                    service = null;
+                    return false;
+                }
+
+            """);
+
+        sb.Append(
+            """
+
+                /// <inheritdoc/>
+                public IEnumerable<ResolveManyResult> ResolveMany(IResolverContext _, Type serviceType)
+            """);
+
+        if (rootCodes.Length == 0)
+            sb.Append(" => ArrayTools.Empty<ResolveManyResult>();");
+        else
+        {
+            sb.Append(
+                """
+
+                    {
+                """);
+            foreach (var serviceTypeGroup in rootCodes.GroupBy(x => x.ServiceType))
+            {
+                sb.Append(
+                    $$"""
+
+                            if (serviceType == {{serviceTypeGroup.First().ServiceTypeCode}})
+                            {
+                    """);
+                foreach (var reg in serviceTypeGroup)
+                    sb.Append(
+                        $"""
+
+                                    yield return ResolveManyResult.Of(r => {reg.CreateMethodName}(r){CommaOptArg(reg.ServiceKeyCode)}{CommaOptArg(reg.RequiredServiceTypeCode)});
+                        """);
+
+                if (includeVariants && serviceTypeGroup.Key.IsGenericType)
+                {
+                    var sourceType = serviceTypeGroup.Key;
+                    var variants = rootCodes
+                        .Where(x => x.ServiceType.IsGenericType &&
+                            x.ServiceType.GetGenericTypeDefinition() == sourceType.GetGenericTypeDefinition() &&
+                            x.ServiceType != sourceType && x.ServiceType.IsAssignableTo(sourceType));
+                    foreach (var variant in variants)
+                    {
+                        sb.Append(
+                            $"""
+
+                                        yield return ResolveManyResult.Of(r => {variant.CreateMethodName}(r){CommaOptArg(variant.ServiceKeyCode)}{CommaOptArg(variant.RequiredServiceTypeCode)});
+                            """);
+                    }
+                }
+
+                sb.Append(
+                    """
+
+                            }
+                    """);
+            }
+            sb.Append(
+                """
+
+                    }
+
+                """);
+        }
+
+        sb.Append(
+            """
+
+                // Resolution roots supposed to be Resolved by the clients:
+
+            """);
+
+        foreach (var root in rootCodes)
+        {
+            sb.Append(
+                $"""
+
+                    internal static {root.ServiceTypeOnlyCode} {root.CreateMethodName}(IResolverContext r) =>
+                        {root.ExpressionCode};
+
+                """);
+        }
+
+        sb.Append(
+            """
+
+                // Dependencies injected through the Resolve call, e.g. Bar in `r => new Foo(r.Resolve<Bar>())`:
+
+            """);
+
+        foreach (var dep in depCodes)
+        {
+            sb.Append(
+                $"""
+
+                    internal static {dep.ServiceTypeOnlyCode} {dep.CreateMethodName}(IResolverContext r) =>
+                        {dep.ExpressionCode};
+
+                """);
+        }
+
+        sb.Append(
+            """
+            }
+
+            """);
+
+        return container;
+    }
 }
 
 /// <summary>Resolves all registered services of <typeparamref name="TService"/> type on demand,
@@ -17019,6 +17456,8 @@ public enum DisposableTracking : byte
 
 /// <summary>Base registration attribute,
 /// there may be descendant predefined and custom attributes simplifying the registration setup.</summary>
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
+    AllowMultiple = true, Inherited = true)]
 public class RegisterAttribute : Attribute
 {
     /// <summary>By default no, because the attribute operates on the</summary>
@@ -17060,6 +17499,8 @@ public class RegisterAttribute : Attribute
 // public static ReflectionFactory Of(Type implementationType = null, IReuse reuse = null, Made made = null, Setup setup = null)
 // todo: add RegisterMany
 /// <summary>A single registration attribute</summary>
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
+    AllowMultiple = true, Inherited = true)]
 public sealed class RegisterAttribute<TService, TImplementation, TReuse> : RegisterAttribute
     where TReuse : IReuse
 {
@@ -17070,6 +17511,24 @@ public sealed class RegisterAttribute<TService, TImplementation, TReuse> : Regis
     public RegisterAttribute()
     {
         ServiceType = typeof(TService);
+        ImplementationType = typeof(TImplementation);
+        ReuseType = typeof(TReuse);
+    }
+}
+
+/// <summary>Register with `TImplementation` the same as `TService`</summary>
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
+    AllowMultiple = true, Inherited = true)]
+public sealed class RegisterAttribute<TImplementation, TReuse> : RegisterAttribute
+    where TReuse : IReuse
+{
+    /// <summary>In this case there are compile-time type constraints for the Implementation and Service types</summary>
+    public override bool TypesAreStaticallyChecked => true;
+
+    /// <summary>Creates the registration attribute</summary>
+    public RegisterAttribute()
+    {
+        ServiceType = typeof(TImplementation);
         ImplementationType = typeof(TImplementation);
         ReuseType = typeof(TReuse);
     }

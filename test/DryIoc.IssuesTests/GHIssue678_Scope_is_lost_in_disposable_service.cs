@@ -7,7 +7,7 @@ using DryIoc.Microsoft.DependencyInjection;
 namespace DryIoc.IssuesTests;
 
 [TestFixture]
-public class GHIssue678_Scope_is_lost_in_diposable_service : ITest
+public class GHIssue678_Scope_is_lost_in_disposable_service : ITest
 {
     public int Run()
     {
