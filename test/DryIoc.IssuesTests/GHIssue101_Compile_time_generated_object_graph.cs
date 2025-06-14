@@ -70,12 +70,15 @@ namespace DryIoc.IssuesTests
             Assert.IsNotNull(x);
         }
 
-        class S2 {}
+        class S2 { }
 
         class TestCompileTimeContainer : ICompileTimeContainer
         {
-            public bool IsRegistered(Type serviceType) => true;
-            public bool IsRegistered(Type serviceType, object serviceKey) => true;
+            public ValueTuple<Type, object>[] GetResolutionRoots() => new ValueTuple<Type, object>[]
+            {
+                (typeof(S2), null)
+            };
+
             public bool TryResolve(out object service, IResolverContext r, Type serviceType)
             {
                 service = new S2();

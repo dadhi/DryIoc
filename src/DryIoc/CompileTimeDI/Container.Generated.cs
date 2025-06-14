@@ -51,11 +51,12 @@ namespace DryIoc
         ///<summary>The instance if generated compile-time container.</summary>
         public static readonly CompileTimeContainer Instance = new CompileTimeContainer();
 
-        // todo: @wip tbd
         /// <inheritdoc/>
-        public bool IsRegistered(Type serviceType) => false;
-        /// <inheritdoc/>
-        public bool IsRegistered(Type serviceType, object serviceKey) => false;
+        public ValueTuple<Type, object>[] GetResolutionRoots() => new ValueTuple<Type, object>[]
+        {
+            (typeof(IService), null),
+            (typeof(BaseAConsumer), null),
+        };
 
         /// <inheritdoc/>
         public bool TryResolve(out object service, IResolverContext r, Type serviceType)
@@ -89,7 +90,7 @@ namespace DryIoc
                         1,
                         typeof(MyService),
                         Reuse.Transient,
-                        RequestFlags.IsResolutionCall|RequestFlags.DoNotPoolRequest)))
+                        RequestFlags.IsResolutionCall | RequestFlags.DoNotPoolRequest)))
                 {
                     service = GetDependency_DependencyB_1(r);
                     return true;
@@ -121,7 +122,7 @@ namespace DryIoc
                         1,
                         typeof(MyService),
                         Reuse.Transient,
-                        RequestFlags.IsResolutionCall|RequestFlags.StopRecursiveDependencyCheck|RequestFlags.DoNotPoolRequest),
+                        RequestFlags.IsResolutionCall | RequestFlags.StopRecursiveDependencyCheck | RequestFlags.DoNotPoolRequest),
                     (object[])null)),
                 ((RuntimeDependencyC)r.Resolve(
                     typeof(RuntimeDependencyC),
@@ -133,7 +134,7 @@ namespace DryIoc
                         1,
                         typeof(MyService),
                         Reuse.Transient,
-                        RequestFlags.IsResolutionCall|RequestFlags.DoNotPoolRequest),
+                        RequestFlags.IsResolutionCall | RequestFlags.DoNotPoolRequest),
                     (object[])null)));
 
         internal static BaseAConsumer Get_BaseAConsumer_1(IResolverContext r) =>

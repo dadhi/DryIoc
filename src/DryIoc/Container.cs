@@ -15789,11 +15789,8 @@ public struct ResolveManyResult
 /// <summary>The interface for the compile-time container, mostly for the resolution</summary>
 public interface ICompileTimeContainer
 {
-    /// <summary>Check if service is registered by type</summary>
-    bool IsRegistered(Type serviceType);
-
-    /// <summary>Check if service is registered by type and the key</summary>
-    bool IsRegistered(Type serviceType, object serviceKey);
+    /// <summary>Services that can be resolved from the container. Their service types and optional service keys</summary>
+    public ValueTuple<Type, object>[] GetResolutionRoots();
 
     /// <summary>Returns the service object if it can be resolved</summary>
     bool TryResolve(out object service, IResolverContext r, Type serviceType);
@@ -15815,21 +15812,12 @@ public sealed class MultiCompileTimeContainer : ICompileTimeContainer
     public MultiCompileTimeContainer(params ICompileTimeContainer[] containers) => Containers = containers;
 
     /// <inheritdoc/>
-    public bool IsRegistered(Type serviceType)
+    public ValueTuple<Type, object>[] GetResolutionRoots()
     {
+        var roots = new List<ValueTuple<Type, object>>();
         foreach (var container in Containers)
-            if (container.IsRegistered(serviceType))
-                return true;
-        return false;
-    }
-
-    /// <inheritdoc/>
-    public bool IsRegistered(Type serviceType, object serviceKey)
-    {
-        foreach (var container in Containers)
-            if (container.IsRegistered(serviceType, serviceKey))
-                return true;
-        return false;
+            roots.AddRange(container.GetResolutionRoots());
+        return roots.ToArray();
     }
 
     /// <inheritdoc/>
@@ -16072,12 +16060,13 @@ public static class CompileTimeContainerGeneration
                 ///<summary>The instance if generated compile-time container.</summary>
                 public static readonly {{genCompileTimeContainerClassName}} Instance = new {{genCompileTimeContainerClassName}}();
 
-                // todo: @wip tbd
-                /// <inheritdoc/>
-                public bool IsRegistered(Type serviceType) => false;
+                private readonly ValueTuple<Type, object>[] _roots =
+                {
+                    {{string.Join("," + NewLine, defaultRoots.Select(static x => ($"{x.ServiceTypeCode}, {x.ServiceKeyCode}")))}}
+                };
 
                 /// <inheritdoc/>
-                public bool IsRegistered(Type serviceType, object serviceKey) => false;
+                public ValueTuple<Type, object>[] GetResolutionRoots() => _roots;
 
                 /// <inheritdoc/>
                 public bool TryResolve(out object service, IResolverContext r, Type serviceType)

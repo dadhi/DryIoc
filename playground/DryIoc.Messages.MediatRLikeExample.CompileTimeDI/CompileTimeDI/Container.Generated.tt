@@ -144,11 +144,13 @@ namespace DryIoc
         ///<summary>The instance if generated compile-time container.</summary>
         public static readonly CompileTimeContainer Instance = new CompileTimeContainer();
 
-        // todo: @wip tbd
+        private readonly ValueTuple<Type, object>[] _roots =
+        {
+            <#=string.Join("," + NewLine, rootCodes.Select(static x => ($"{x.ServiceTypeCode}, {x.ServiceKeyCode}")))#>
+        };
+
         /// <inheritdoc/>
-        public bool IsRegistered(Type serviceType) => false;
-        /// <inheritdoc/>
-        public bool IsRegistered(Type serviceType, object serviceKey) => false;
+        public ValueTuple<Type, object>[] GetResolutionRoots() => _roots;
 
         /// <inheritdoc/>
         public bool TryResolve(out object service, IResolverContext r, Type serviceType)
