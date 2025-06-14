@@ -15892,8 +15892,8 @@ public static class CompileTimeContainerGeneration
     {
         Debug.Assert(resultCode != null, "resultCode StringBuilder should not be null");
 
-        roots ??= [];
-        namespaceUsings ??= [];
+        roots ??= ArrayTools.Empty<ServiceInfo>();
+        namespaceUsings ??= ArrayTools.Empty<string>();
 
         // `GenerateResolutionExpressions` is taking care of ensuring the container has a proper settings for the Generation
         var genExprs =
