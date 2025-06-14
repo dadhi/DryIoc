@@ -10140,7 +10140,7 @@ public abstract class ServiceInfo
 
     /// <summary>Creates info out of provided settings</summary>
     public static ServiceInfo Of(Type serviceType, ServiceDetails details) =>
-        new WithDetails(serviceType, details);
+        new WithDetails(serviceType, details ?? ServiceDetails.Default);
 
     /// <summary>Creates info out of provided settings</summary>
     public static ServiceInfo Of(Type serviceType, IfUnresolved ifUnresolved, object serviceKey) =>
@@ -15999,7 +15999,6 @@ public static class CompileTimeContainerGeneration
 
                         WARNINGS: Some dependencies are missing. Register them at runtime or add to the compile-time registrations.
 
-
                         """);
 
                 // todo: @wip remove unnecessary info from the output
@@ -16062,7 +16061,7 @@ public static class CompileTimeContainerGeneration
 
                 private readonly ValueTuple<Type, object>[] _roots =
                 {
-                    {{string.Join("," + NewLine, defaultRoots.Select(static x => ($"{x.ServiceTypeCode}, {x.ServiceKeyCode}")))}}
+                    {{string.Join("," + NewLine, rootCodes.Select(static x => ($"({x.ServiceTypeCode}, {x.ServiceKeyCode})")))}}
                 };
 
                 /// <inheritdoc/>

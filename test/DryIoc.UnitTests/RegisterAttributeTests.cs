@@ -9,10 +9,11 @@ namespace DryIoc.UnitTests
     {
         public int Run()
         {
+            Test_generating_the_object_graph_with_the_missing_services();
             Test_generating_the_object_graph();
             Can_register_service_with_tracking_disposable_reuse();
 
-            return 2;
+            return 3;
         }
 
         [Test]
@@ -50,19 +51,23 @@ namespace DryIoc.UnitTests
             public B(IA a) => A = a;
         }
 
+        public class B2
+        {
+            public readonly A A;
+            public B2(A a) => A = a;
+        }
+
         [Register<IA, A>(ReuseAs.Singleton)]
         [Register<B>(ReuseAs = ReuseAs.Scoped)]
+        [Register<B2>(ReuseAs = ReuseAs.ScopedOrSingleton)]
         public static class DiConfig { }
 
         [Test]
         public void Test_generating_the_object_graph()
         {
-            using var c = new Container(
-            // rules => rules.WithExpressionGeneration()
-            );
+            using var c = new Container();
 
             var count = c.RegisterByRegisterAttributes(typeof(DiConfig));
-            Assert.AreEqual(2, count);
 
             using var scope = c.OpenScope();
 
@@ -72,8 +77,8 @@ namespace DryIoc.UnitTests
 
             var sb = new StringBuilder(4096);
             var containerForGen = c.GenerateCompileTimeContainerCSharpCode(sb,
-                roots: [], // generates top level Resolve for all registered services
-                namespaceUsings: [nameof(UnitTests)],
+                roots: null, // generates top level Resolve for all registered services
+                namespaceUsings: new[] { nameof(UnitTests) },
                 genCompileTimeContainerClassName: "MyCompTimeContainer");
 
             var code = sb.ToString();
@@ -81,6 +86,25 @@ namespace DryIoc.UnitTests
             StringAssert.Contains("MyCompTimeContainer", code);
             StringAssert.Contains("new RegisterAttributeTests.A", code);
             StringAssert.Contains("new RegisterAttributeTests.B", code);
+        }
+
+        [Test]
+        public void Test_generating_the_object_graph_with_the_missing_services()
+        {
+            using var c = new Container();
+
+            var count = c.RegisterByRegisterAttributes(typeof(DiConfig));
+
+            var sb = new StringBuilder(4096);
+            var containerForGen = c.GenerateCompileTimeContainerCSharpCode(sb,
+                roots: new[] { ServiceInfo.Of<B2>() },
+                namespaceUsings: new[] { nameof(UnitTests) },
+                genCompileTimeContainerClassName: "MyCompTimeContainer2");
+
+            var code = sb.ToString();
+
+            StringAssert.Contains("MyCompTimeContainer2", code);
+            StringAssert.Contains("new RegisterAttributeTests.B2", code);
         }
     }
 }

@@ -146,7 +146,7 @@ namespace DryIoc
 
         private readonly ValueTuple<Type, object>[] _roots =
         {
-            <#=string.Join("," + NewLine, rootCodes.Select(static x => ($"{x.ServiceTypeCode}, {x.ServiceKeyCode}")))#>
+            <#=string.Join("," + NewLine, rootCodes.Select(static x => ($"({x.ServiceTypeCode}, {x.ServiceKeyCode})")))#>
         };
 
         /// <inheritdoc/>
