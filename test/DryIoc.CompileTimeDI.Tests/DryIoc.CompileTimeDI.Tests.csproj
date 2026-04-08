@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!--
+      End-to-end test for the DryIoc.dll NuGet package CompileTime DI install experience.
+
+      This project intentionally uses a PackageReference to DryIoc.dll (instead of a ProjectReference)
+      to simulate the real NuGet install/update experience. The package must be built locally first:
+
+        dotnet build src/DryIoc/DryIoc.csproj -c Release -p:SkipCompTimeGen=true
+
+      The NuGet.Config in this folder points to ../../.dist/packages where the package lands.
+
+      Build flow:
+        1. First `dotnet restore` triggers CopyCompileTimeDIToProject (from DryIoc.dll.targets)
+           which copies T4 files and dotnet-tools.json to this project's CompileTimeDI\ folder.
+        2. First `dotnet build -c Debug` compiles with the starter Container.Generated.cs.
+        3. Second `dotnet build -c Debug` triggers CompileTimeGenerate to regenerate Container.Generated.cs.
+    -->
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- This is a console app end-to-end test, not a unit test project -->
+    <IsTestProject>false</IsTestProject>
+
+    <!--
+      Disable automatic generation for this test project since we test the flow manually.
+      Remove or set to false to enable automatic T4 generation during Debug builds.
+    -->
+    <SkipCompTimeGen>true</SkipCompTimeGen>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DryIoc.dll" Version="6.0.0-preview-09" />
+  </ItemGroup>
+
+</Project>
