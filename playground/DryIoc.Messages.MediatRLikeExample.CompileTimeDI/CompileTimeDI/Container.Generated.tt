@@ -2,7 +2,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2016-2023 Maksim Volkau
+Copyright (c) 2016-2025 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -31,7 +31,7 @@ THE SOFTWARE.
 <#@ import Namespace="DryIoc.FastExpressionCompiler.LightExpression" #>
 <#@ include File="CompileTimeDI\CompileTimeRegistrations.ttinclude" #>
 <#
-// todo: @simplify The rules for `WithExpressionGenerationSettingsOnly` are required` here because the container with generation rules is not returned by `GenerateResolutionExpressions`
+// todo: @simplify The rules for `WithExpressionGenerationSettingsOnly` are required here because the container with generation rules is not returned by `GenerateResolutionExpressions`
 var container = GetContainerWithRegistrations().With(rules => rules.WithExpressionGenerationSettingsOnly());
 
 var result = container.GenerateResolutionExpressions(x => x.SelectMany(r =>
@@ -59,7 +59,7 @@ string GetTypeNameOnly(string typeName) => typeName.Split('`').First().Split('.'
 
 string CommaOptArg(string arg) => arg == "null" ? "" : ", " + arg;
 
-int getServiceBodyLineIdent = 16;
+int getServiceBodyLineIdent = 12;
 
 var rootCodes = result.Roots.Select((r, i) =>
     new { ServiceType = r.Key.ServiceType,
@@ -146,7 +146,8 @@ namespace DryIoc
 
         private readonly ValueTuple<Type, object>[] _roots =
         {
-            <#=string.Join("," + NewLine, rootCodes.Select(static x => ($"({x.ServiceTypeCode}, {x.ServiceKeyCode})")))#>
+            <#=string.Join("," + Environment.NewLine + "            ",
+                rootCodes.Select(static x => ($"({x.ServiceTypeCode}, {x.ServiceKeyCode})")))#>
         };
 
         /// <inheritdoc/>
