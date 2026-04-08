@@ -1182,6 +1182,12 @@ public partial class Container : IContainer
 
             if (singleMatchedFactory != null)
             {
+                // Before returning the reuse-selected factory, check if a single conditioned factory should take priority.
+                // Conditioned factories are more specific and should be preferred over a "default" factory selected by reuse lifespan (GHIssue #631).
+                var conditionedFactories = factories.Match(static f => f.Value.Setup.Condition != null);
+                if (conditionedFactories.Length == 1)
+                    singleMatchedFactory = conditionedFactories[0];
+
                 // Add asResolutionCall or change the serviceKey to prevent the caching of expression as default (BBIssue: #382)
                 if (!request.IsResolutionCall)
                     singleMatchedFactory.Value.SetAsResolutionCall();
