@@ -55,11 +55,8 @@ namespace DryIoc.IssuesTests
         public void Test_WithUseInterpretation_does_not_create_DynamicMethod()
         {
             // Verify that DynamicMethod creation is not triggered when WithUseInterpretation is used.
-            // On AOT platforms (Xamarin.iOS), DynamicMethod.ctor throws PlatformNotSupportedException.
-            // We simulate this by verifying that the DynamicMethod is not needed for simple service resolution.
-
             // On AOT platforms like Xamarin.iOS, DynamicMethod.ctor throws PlatformNotSupportedException.
-            // We verify the resolution works, which confirms interpretation (not compilation) was used.
+            // The fix ensures DryIoc uses only the interpreter (no compilation) when UseInterpretation=true.
             var c = new Container(Rules.Default.WithUseInterpretation());
 
             c.Register<R>();
@@ -68,8 +65,8 @@ namespace DryIoc.IssuesTests
 
             using var s = c.OpenScope();
 
-            // If this succeeds without PlatformNotSupportedException, it means DynamicMethod was not needed
-            // (or it was used but the platform supports it). On iOS AOT, the test validates no DynamicMethod is used.
+            // If this succeeds it confirms interpretation was used without any DynamicMethod or IL emit.
+            // On iOS AOT (where DynamicMethod.ctor throws), this test would fail if compilation is triggered.
             var r = s.Resolve<R>();
             Assert.IsNotNull(r);
             Assert.IsNotNull(r.A);
