@@ -4395,6 +4395,18 @@ public static class FactoryDelegateCompiler
             if (factoryDelegate != null)
                 return factoryDelegate;
         }
+        else
+        {
+            // When UseInterpretation=true, avoid calling Expression.Compile() (and FEC) which may internally use
+            // DynamicMethod - that is not supported on AOT platforms like Xamarin.iOS in release/TestFlight mode.
+            // Instead, return a delegate that wraps the DryIoc interpreter so that no code is compiled or emitted at runtime.
+            // If the expression cannot be interpreted (e.g., it uses Made.Of with complex arbitrary expressions
+            // not covered by the DryIoc Interpreter), a ContainerException with a helpful message is thrown.
+            var capturedExpr = expression;
+            return r => Interpreter.TryInterpretAndUnwrapContainerException(r, capturedExpr, out var result)
+                ? result
+                : Throw.For<object>(Error.UnableToInterpretExpression, capturedExpr);
+        }
 
         // It is required for the expression based Made.Of (sigh...) and ExpressionFactory with an arbitrary expressions, not covered by the own DryIoc Interpreter (sigh...).
         // Or as a fallback to the platforms where FastExpressionCompiler is not able to compile the expression.
@@ -16671,7 +16683,12 @@ public static class Error
             "For all those reasons DryIoc has a timeout to prevent the infinite waiting. " + NewLine +
             $"You may change the default timeout via setting the static `Scope.{nameof(Scope.WaitForScopedServiceIsCreatedTimeoutMilliseconds)}`"),
         ServiceTypeIsNull = Of("Registered service type is null"),
-        RegisterAttributedUnsupportedReuseType = Of("Not support reuse type {0} in the RegisterAttribute.");
+        RegisterAttributedUnsupportedReuseType = Of("Not support reuse type {0} in the RegisterAttribute."),
+        UnableToInterpretExpression = Of(
+            "DryIoc is configured with `Rules.WithUseInterpretation()` to avoid code compilation (e.g. for AOT platforms like Xamarin.iOS), " + NewLine +
+            "but the DryIoc Interpreter is unable to interpret the following expression:" + NewLine + "{0}" + NewLine +
+            "To fix this, simplify the registration (e.g. avoid using Made.Of or custom ExpressionFactory with complex expressions that DryIoc Interpreter does not support), " + NewLine +
+            "or use `Rules.WithoutUseInterpretation()` to allow code compilation on platforms that support it.");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 
