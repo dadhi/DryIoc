@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using static DryIoc.FastExpressionCompiler.LightExpression.Expression;
 
 
 namespace DryIoc.IssuesTests
@@ -11,7 +12,8 @@ namespace DryIoc.IssuesTests
             Test_multiple_scope_openings_simulate_second_navigation();
             Test_WithUseInterpretation_does_not_create_DynamicMethod();
             Test_WithUseInterpretation_across_multiple_scope_navigations();
-            return 3;
+            Test_UnableToInterpretExpression_thrown_for_unsupported_expression_with_UseInterpretation();
+            return 4;
         }
 
         [Test]
@@ -111,6 +113,23 @@ namespace DryIoc.IssuesTests
                 Assert.AreNotSame(aFromScope1, r2.A, "Scoped A should be a new instance in new scope");
                 Assert.AreSame(bSingleton, r2.A.B, "Singleton B should be the same instance across scopes");
             }
+        }
+
+        [Test]
+        public void Test_UnableToInterpretExpression_thrown_for_unsupported_expression_with_UseInterpretation()
+        {
+            var c = new Container(Rules.Default.WithUseInterpretation());
+
+            // ExpressionFactory with a Conditional (ternary) expression. ExprType.Conditional is NOT handled
+            // by the DryIoc interpreter (only Constant, New, Call, Convert, MemberAccess, MemberInit,
+            // NewArrayInit, Invoke, Parameter, Lambda are supported). With UseInterpretation=true,
+            // the fix should throw ContainerException(Error.UnableToInterpretExpression) instead of
+            // falling back to Expression.Compile() which would create a DynamicMethod (SIGABRT on AOT).
+            c.Register(typeof(B), new ExpressionFactory(
+                _ => Condition(Constant(true), New(typeof(B)), Constant(null, typeof(B)))));
+
+            var ex = Assert.Throws<ContainerException>(() => c.Resolve<B>());
+            Assert.AreEqual(Error.UnableToInterpretExpression, ex.Error);
         }
 
         class R

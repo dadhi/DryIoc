@@ -4400,12 +4400,11 @@ public static class FactoryDelegateCompiler
             // When UseInterpretation=true, avoid calling Expression.Compile() (and FEC) which may internally use
             // DynamicMethod - that is not supported on AOT platforms like Xamarin.iOS in release/TestFlight mode.
             // Instead, return a delegate that wraps the DryIoc interpreter so that no code is compiled or emitted at runtime.
-            // If the expression cannot be interpreted (e.g., it uses Made.Of with complex arbitrary expressions
+            // If the expression cannot be interpreted (e.g., it uses ExpressionFactory with complex arbitrary expressions
             // not covered by the DryIoc Interpreter), a ContainerException with a helpful message is thrown.
-            var capturedExpr = expression;
-            return r => Interpreter.TryInterpretAndUnwrapContainerException(r, capturedExpr, out var result)
+            return r => Interpreter.TryInterpretAndUnwrapContainerException(r, expression, out var result)
                 ? result
-                : Throw.For<object>(Error.UnableToInterpretExpression, capturedExpr);
+                : Throw.For<object>(Error.UnableToInterpretExpression, expression);
         }
 
         // It is required for the expression based Made.Of (sigh...) and ExpressionFactory with an arbitrary expressions, not covered by the own DryIoc Interpreter (sigh...).
