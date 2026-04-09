@@ -6009,7 +6009,7 @@ public enum DynamicRegistrationFlags : byte
     /// <summary>Specifies that provider should be asked for the `object` service type to get the decorator for the generic `T` service</summary>
     DecoratorOfAnyTypeViaObjectServiceType = 1 << 3,
     /// <summary>Specifies that provider should be excluded from collection wrapper resolution (IEnumerable, arrays, IList, etc.).
-    /// Used by <see cref="Rules.WithConcreteTypeDynamicRegistrations"/> to prevent unintended instantiation of concrete types
+    /// Used by <see cref="Rules.WithConcreteTypeDynamicRegistrations(System.Func{System.Type,object,bool},IReuse)"/> to prevent unintended instantiation of concrete types
     /// when resolving collection wrappers for unregistered service types.</summary>
     ExcludeFromCollectionWrapper = 1 << 4,
 }
