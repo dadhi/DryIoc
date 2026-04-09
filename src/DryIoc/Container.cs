@@ -627,14 +627,14 @@ public partial class Container : IContainer
         if (unwrappedType != null & unwrappedType != typeof(void)) // accounting for the resolved action GH#114
             requiredItemType = unwrappedType;
 
-        var items = GetAllServiceFactories(requiredItemType)
+        var items = GetAllServiceFactoriesExcludingFallback(requiredItemType)
             .Map(requiredServiceType, static (t, f) => new ServiceRegistrationInfo(f.Value, t, f.Key));
 
         ServiceRegistrationInfo[] openGenericItems = null;
         if (requiredItemType.IsClosedGeneric())
         {
             var requiredItemOpenGenericType = requiredItemType.GetGenericTypeDefinition();
-            openGenericItems = GetAllServiceFactories(requiredItemOpenGenericType)
+            openGenericItems = GetAllServiceFactoriesExcludingFallback(requiredItemOpenGenericType)
                 .Map(requiredItemOpenGenericType, requiredServiceType,
                     static (gt, t, x) => new ServiceRegistrationInfo(x.Value, t, new ServiceKeyAndRequiredOpenGenericType(gt, x.Key)));
         }
@@ -1471,6 +1471,22 @@ public partial class Container : IContainer
         return factories;
     }
 
+    // Used by collection resolving (GetArrayExpression, ResolveMany) to exclude AsFallback dynamic registrations,
+    // so that concrete types that are not explicitly registered are not included in the collection.
+    internal KV<object, Factory>[] GetAllServiceFactoriesExcludingFallback(Type serviceType)
+    {
+        var serviceFactories = Registry.GetServiceFactories(_registry.Value);
+        var entry = serviceFactories.GetValueOrDefault(serviceType);
+
+        var factories = FactoriesEntry.ToNotNullKeyedFactories(entry);
+
+        if (Rules.DynamicRegistrationProviders != null &&
+            !serviceType.IsExcludedGeneralPurposeServiceType())
+            return CombineRegisteredServiceWithDynamicFactories(factories, serviceType, null, serviceKey: null, forCollection: true);
+
+        return factories;
+    }
+
     /// <inheritdoc />
     public Expression GetDecoratorExpressionOrDefault(Request request)
     {
@@ -1892,10 +1908,12 @@ public partial class Container : IContainer
 
     // todo: @perf split into with and without the serviceKey
     private KV<object, Factory>[] CombineRegisteredServiceWithDynamicFactories(
-        KV<object, Factory>[] factories, Type serviceType, Type openGenericServiceType, object serviceKey = null)
+        KV<object, Factory>[] factories, Type serviceType, Type openGenericServiceType, object serviceKey = null, bool forCollection = false)
     {
         var withFlags = DynamicRegistrationFlags.Service;
         var withoutFlags = factories.Length != 0 ? DynamicRegistrationFlags.AsFallback : DynamicRegistrationFlags.NoFlags;
+        if (forCollection)
+            withoutFlags |= DynamicRegistrationFlags.ExcludeFromCollectionWrapper;
 
         // Assign unique continuous keys across all of the dynamic providers,
         // to prevent duplicate keys and peeking the wrong factory by collection wrappers
@@ -5496,13 +5514,13 @@ public static class WrappersSupport
         var details = request.GetServiceDetails();
         var requiredItemType = container.GetWrappedType(serviceType, details.RequiredServiceType);
 
-        var items = container.GetAllServiceFactories(requiredItemType)
+        var items = container.GetAllServiceFactoriesExcludingFallback(requiredItemType)
             .Map(requiredItemType, static (t, x) => new ServiceRegistrationInfo(x.Value, t, x.Key));
 
         if (requiredItemType.IsClosedGeneric())
         {
             var requiredItemOpenGenericType = requiredItemType.GetGenericTypeDefinition();
-            var openGenericItems = container.GetAllServiceFactories(requiredItemOpenGenericType)
+            var openGenericItems = container.GetAllServiceFactoriesExcludingFallback(requiredItemOpenGenericType)
                 .Map(requiredItemOpenGenericType, requiredItemType,
                     static (gt, t, f) => new ServiceRegistrationInfo(f.Value, t, new ServiceKeyAndRequiredOpenGenericType(gt, f.Key)));
             items = items.Append(openGenericItems);
@@ -5990,6 +6008,10 @@ public enum DynamicRegistrationFlags : byte
     Decorator = 1 << 2,
     /// <summary>Specifies that provider should be asked for the `object` service type to get the decorator for the generic `T` service</summary>
     DecoratorOfAnyTypeViaObjectServiceType = 1 << 3,
+    /// <summary>Specifies that provider should be excluded from collection wrapper resolution (IEnumerable, arrays, IList, etc.).
+    /// Used by <see cref="Rules.WithConcreteTypeDynamicRegistrations(System.Func{System.Type,object,bool},IReuse)"/> to prevent unintended instantiation of concrete types
+    /// when resolving collection wrappers for unregistered service types.</summary>
+    ExcludeFromCollectionWrapper = 1 << 4,
 }
 
 internal sealed class UniqueRegisteredServiceKey : IPrintable, IConvertibleToExpression
@@ -6624,13 +6646,13 @@ public sealed class Rules
 
     /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.</summary>
     public Rules WithConcreteTypeDynamicRegistrations(Func<Type, object, bool> condition = null, IReuse reuse = null) =>
-        WithDynamicRegistrationsAsFallback(ConcreteTypeDynamicRegistrations(condition, reuse));
+        WithDynamicRegistrationsAsFallback(DefaultDynamicRegistrationFlags | DryIoc.DynamicRegistrationFlags.ExcludeFromCollectionWrapper, ConcreteTypeDynamicRegistrations(condition, reuse));
 
     /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.
     /// Pass `IfUnresolved.ReturnDefault` or `IfUnresolved.ReturnDefaultIfNotRegistered` to `ifConcreteTypeIsUnresolved`
     /// to allow fallback to the next rule.</summary>
     public Rules WithConcreteTypeDynamicRegistrations(IfUnresolved ifConcreteTypeIsUnresolved, Func<Type, object, bool> condition = null, IReuse reuse = null) =>
-        WithDynamicRegistrationsAsFallback(ConcreteTypeDynamicRegistrations(ifConcreteTypeIsUnresolved, condition, reuse));
+        WithDynamicRegistrationsAsFallback(DefaultDynamicRegistrationFlags | DryIoc.DynamicRegistrationFlags.ExcludeFromCollectionWrapper, ConcreteTypeDynamicRegistrations(ifConcreteTypeIsUnresolved, condition, reuse));
 
     /// [Obsolete("Replaced with `WithConcreteTypeDynamicRegistrations`")]
     public Rules WithAutoConcreteTypeResolution(Func<Request, bool> condition = null)
