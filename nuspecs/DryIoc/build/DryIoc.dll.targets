@@ -45,7 +45,7 @@
               Command="dotnet tool restore --ignore-failed-sources"
               IgnoreExitCode="true" />
         <Exec WorkingDirectory="$(ProjectDir)"
-              Command="dotnet t4 -P=&quot;$(TargetDir)&quot; -r=&quot;$(TargetPath)&quot; -o=CompileTimeDI\Container.Generated.cs CompileTimeDI\Container.Generated.tt" />
+              Command="dotnet t4 -P=&quot;$(TargetDir)&quot; -r=&quot;$(TargetPath)&quot; -o=CompileTimeDI/Container.Generated.cs CompileTimeDI/Container.Generated.tt" />
     </Target>
 
     <ItemGroup>

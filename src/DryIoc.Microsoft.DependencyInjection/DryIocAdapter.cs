@@ -499,6 +499,13 @@ public sealed class DryIocServiceProvider : IDisposable,
             Container.IsRegistered(serviceType.GetGenericTypeDefinition()))
             return true;
 
+        // Also check compile-time container roots so endpoint injection works without double-registration.
+        var compTimeRoots = Container.Rules.CompileTimeContainer?.GetResolutionRoots();
+        if (compTimeRoots != null)
+            foreach (var (type, _) in compTimeRoots)
+                if (type == serviceType)
+                    return true;
+
         return Container.IsRegistered(serviceType, factoryType: FactoryType.Wrapper);
     }
 

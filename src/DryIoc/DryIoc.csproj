@@ -42,6 +42,12 @@
     <Compile Remove="CompileTimeDI\*.cs" />
   </ItemGroup>
 
+  <!-- Skip T4 re-generation in this project: Example types are not in DryIoc.dll (see above),
+       so the T4 template cannot find them. Consumers regenerate using their own assembly. -->
+  <PropertyGroup>
+    <SkipCompTimeGen>true</SkipCompTimeGen>
+  </PropertyGroup>
+
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
     <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.7.0" />
   </ItemGroup>
@@ -61,8 +67,8 @@
           Command="dotnet tool restore --ignore-failed-sources"
           IgnoreExitCode="true" />
     <Exec WorkingDirectory="$(ProjectDir)"
-          Command="dotnet t4 -P=&quot;$(TargetDir)&quot; -r=&quot;$(TargetPath)&quot; -o=CompileTimeDI\Container.Generated.cs CompileTimeDI\Container.Generated.tt" />
-    <Message Text="[DryIoc] Generated: '$(ProjectDir)CompileTimeDI\Container.Generated.cs'" Importance="high"/>
+          Command="dotnet t4 -P=&quot;$(TargetDir)&quot; -r=&quot;$(TargetPath)&quot; -o=CompileTimeDI/Container.Generated.cs CompileTimeDI/Container.Generated.tt" />
+    <Message Text="[DryIoc] Generated: '$(ProjectDir)CompileTimeDI/Container.Generated.cs'" Importance="high"/>
   </Target>
 
   <ItemGroup>
