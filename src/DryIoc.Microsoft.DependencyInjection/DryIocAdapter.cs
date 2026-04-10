@@ -23,6 +23,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+#if NETSTANDARD2_1 || NET5_0_OR_GREATER
+#define SUPPORTS_ASYNC_DISPOSABLE
+#endif
+
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;  // for MethodImplAttribute
@@ -432,7 +436,7 @@ public static class DryIocAdapter
 
 /// <summary>Impl of `IsRegistered`, `GetRequiredService`, `CreateScope`.</summary>
 public sealed class DryIocServiceProvider : IDisposable,
-#if NETSTANDARD2_1 || NET5_0_OR_GREATER
+#if SUPPORTS_ASYNC_DISPOSABLE
     IAsyncDisposable,
 #endif
     IServiceProvider, IServiceScopeFactory, IServiceScope,
@@ -557,7 +561,7 @@ public sealed class DryIocServiceProvider : IDisposable,
     /// <inheritdoc />
     public void Dispose() => Container.Dispose();
 
-#if NETSTANDARD2_1 || NET5_0_OR_GREATER
+#if SUPPORTS_ASYNC_DISPOSABLE
     /// <inheritdoc />
     public System.Threading.Tasks.ValueTask DisposeAsync() => Container.DisposeAsync();
 #endif
