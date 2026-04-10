@@ -5160,6 +5160,16 @@ public static class ResolverContext
             ? RootOrSelfExpr
             : FactoryDelegateCompiler.ResolverContextParamExpr;
 
+    /// <summary>Finds the correct resolver context expression for directly injecting container interfaces (IResolver, IResolverContext, etc.).
+    /// Unlike <see cref="GetRootOrSelfExpr"/>, this always returns the root container expression for singletons,
+    /// regardless of the <see cref="Rules.ThrowIfDependencyHasShorterReuseLifespan"/> rule - see GH issue #686.</summary>
+    internal static Expression GetRootOrSelfExprForContainerInterface(Request request) =>
+        request.Reuse is CurrentScopeReuse == false
+        && request.DirectParent.IsSingletonOrDependencyOfSingleton
+        && !request.OpensResolutionScopeUpToResolutionCall()
+            ? RootOrSelfExpr
+            : FactoryDelegateCompiler.ResolverContextParamExpr;
+
     private static bool OpensResolutionScopeUpToResolutionCall(this Request r)
     {
         var p = r.DirectParent;
@@ -5459,13 +5469,13 @@ public static class WrappersSupport
     private static ImHashMap<Type, object> AddContainerInterfaces(this ImHashMap<Type, object> wrappers)
     {
         var resolverContextExpr = new WrapperExpressionFactory.OfContainer(
-            static (r, _) => ResolverContext.GetRootOrSelfExpr(r));
+            static (r, _) => ResolverContext.GetRootOrSelfExprForContainerInterface(r));
 
         var containerExpr = new WrapperExpressionFactory.OfContainer(
-            static (r, _) => TryConvertIntrinsic<IContainer>(ResolverContext.GetRootOrSelfExpr(r)));
+            static (r, _) => TryConvertIntrinsic<IContainer>(ResolverContext.GetRootOrSelfExprForContainerInterface(r)));
 
         var registratorExpr = new WrapperExpressionFactory.OfContainer(
-            static (r, _) => TryConvertIntrinsic<IRegistrator>(ResolverContext.GetRootOrSelfExpr(r)));
+            static (r, _) => TryConvertIntrinsic<IRegistrator>(ResolverContext.GetRootOrSelfExprForContainerInterface(r)));
 
         return wrappers
             .AddSureNotPresent(typeof(IContainer), containerExpr)
