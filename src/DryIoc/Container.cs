@@ -13141,11 +13141,17 @@ public class ReflectionFactory : Factory
 
         var inputArgs = request.InputArgExprs;
         var argsUsedMask = 0;
+        // For a decorator, we don't want to match input args against the parameter that is meant to receive
+        // the decorated service. Such parameter is identified when its type can hold the service being decorated,
+        // i.e., `paramType.IsAssignableFrom(request.ServiceType)`. Fixes #672.
+        var isDecoratorRequest = request.FactoryType == FactoryType.Decorator;
+        var decoratorServiceType = isDecoratorRequest ? request.ServiceType : null;
         for (var i = 0; i < parameters.Length; ++i)
         {
             var param = parameters[i];
             var paramType = param.ParameterType;
-            if (inputArgs != null)
+            if (inputArgs != null &&
+                !(isDecoratorRequest && paramType.IsAssignableFrom(decoratorServiceType)))
             {
                 var inputArgExpr = TryGetExpressionFromInputArgs(paramType, inputArgs, ref argsUsedMask);
                 if (inputArgExpr != null)
