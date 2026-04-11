@@ -492,19 +492,19 @@ public sealed class DryIocServiceProvider : IDisposable,
             serviceType == typeof(IServiceProviderIsKeyedService))
             return true;
 
+        // Check compile-time container first - it is primary, runtime registrations are the fallback.
+        var compTimeRoots = Container.Rules.CompileTimeContainer?.GetResolutionRoots();
+        if (compTimeRoots != null)
+            foreach (var (type, _) in compTimeRoots)
+                if (type == serviceType)
+                    return true;
+
         if (Container.IsRegistered(serviceType))
             return true;
 
         if (serviceType.IsGenericType &&
             Container.IsRegistered(serviceType.GetGenericTypeDefinition()))
             return true;
-
-        // Also check compile-time container roots so endpoint injection works without double-registration.
-        var compTimeRoots = Container.Rules.CompileTimeContainer?.GetResolutionRoots();
-        if (compTimeRoots != null)
-            foreach (var (type, _) in compTimeRoots)
-                if (type == serviceType)
-                    return true;
 
         return Container.IsRegistered(serviceType, factoryType: FactoryType.Wrapper);
     }
