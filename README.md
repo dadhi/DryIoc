@@ -3,7 +3,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 
 <img src="./logo/logo.svg" alt="logo" width="100px"/>
 
-[![Windows, Linux, MacOS](https://ci.appveyor.com/api/projects/status/8eypvhn6ae70vk09?svg=true)](https://ci.appveyor.com/project/MaksimVolkau/dryioc-qt8fa)
+[![CI](https://github.com/dadhi/DryIoc/actions/workflows/ci.yml/badge.svg)](https://github.com/dadhi/DryIoc/actions/workflows/ci.yml)
 [![SOQnA](https://img.shields.io/badge/StackOverflow-QnA-green.svg)](http://stackoverflow.com/questions/tagged/dryioc)
 [![Gitter](https://img.shields.io/gitter/room/nwjs/nw.js.svg)](https://gitter.im/dadhi/DryIoc)
 [![Slack](https://img.shields.io/badge/Slack-Chat-blue.svg)](https://dryioc.slack.com)
@@ -25,12 +25,14 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 - NuGet packages:
 
     - __DryIoc.dll__ [![NuGet Version](https://img.shields.io/nuget/v/DryIoc.dll)](https://www.nuget.org/packages/DryIoc.dll)![NuGet Downloads](https://img.shields.io/nuget/dt/DryIoc.dll)
+      — includes **Compile-time DI**: on first `dotnet build` scaffolds T4 templates; run `dotnet t4` to emit a reflection-free, AOT-friendly `Container.Generated.cs`. See [`samples/MinimalWeb`](samples/MinimalWeb) for a working ASP.NET Minimal API example.
 
     - __DryIoc__ (source code) [![NuGet Version](https://img.shields.io/nuget/v/DryIoc)](https://www.nuget.org/packages/DryIoc)![NuGet Downloads](https://img.shields.io/nuget/dt/DryIoc)
 
     - __DryIoc.Internal__ (source code with public types made internal) [![NuGet Version](https://img.shields.io/nuget/v/DryIoc.Internal)](https://www.nuget.org/packages/DryIoc.Internal)![NuGet Downloads](https://img.shields.io/nuget/dt/DryIoc.Internal)
 
 - [Release Notes](https://github.com/dadhi/DryIoc/releases/tag/v5.4.3) :: [Previous Versions](https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/VersionHistory.md)
+- [Pre-release `.nupkg` artifacts](https://github.com/dadhi/DryIoc/actions/workflows/ci.yml) — download from the latest CI run (Windows job → Artifacts → `packages`)
 - [Extensions and Companions](Extensions.md)
 - [Live Documentation][WikiHome] is created with [CsToMd](https://github.com/dadhi/CsToMd)
 - [Contribution guide](CONTRIBUTING.md)

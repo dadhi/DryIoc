@@ -25,11 +25,14 @@
 
 - Decrease memory footprint
 - Remove Obsolete API
-- @WIP Compile-time Dependency Injection
+- Compile-time Dependency Injection (T4-based, AOT-friendly; see DryIoc.dll package readme)
 
 ]]>
     </PackageReleaseNotes>
   </PropertyGroup>
+
+  <!-- todo: @feat comp-time in .net 10: adopt C# 14 interceptors / .NET 10 source-gen APIs for zero-reflection DI without T4 -->
+  <!-- todo: @feat AOT publish: verify full NativeAOT compatibility of DryIoc.dll + MSDI adapter -->
 
   <ItemGroup Label="Packaging build and content files">
     <None Include="..\..\nuspecs\DryIoc\readme.md" Pack="true" PackagePath="\"/>

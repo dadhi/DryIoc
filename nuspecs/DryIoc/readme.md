@@ -41,3 +41,8 @@ Add `<SkipCompTimeGen>true</SkipCompTimeGen>` to your project file to disable T4
 - VS Code: [T4 Support](https://marketplace.visualstudio.com/items?itemName=zbecknell.t4-support)
 - Visual Studio: [ForTea](https://plugins.jetbrains.com/plugin/11634-fortea) (ReSharper)
 - Rider: native T4 support
+
+### Roadmap
+
+<!-- todo: @feat comp-time in .net 10: adopt C# 14 interceptors / .NET 10 source-gen APIs for zero-reflection DI without T4 -->
+<!-- todo: @feat AOT publish: verify and document full NativeAOT compatibility of DryIoc.dll + DryIoc.Microsoft.DependencyInjection -->

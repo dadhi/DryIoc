@@ -1,3 +1,0 @@
-# CI moved to GitHub Actions (.github/workflows/ci.yml)
-build: off
-test: off
