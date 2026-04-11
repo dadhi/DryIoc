@@ -349,4 +349,4 @@ DryIoc.Internal/
 ApiKey.txt
 
 .metals/
-.temp/
+.temp//.nuget/
