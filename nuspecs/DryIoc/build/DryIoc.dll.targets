@@ -1,6 +1,6 @@
 <Project>
     <!-- CopyCompileTimeDIToProject: copies T4 files to the consuming project on install/update.
-         - Always refreshes package-owned files (Container.Generated.tt, CompileTimeRegistrations.Example.cs).
+         - Always refreshes package-owned files (Container.Generated.tt, CompileTimeExampleServices.cs).
          - First-install-only: user-owned files (CompileTimeRegistrations.ttinclude, Container.Generated.cs,
            .config/dotnet-tools.json) are never overwritten so user customizations are preserved.
     -->
@@ -8,7 +8,7 @@
         <!-- Always refresh package-owned files -->
         <Copy SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\Container.Generated.tt"
               DestinationFolder="$(ProjectDir)CompileTimeDI" SkipUnchangedFiles="true" />
-        <Copy SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\CompileTimeRegistrations.Example.cs"
+        <Copy SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\CompileTimeExampleServices.cs"
               DestinationFolder="$(ProjectDir)CompileTimeDI" SkipUnchangedFiles="true" />
 
         <!-- First-install only: user-owned files -->
