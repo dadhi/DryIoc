@@ -25,7 +25,7 @@
 
 - Decrease memory footprint
 - Remove Obsolete API
-- Compile-time Dependency Injection (T4-based, AOT-friendly; see DryIoc.dll package readme)
+- Compile-time Dependency Injection (T4-based, AOT-friendly; see `readme.md` in the DryIoc.dll NuGet package)
 
 ]]>
     </PackageReleaseNotes>
