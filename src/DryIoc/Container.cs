@@ -9519,8 +9519,13 @@ public static class Registrator
             (bool?)null;
         var trackDisposable = transientTracking == DisposableTracking.TrackDisposableTransient;
 
-        Func<Request, bool> condition = attr.ConditionType == null ? null :
-            r => ((RegisterConditionAttribute)Activator.CreateInstance(attr.ConditionType)).Evaluate(r);
+        // Create the condition instance once at registration time to avoid per-resolution overhead
+        Func<Request, bool> condition = null;
+        if (attr.ConditionType != null)
+        {
+            var conditionInstance = (RegisterConditionAttribute)Activator.CreateInstance(attr.ConditionType);
+            condition = conditionInstance.Evaluate;
+        }
 
         if (attr.FactoryType == FactoryType.Wrapper)
             return Setup.WrapperWith(
@@ -17588,7 +17593,7 @@ public abstract class RegisterConditionAttribute : Attribute
     AllowMultiple = true, Inherited = true)]
 public class RegisterAttribute : Attribute
 {
-    /// <summary>By default no when the attribute operates on the specified service and implementation runtime types</summary>
+    /// <summary>By default false when the attribute operates on the specified service and implementation runtime types</summary>
     public virtual bool TypesAreStaticallyChecked => false;
 
     /// <summary>A service type. If null, the target type (when attribute is on the implementation class) or the implementation type is used.</summary>
