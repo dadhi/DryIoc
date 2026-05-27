@@ -68,7 +68,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             Assert.IsTrue(svc.AsyncDisposed, "DisposeAsync should have been called on the scoped service.");
         }
 
-        internal sealed class AsyncDisposableService : IAsyncDisposable, IDisposable
+        private sealed class AsyncDisposableService : IAsyncDisposable, IDisposable
         {
             public bool AsyncDisposed { get; private set; }
             public bool SyncDisposed { get; private set; }
