@@ -9473,9 +9473,11 @@ public static class Registrator
 
         foreach (var a in attrs)
         {
-            var factory = CreateFactory(a);
+            // When ImplementationType is null, use the target type (allows putting [Register] directly on the implementation class)
+            var implType = a.ImplementationType ?? registrationAttributesTarget;
+            var factory = CreateFactory(a, implType);
 
-            registrator.Register(factory, a.ServiceType, a.ServiceKey, a.IfAlreadyRegistered,
+            registrator.Register(factory, a.ServiceType ?? implType, a.ServiceKey, a.IfAlreadyRegistered,
                 isStaticallyChecked: a.TypesAreStaticallyChecked);
 
             ++regCount;
@@ -9483,12 +9485,12 @@ public static class Registrator
         return regCount;
     }
 
-    internal static ReflectionFactory CreateFactory(RegisterAttribute attr)
+    internal static ReflectionFactory CreateFactory(RegisterAttribute attr, Type implementationType = null)
     {
         var reuse = TryGetReuse(attr);
-        var made = Made.Default;  // todo: @wip add features later
+        var made = Made.Default;
         var setup = GetSetup(attr);
-        return ReflectionFactory.Of(attr.ImplementationType, reuse, made, setup);
+        return ReflectionFactory.Of(implementationType ?? attr.ImplementationType, reuse, made, setup);
     }
 
     internal static IReuse TryGetReuse(RegisterAttribute attr) =>
@@ -9510,18 +9512,74 @@ public static class Registrator
 
     internal static Setup GetSetup(RegisterAttribute attr)
     {
-        // todo: @wip support other stuff later
         var transientTracking = attr.TrackDisposableTransient;
-        if (transientTracking == DisposableTracking.TrackDisposableTransient)
-            return Setup.With(trackDisposableTransient: true);
+        bool? allowDisposable =
+            transientTracking == DisposableTracking.AllowDisposableTransient ? true :
+            transientTracking == DisposableTracking.ThrowOnRegisteringDisposableTransient ? false :
+            (bool?)null;
+        var trackDisposable = transientTracking == DisposableTracking.TrackDisposableTransient;
 
-        if (transientTracking == DisposableTracking.AllowDisposableTransient)
-            return Setup.With(allowDisposableTransient: true);
+        // Create the condition instance once at registration time to avoid per-resolution overhead
+        Func<Request, bool> condition = null;
+        if (attr.ConditionType != null)
+        {
+            var conditionInstance = (RegisterConditionAttribute)Activator.CreateInstance(attr.ConditionType);
+            condition = conditionInstance.Evaluate;
+        }
 
-        if (transientTracking == DisposableTracking.ThrowOnRegisteringDisposableTransient)
-            return Setup.With(allowDisposableTransient: false);
+        if (attr.FactoryType == FactoryType.Wrapper)
+            return Setup.WrapperWith(
+                wrappedServiceTypeArgIndex: attr.WrappedServiceTypeArgIndex,
+                alwaysWrapsRequiredServiceType: attr.AlwaysWrapsRequiredServiceType,
+                condition: condition,
+                openResolutionScope: attr.OpenResolutionScope,
+                asResolutionCall: attr.AsResolutionCall,
+                preventDisposal: attr.PreventDisposal,
+                weaklyReferenced: attr.WeaklyReferenced,
+                allowDisposableTransient: allowDisposable,
+                trackDisposableTransient: trackDisposable,
+                useParentReuse: attr.UseParentReuse,
+                disposalOrder: attr.DisposalOrder,
+                avoidResolutionScopeTracking: attr.AvoidResolutionScopeTracking);
 
-        return Setup.Default;
+        if (attr.FactoryType == FactoryType.Decorator)
+        {
+            Func<Request, bool> decoratorCond = condition;
+            if (attr.DecorateesType != null || attr.DecorateeServiceKey != null)
+            {
+                var typeCondition = attr.DecorateesType != null ? Setup.GetDecorateeCondition(attr.DecorateesType) : null;
+                var keyCondition = attr.DecorateeServiceKey != null ? Setup.GetDecorateeCondition(attr.DecorateeServiceKey) : null;
+                var combined = typeCondition != null && keyCondition != null ? r => typeCondition(r) && keyCondition(r) : typeCondition ?? keyCondition;
+                decoratorCond = condition != null && combined != null ? r => condition(r) && combined(r) : condition ?? combined;
+            }
+            return Setup.DecoratorWith(
+                condition: decoratorCond,
+                order: attr.DecoratorOrder,
+                useDecorateeReuse: attr.UseDecorateeReuse,
+                openResolutionScope: attr.OpenResolutionScope,
+                asResolutionCall: attr.AsResolutionCall,
+                preventDisposal: attr.PreventDisposal,
+                weaklyReferenced: attr.WeaklyReferenced,
+                allowDisposableTransient: allowDisposable,
+                trackDisposableTransient: trackDisposable,
+                disposalOrder: attr.DisposalOrder,
+                avoidResolutionScopeTracking: attr.AvoidResolutionScopeTracking);
+        }
+
+        return Setup.With(
+            metadataOrFuncOfMetadata: attr.Metadata,
+            condition: condition,
+            openResolutionScope: attr.OpenResolutionScope,
+            asResolutionCall: attr.AsResolutionCall,
+            asResolutionRoot: attr.AsResolutionRoot,
+            preventDisposal: attr.PreventDisposal,
+            weaklyReferenced: attr.WeaklyReferenced,
+            allowDisposableTransient: allowDisposable,
+            trackDisposableTransient: trackDisposable,
+            useParentReuse: attr.UseParentReuse,
+            disposalOrder: attr.DisposalOrder,
+            preferInSingleServiceResolve: attr.PreferInSingleServiceResolve,
+            avoidResolutionScopeTracking: attr.AvoidResolutionScopeTracking);
     }
 }
 
@@ -17521,36 +17579,42 @@ public enum ReuseAs : byte
     ScopedOrSingleton,
 }
 
+/// <summary>Abstract base class for condition attributes to be used with <see cref="RegisterAttribute.ConditionType"/>.
+/// Implement this to provide a custom condition controlling when the registered factory is used for a resolution request.</summary>
+public abstract class RegisterConditionAttribute : Attribute
+{
+    /// <summary>Returns true to use the service factory for the given resolution request.</summary>
+    public abstract bool Evaluate(Request request);
+}
+
 /// <summary>Base registration attribute,
 /// there may be descendant predefined and custom attributes simplifying the registration setup.</summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
     AllowMultiple = true, Inherited = true)]
 public class RegisterAttribute : Attribute
 {
-    /// <summary>By default no when the attribute operates on the specified srevice and implementation runtime types</summary>
+    /// <summary>By default false when the attribute operates on the specified service and implementation runtime types</summary>
     public virtual bool TypesAreStaticallyChecked => false;
 
-    /// <summary>A service type</summary>
+    /// <summary>A service type. If null, the target type (when attribute is on the implementation class) or the implementation type is used.</summary>
     public Type ServiceType;
 
-    /// <summary>An implementation type</summary>
+    /// <summary>An implementation type. If null, inferred from the type the attribute is applied to.</summary>
     public Type ImplementationType;
 
     /// <summary>One of the IReuse implementation types.</summary>
     public ReuseAs ReuseAs;
 
-    /// <summary>Optional name of the bound scope for the `ReuseType.Scoped`</summary>
+    /// <summary>Optional name of the bound scope for the `ReuseAs.Scoped`</summary>
     public object ReuseScopeName;
 
-    /// <summary>Optional names of the bound scopes fore the Scoped reuse. 
-    /// Overrides the `ReuseScopeName`</summary>
+    /// <summary>Optional names of the bound scopes for the Scoped reuse. Overrides the <see cref="ReuseScopeName"/></summary>
     public object[] ReuseScopeNames;
-    /// <summary>Valid for `ReuseType.ScopedToService`.
-    /// Overrides `ReuseScopeNames` and `ReuseScopeName`</summary>
+
+    /// <summary>Valid for `ReuseAs.ScopedToService`. Overrides <see cref="ReuseScopeNames"/> and <see cref="ReuseScopeName"/></summary>
     public Type ScopedToServiceType;
 
-    /// <summary>Optional and valid for `ReuseType.ScopedToService`.
-    /// Overrides `ReuseScopeNames` and `ReuseScopeName`</summary>
+    /// <summary>Optional and valid for `ReuseAs.ScopedToService`. Overrides <see cref="ReuseScopeNames"/> and <see cref="ReuseScopeName"/></summary>
     public object ScopedToServiceKey;
 
     /// <summary>A service key</summary>
@@ -17559,13 +17623,76 @@ public class RegisterAttribute : Attribute
     /// <summary>Uses the global container rules by default</summary>
     public IfAlreadyRegistered? IfAlreadyRegistered;
 
-    // todo: @wip
-    // public Made Made;
-
-    /// <summary>How to track the disposable transient</summary>
+    /// <summary>How to track the disposable transient. Defaults to using container rules.</summary>
     public DisposableTracking TrackDisposableTransient;
 
-    /// <summary>Creates the registration attribute with the minimal configuration</summary>
+    /// <summary>The factory type: <see cref="DryIoc.FactoryType.Service"/> (default), 
+    /// <see cref="DryIoc.FactoryType.Decorator"/>, or <see cref="DryIoc.FactoryType.Wrapper"/>.</summary>
+    public FactoryType FactoryType;
+
+    /// <summary>Type of a class derived from <see cref="RegisterConditionAttribute"/> providing the resolution condition.
+    /// The type must have a parameterless constructor.</summary>
+    public Type ConditionType;
+
+    /// <summary>Optional metadata value associated with the registration.</summary>
+    public object Metadata;
+
+    /// <summary>Corresponds to <see cref="Setup.OpenResolutionScope"/>.</summary>
+    public bool OpenResolutionScope;
+
+    /// <summary>Corresponds to <see cref="Setup.AsResolutionCall"/>.</summary>
+    public bool AsResolutionCall;
+
+    /// <summary>Corresponds to <see cref="Setup.AsResolutionRoot"/>. Valid for Service factory type only.</summary>
+    public bool AsResolutionRoot;
+
+    /// <summary>Prevents disposal of reused instance if it is disposable.</summary>
+    public bool PreventDisposal;
+
+    /// <summary>Stores reused instance as <see cref="WeakReference"/>.</summary>
+    public bool WeaklyReferenced;
+
+    /// <summary>Instructs to use parent reuse. Applied only if Reuse is not specified.</summary>
+    public bool UseParentReuse;
+
+    /// <summary>When multiple service candidates are found, prefers this registration for single-service resolution.</summary>
+    public bool PreferInSingleServiceResolve;
+
+    /// <summary>Does not add the resolution scope into the parent or singleton scope.</summary>
+    public bool AvoidResolutionScopeTracking;
+
+    /// <summary>Relative disposal order. Greater number means later disposal.</summary>
+    public int DisposalOrder;
+
+    // Decorator-specific properties
+
+    /// <summary>Controls the order that decorators are applied. Greater number means further from decoratee.
+    /// Valid for <see cref="DryIoc.FactoryType.Decorator"/> only.</summary>
+    public int DecoratorOrder;
+
+    /// <summary>Instructs to use the decorated service reuse for the decorator.
+    /// Valid for <see cref="DryIoc.FactoryType.Decorator"/> only.</summary>
+    public bool UseDecorateeReuse;
+
+    /// <summary>The type the decorator applies to. If null, the decorator applies to all services of the registered service type.
+    /// Valid for <see cref="DryIoc.FactoryType.Decorator"/> only.</summary>
+    public Type DecorateesType;
+
+    /// <summary>The service key of the decoratee service to decorate. If null, all services of the type are decorated.
+    /// Valid for <see cref="DryIoc.FactoryType.Decorator"/> only.</summary>
+    public object DecorateeServiceKey;
+
+    // Wrapper-specific properties
+
+    /// <summary>Index of wrapped service type argument in an open-generic wrapper. -1 (default) means single type argument.
+    /// Valid for <see cref="DryIoc.FactoryType.Wrapper"/> only.</summary>
+    public int WrappedServiceTypeArgIndex = -1;
+
+    /// <summary>When true, the wrapper always wraps the required service type regardless of its generic type arguments.
+    /// Valid for <see cref="DryIoc.FactoryType.Wrapper"/> only.</summary>
+    public bool AlwaysWrapsRequiredServiceType;
+
+    /// <summary>Creates the registration attribute with full service and implementation types specified.</summary>
     public RegisterAttribute(Type serviceType, Type implementationType,
         ReuseAs reuseAs = ReuseAs.ContainerRulesDefaultReuse)
     {
@@ -17573,13 +17700,24 @@ public class RegisterAttribute : Attribute
         ImplementationType = implementationType;
         ReuseAs = reuseAs;
     }
+
+    /// <summary>Creates the registration attribute specifying only the service type.
+    /// The implementation type is inferred from the type the attribute is applied to.</summary>
+    public RegisterAttribute(Type serviceType, ReuseAs reuseAs = ReuseAs.ContainerRulesDefaultReuse)
+    {
+        ServiceType = serviceType;
+        ReuseAs = reuseAs;
+    }
+
+    /// <summary>Creates the registration attribute with only the reuse specified.
+    /// Both service and implementation types are inferred from the type the attribute is applied to.</summary>
+    public RegisterAttribute(ReuseAs reuseAs = ReuseAs.ContainerRulesDefaultReuse)
+    {
+        ReuseAs = reuseAs;
+    }
 }
 
-// todo: @feature @wip implement the Register via attributes
-// void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered, bool isStaticallyChecked);
-// public static ReflectionFactory Of(Type implementationType = null, IReuse reuse = null, Made made = null, Setup setup = null)
-// todo: add RegisterMany
-/// <summary>A single registration attribute</summary>
+/// <summary>A single registration attribute with statically-checked service and implementation types.</summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
     AllowMultiple = true, Inherited = true)]
 public class RegisterAttribute<TService, TImplementation> : RegisterAttribute
@@ -17592,7 +17730,7 @@ public class RegisterAttribute<TService, TImplementation> : RegisterAttribute
         : base(typeof(TService), typeof(TImplementation), reuseAs) { }
 }
 
-/// <summary>Register with `TImplementation` the same as `TService`</summary>
+/// <summary>Register with <typeparamref name="TImplementation"/> as both service and implementation type.</summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
     AllowMultiple = true, Inherited = true)]
 public class RegisterAttribute<TImplementation> : RegisterAttribute
