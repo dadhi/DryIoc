@@ -1,0 +1,42 @@
+name: CI
+
+# workflow_dispatch: allow manual "Run workflow" from the Actions tab
+# (useful when an old run is >30 days and cannot be re-run).
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Test
+        if: runner.os != 'Windows'
+        run: |
+          dotnet run -v:minimal -c:Release -p:LatestSupportedNet=net9.0 -f:net9.0 --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+          dotnet run -v:minimal -c:Release -p:LatestSupportedNet=net9.0 -f:net9.0 -p:UseCompilationOnly=true --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+          dotnet test -v:minimal -c:Release samples/MinimalWeb.Tests/MinimalWeb.Tests.csproj
+
+      - name: Build, test and pack
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: build.bat net9.0
+
+      - name: Test MinimalWeb sample
+        if: runner.os == 'Windows'
+        run: dotnet test -v:minimal -c:Release samples/MinimalWeb.Tests/MinimalWeb.Tests.csproj
+
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows'
+        with:
+          name: packages
+          path: .dist/packages/*.nupkg

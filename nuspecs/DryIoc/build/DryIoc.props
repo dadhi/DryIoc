@@ -13,8 +13,8 @@
           DestinationFiles="$(ProjectDir)\CompileTimeDI\Container.Generated.tt"
           SkipUnchangedFiles="true"/>
         <Copy
-          SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\CompileTimeRegistrations.Example.cs" 
-          DestinationFiles="$(ProjectDir)\CompileTimeDI\CompileTimeRegistrations.Example.cs" 
+          SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\CompileTimeExampleServices.cs" 
+          DestinationFiles="$(ProjectDir)\CompileTimeDI\CompileTimeExampleServices.cs" 
           SkipUnchangedFiles="true"/>
 
         <Copy Condition="!Exists('$(ProjectDir)\CompileTimeDI\CompileTimeRegistrations.ttinclude')"

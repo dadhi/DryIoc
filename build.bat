@@ -55,6 +55,15 @@ echo:
 echo:
 echo:## Finished: TestRunners
 echo:
+echo:## Starting: Sample Tests (MinimalWeb)
+echo:
+
+dotnet test -v:minimal -c:Release samples/MinimalWeb.Tests/MinimalWeb.Tests.csproj
+if %ERRORLEVEL% neq 0 goto :error
+
+echo:
+echo:## Finished: Sample Tests
+echo:
 echo:## Starting: Documentation generation
 echo:
 

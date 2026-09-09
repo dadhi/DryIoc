@@ -2,7 +2,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2016-2024 Maksim Volkau
+Copyright (c) 2016-2026 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -491,6 +491,13 @@ public sealed class DryIocServiceProvider : IDisposable,
             serviceType == typeof(IKeyedServiceProvider) |
             serviceType == typeof(IServiceProviderIsKeyedService))
             return true;
+
+        // Compile-time container is primary; runtime registrations are the fallback.
+        var compTimeRoots = Container.Rules.CompileTimeContainer?.GetResolutionRoots();
+        if (compTimeRoots != null)
+            foreach (var (type, _) in compTimeRoots)
+                if (type == serviceType)
+                    return true;
 
         if (Container.IsRegistered(serviceType))
             return true;

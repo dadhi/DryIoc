@@ -26,6 +26,8 @@
 
     <ItemGroup>
         <Compile Include="..\DryIoc.UnitTests\TestTools.cs" Link="TestTools.cs"/>
+        <Compile Include="..\..\src\DryIoc\CompileTimeDI\CompileTimeExampleServices.cs" Link="CompileTimeDI\CompileTimeExampleServices.cs"/>
+        <Compile Include="..\..\src\DryIoc\CompileTimeDI\Container.Generated.cs" Link="CompileTimeDI\Container.Generated.cs"/>
     </ItemGroup>
 
 </Project>
