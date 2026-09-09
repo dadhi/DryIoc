@@ -1,6 +1,11 @@
 name: CI
 
-on: [push, pull_request]
+# workflow_dispatch: allow manual "Run workflow" from the Actions tab
+# (useful when an old run is >30 days and cannot be re-run).
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   build:

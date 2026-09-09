@@ -492,7 +492,7 @@ public sealed class DryIocServiceProvider : IDisposable,
             serviceType == typeof(IServiceProviderIsKeyedService))
             return true;
 
-        // Check compile-time container first - it is primary, runtime registrations are the fallback.
+        // Compile-time container is primary; runtime registrations are the fallback.
         var compTimeRoots = Container.Rules.CompileTimeContainer?.GetResolutionRoots();
         if (compTimeRoots != null)
             foreach (var (type, _) in compTimeRoots)
