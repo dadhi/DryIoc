@@ -46,6 +46,7 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices; // for MethodImplAttribute
+using System.Runtime.ExceptionServices;  // for ExceptionDispatchInfo
 using System.Diagnostics.CodeAnalysis; // for SetsRequiredMembersAttribute
 using System.Text;
 using System.Threading;
@@ -16866,24 +16867,11 @@ public static class ReflectionTools
     internal static readonly ConstructorInfo WeakReferenceCtor =
         typeof(WeakReference).GetConstructor(new[] { typeof(object) });
 
-    // todo: @perf preserve the stack trace by the modern means, e.g. via ExceptionDispatchInfo.Capture
-    private const string InternalPreserveStackTraceMethod = nameof(InternalPreserveStackTrace);
-#if NET8_0_OR_GREATER
-    [UnsafeAccessor(UnsafeAccessorKind.Method, Name = InternalPreserveStackTraceMethod)]
-    private static extern void InternalPreserveStackTrace(Exception exception);
-#else
-    private static Lazy<Action<Exception>> _preserveExceptionStackTraceAction = new Lazy<Action<Exception>>(() =>
-        typeof(Exception).GetMethod(InternalPreserveStackTraceMethod, BindingFlags.Instance | BindingFlags.NonPublic)
-        ?.To(static x => x.CreateDelegate(typeof(Action<Exception>)).To<Action<Exception>>()));
-    private static void InternalPreserveStackTrace(Exception exception) =>
-        _preserveExceptionStackTraceAction.Value?.Invoke(exception);
-#endif
-
     /// <summary>Preserves the stack trace before re-throwing.</summary>
     public static Exception TryRethrowWithPreservedStackTrace(this Exception ex)
     {
-        InternalPreserveStackTrace(ex);
-        return ex;
+        ExceptionDispatchInfo.Capture(ex).Throw();
+        return ex; // unreachable, just for the compiler
     }
 
     /// <summary>Flags for <see cref="GetImplementedTypes"/> method.</summary>
