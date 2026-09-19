@@ -25,18 +25,31 @@
 
 - Decrease memory footprint
 - Remove Obsolete API
-- @WIP Compile-time Dependency Injection
+- Compile-time Dependency Injection (T4-based, AOT-friendly; see `readme.md` in the DryIoc.dll NuGet package)
 
 ]]>
     </PackageReleaseNotes>
   </PropertyGroup>
+
+  <!-- todo: @feat comp-time in .net 10: adopt C# 14 interceptors / .NET 10 source-gen APIs for zero-reflection DI without T4 -->
+  <!-- todo: @feat AOT publish: verify full NativeAOT compatibility of DryIoc.dll + MSDI adapter -->
 
   <ItemGroup Label="Packaging build and content files">
     <None Include="..\..\nuspecs\DryIoc\readme.md" Pack="true" PackagePath="\"/>
     <None Include="..\..\nuspecs\DryIoc\build\DryIoc.dll.targets" Pack="true" PackagePath="build" />
     <None Include=".config\dotnet-tools.json" Pack="true" PackagePath="tools" />
     <None Include="CompileTimeDI\**\*" Pack="true" PackagePath="CompileTimeDI" />
+    <!-- Exclude CompileTimeDI content files from DryIoc.dll compilation:
+         These files are copied to consumer projects and should not be part of the DryIoc.dll assembly.
+         Including them would create duplicate type definitions (CS0436) in consumer projects. -->
+    <Compile Remove="CompileTimeDI\*.cs" />
   </ItemGroup>
+
+  <!-- Skip T4 re-generation in this project: Example types are not in DryIoc.dll (see above),
+       so the T4 template cannot find them. Consumers regenerate using their own assembly. -->
+  <PropertyGroup>
+    <SkipCompTimeGen>true</SkipCompTimeGen>
+  </PropertyGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
     <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.7.0" />
@@ -46,20 +59,19 @@
     <Message Importance="high" Text="MSBuildNodeCount: $(MSBuildNodeCount)"/>
   </Target>
 
-  <!-- Run compile-time generation only in debug configuration, 
-      for the one of target frameworks (highest), 
-      when the DryIoc was already build (TargetPath exists) in order to consume its types -->
-  <Target Name="CompileTimeGenerate" BeforeTargets="PrepareForBuild" Condition="'$(TargetFramework)' == 'net8.0' AND '$(SkipCompTimeGen)' != 'true' AND '$(Configuration)' == 'Debug' AND Exists('$(ProjectDir)CompileTimeDI') AND Exists('$(TargetPath)')">
+  <!-- Run compile-time generation only in debug configuration,
+      for the one of target frameworks (highest),
+      when DryIoc was already built (TargetPath exists) in order to consume its types via dotnet-t4 -->
+  <Target Name="CompileTimeGenerate" BeforeTargets="PrepareForBuild" Condition="('$(TargetFramework)' == 'net9.0' OR '$(TargetFramework)' == 'net8.0') AND '$(SkipCompTimeGen)' != 'true' AND '$(Configuration)' == 'Debug' AND Exists('$(ProjectDir)CompileTimeDI') AND Exists('$(TargetPath)')">
 
-    <Message Text="Generating the object graphs from the compile-time registrations for $(TargetFramework)..." Importance="high"/>
-    <Message Text="Env:" Importance="high"/>
-    <Message Text="TargetDir='$(TargetDir)'" Importance="high"/>
-    <Message Text="TargetPath='$(TargetPath)'" Importance="high"/>
-    <Message Text="ProjectDir='$(ProjectDir)'" Importance="high"/>
+    <Message Text="[DryIoc] Generating compile-time container for $(TargetFramework)..." Importance="high"/>
 
-    <Exec WorkingDirectory="$(ProjectDir)" Command='dotnet tool restore --ignore-failed-sources --tool-manifest "$(ProjectDir)\.config\dotnet-tools.json"' />
-    <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet t4 -P=$(TargetDir) -r=$(TargetPath) -o=CompileTimeDI\Container.Generated.cs CompileTimeDI\Container.Generated.tt" />
-    <Message Text="Generated source file is '$(ProjectDir)CompileTimeDI\Container.Generated.cs'" Importance="high"/>
+    <Exec WorkingDirectory="$(ProjectDir)"
+          Command="dotnet tool restore --ignore-failed-sources"
+          IgnoreExitCode="true" />
+    <Exec WorkingDirectory="$(ProjectDir)"
+          Command="dotnet t4 -P=&quot;$(TargetDir)&quot; -r=&quot;$(TargetPath)&quot; -o=CompileTimeDI/Container.Generated.cs CompileTimeDI/Container.Generated.tt" />
+    <Message Text="[DryIoc] Generated: '$(ProjectDir)CompileTimeDI/Container.Generated.cs'" Importance="high"/>
   </Target>
 
   <ItemGroup>
