@@ -49,7 +49,7 @@
         <!--CompileTimeDI-->
         <file src="..\src\DryIoc\CompileTimeDI\Container.Generated.tt"              target="CompileTimeDI" />
         <file src="..\src\DryIoc\CompileTimeDI\CompileTimeRegistrations.ttinclude"  target="CompileTimeDI" />
-        <file src="..\src\DryIoc\CompileTimeDI\CompileTimeRegistrations.Example.cs" target="CompileTimeDI" />
+        <file src="..\src\DryIoc\CompileTimeDI\CompileTimeExampleServices.cs" target="CompileTimeDI" />
         <file src="..\src\DryIoc\.config\dotnet-tools.json"                         target="CompileTimeDI" />
 
         <!--net45-->

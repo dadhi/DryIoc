@@ -1,39 +1,51 @@
 <Project>
-    <ItemGroup>
-      <CompileTimeDI Include="$(MSBuildThisFileDirectory)..\CompileTimeDI\**\*" />
-    </ItemGroup>
-    <Target Name="CopyCompileTimeDIToProject" AfterTargets="Restore">
-        <Message Text="Copying T4 template, T4 include, example files and dotnet-t4 CLI-tool manifest to the project..." Importance="high" />
+    <!-- CopyCompileTimeDIToProject: copies T4 files to the consuming project on install/update.
+         - Always refreshes package-owned files (Container.Generated.tt, CompileTimeExampleServices.cs).
+         - First-install-only: user-owned files (CompileTimeRegistrations.ttinclude, Container.Generated.cs,
+           .config/dotnet-tools.json) are never overwritten so user customizations are preserved.
+    -->
+    <Target Name="CopyCompileTimeDIToProject" BeforeTargets="Build">
+        <!-- Always refresh package-owned files -->
+        <Copy SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\Container.Generated.tt"
+              DestinationFolder="$(ProjectDir)CompileTimeDI" SkipUnchangedFiles="true" />
+        <Copy SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\CompileTimeExampleServices.cs"
+              DestinationFolder="$(ProjectDir)CompileTimeDI" SkipUnchangedFiles="true" />
 
-        <Message Text="Env:"                       Importance="high"/>
-        <Message Text="TargetDir='$(TargetDir)'"   Importance="high"/>
-        <Message Text="TargetPath='$(TargetPath)'" Importance="high"/>
-        <Message Text="ProjectDir='$(ProjectDir)'" Importance="high"/>
-        <Message Text="MSBuildThisFileDirectory='$(MSBuildThisFileDirectory)'" Importance="high"/>
+        <!-- First-install only: user-owned files -->
+        <Copy Condition="!Exists('$(ProjectDir)CompileTimeDI\CompileTimeRegistrations.ttinclude')"
+              SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\CompileTimeRegistrations.ttinclude"
+              DestinationFolder="$(ProjectDir)CompileTimeDI" />
+        <Copy Condition="!Exists('$(ProjectDir)CompileTimeDI\Container.Generated.cs')"
+              SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\Container.Generated.cs"
+              DestinationFolder="$(ProjectDir)CompileTimeDI" />
+        <Copy Condition="!Exists('$(ProjectDir).config\dotnet-tools.json')"
+              SourceFiles="$(MSBuildThisFileDirectory)..\tools\dotnet-tools.json"
+              DestinationFolder="$(ProjectDir).config" />
 
-        <MakeDir Directories="$(ProjectDir).config" Condition="!Exists('$(ProjectDir).config')" />
-        <Copy SourceFiles="$(MSBuildThisFileDirectory)..\tools\dotnet-tools.json" DestinationFolder="$(ProjectDir).config" />
-
-        <MakeDir Directories="$(ProjectDir)CompileTimeDI" Condition="!Exists('$(ProjectDir)CompileTimeDI')" />
-        <Copy SourceFiles="@(CompileTimeDI)" DestinationFolder="$(ProjectDir)CompileTimeDI" />
-
-        <Exec WorkingDirectory="$(ProjectDir)" Command='dotnet tool install --ignore-failed-sources --tool-manifest "$(ProjectDir)\.config\dotnet-tools.json" dotnet-t4' />
+        <Exec WorkingDirectory="$(ProjectDir)"
+              Command="dotnet tool restore --ignore-failed-sources"
+              IgnoreExitCode="true" />
     </Target>
 
-    <Target Name="CompileTimeGenerate" 
+    <!-- CompileTimeGenerate: runs dotnet-t4 to regenerate Container.Generated.cs.
+         Conditions: Debug only; CompileTimeDI setup done; assembly built at least once (TargetPath exists);
+         supported TFMs only; opt-out via $(SkipCompTimeGen)=true.
+    -->
+    <Target Name="CompileTimeGenerate"
         BeforeTargets="PrepareForBuild"
-        Condition="'$(SkipCompTimeGen)' != 'true' AND '$(Configuration)' == 'Debug' AND Exists('$(ProjectDir)CompileTimeDI') AND Exists('$(TargetPath)') AND ('$(TargetFramework)' == 'netstandard2.1' OR '$(TargetFramework)' == 'net8.0' OR '$(TargetFramework)' == 'net9.0')">
+        Condition="'$(SkipCompTimeGen)' != 'true' AND '$(Configuration)' == 'Debug'
+                   AND Exists('$(ProjectDir)CompileTimeDI') AND Exists('$(TargetPath)')
+                   AND ('$(TargetFramework)' == 'netstandard2.1'
+                     OR '$(TargetFramework)' == 'net6.0' OR '$(TargetFramework)' == 'net7.0'
+                     OR '$(TargetFramework)' == 'net8.0' OR '$(TargetFramework)' == 'net9.0'
+                     OR '$(TargetFramework)' == 'net10.0')">
 
-        <Message Text="Generating the object graphs from the compile-time registrations for $(TargetFramework)..." Importance="high"/>
-        <Message Text="Env:"                       Importance="high"/>
-        <Message Text="TargetDir='$(TargetDir)'"   Importance="high"/>
-        <Message Text="TargetPath='$(TargetPath)'" Importance="high"/>
-        <Message Text="ProjectDir='$(ProjectDir)'" Importance="high"/>
-
-        <Exec WorkingDirectory="$(ProjectDir)" Command='dotnet tool restore --ignore-failed-sources --tool-manifest "$(ProjectDir)\.config\dotnet-tools.json"' />
-        <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet t4 -P=$(TargetDir) -r=$(TargetPath) -o=CompileTimeDI\Container.Generated.cs CompileTimeDI\Container.Generated.tt" />
-
-        <Message Text="Generated source file is '$(ProjectDir)CompileTimeDI\Container.Generated.cs'" Importance="high"/>
+        <Message Text="[DryIoc] Regenerating Container.Generated.cs for $(TargetFramework)..." Importance="high"/>
+        <Exec WorkingDirectory="$(ProjectDir)"
+              Command="dotnet tool restore --ignore-failed-sources"
+              IgnoreExitCode="true" />
+        <Exec WorkingDirectory="$(ProjectDir)"
+              Command="dotnet t4 -P=&quot;$(TargetDir)&quot; -r=&quot;$(TargetPath)&quot; -o=CompileTimeDI/Container.Generated.cs CompileTimeDI/Container.Generated.tt" />
     </Target>
 
     <ItemGroup>
