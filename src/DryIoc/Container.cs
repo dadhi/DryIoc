@@ -46,6 +46,7 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices; // for MethodImplAttribute
+using System.Runtime.ExceptionServices;  // for ExceptionDispatchInfo
 using System.Diagnostics.CodeAnalysis; // for SetsRequiredMembersAttribute
 using System.Text;
 using System.Threading;
@@ -1182,6 +1183,13 @@ public partial class Container : IContainer
 
             if (singleMatchedFactory != null)
             {
+                // Before returning the reuse-selected factory, check if a single conditioned factory should take priority.
+                // Conditioned factories are more specific and should be preferred over a "default" factory selected by reuse lifespan (GHIssue #631).
+                // Only consider conditioned factories that also pass the reuse matching criteria.
+                var conditionedReuseMatchedFactories = reuseMatchedFactories.Match(static f => f.Value.Setup.Condition != null);
+                if (conditionedReuseMatchedFactories.Length == 1)
+                    singleMatchedFactory = conditionedReuseMatchedFactories[0];
+
                 // Add asResolutionCall or change the serviceKey to prevent the caching of expression as default (BBIssue: #382)
                 if (!request.IsResolutionCall)
                     singleMatchedFactory.Value.SetAsResolutionCall();
@@ -16888,24 +16896,11 @@ public static class ReflectionTools
     internal static readonly ConstructorInfo WeakReferenceCtor =
         typeof(WeakReference).GetConstructor(new[] { typeof(object) });
 
-    // todo: @perf preserve the stack trace by the modern means, e.g. via ExceptionDispatchInfo.Capture
-    private const string InternalPreserveStackTraceMethod = nameof(InternalPreserveStackTrace);
-#if NET8_0_OR_GREATER
-    [UnsafeAccessor(UnsafeAccessorKind.Method, Name = InternalPreserveStackTraceMethod)]
-    private static extern void InternalPreserveStackTrace(Exception exception);
-#else
-    private static Lazy<Action<Exception>> _preserveExceptionStackTraceAction = new Lazy<Action<Exception>>(() =>
-        typeof(Exception).GetMethod(InternalPreserveStackTraceMethod, BindingFlags.Instance | BindingFlags.NonPublic)
-        ?.To(static x => x.CreateDelegate(typeof(Action<Exception>)).To<Action<Exception>>()));
-    private static void InternalPreserveStackTrace(Exception exception) =>
-        _preserveExceptionStackTraceAction.Value?.Invoke(exception);
-#endif
-
     /// <summary>Preserves the stack trace before re-throwing.</summary>
     public static Exception TryRethrowWithPreservedStackTrace(this Exception ex)
     {
-        InternalPreserveStackTrace(ex);
-        return ex;
+        ExceptionDispatchInfo.Capture(ex).Throw();
+        return ex; // unreachable, just for the compiler
     }
 
     /// <summary>Flags for <see cref="GetImplementedTypes"/> method.</summary>
