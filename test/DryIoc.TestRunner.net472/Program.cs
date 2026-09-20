@@ -430,6 +430,8 @@ public class Program
             new GHIssue669_Unable_to_resolve_type_with_optional_arguments_with_both_MefAttributedModel_and_MS_DI(),
             new GHIssue678_Scope_is_lost_in_disposable_service(),
             new GHIssue685_Creating_scopes_via_funcs_is_not_threadsafe_and_fails_sporadically_with_NullRef_exception(),
+            new GHIssue686_Singleton_service_resolved_by_scoped_container_not_root_container(),
+            new GHIssue692_Resolve_failed_on_Android_Avalonia(),
         };
 
         var totalPassed = 0;
