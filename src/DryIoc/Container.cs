@@ -46,6 +46,7 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices; // for MethodImplAttribute
+using System.Runtime.ExceptionServices;  // for ExceptionDispatchInfo
 using System.Diagnostics.CodeAnalysis; // for SetsRequiredMembersAttribute
 using System.Text;
 using System.Threading;
@@ -627,14 +628,14 @@ public partial class Container : IContainer
         if (unwrappedType != null & unwrappedType != typeof(void)) // accounting for the resolved action GH#114
             requiredItemType = unwrappedType;
 
-        var items = GetAllServiceFactories(requiredItemType)
+        var items = GetAllServiceFactoriesExcludingFallback(requiredItemType)
             .Map(requiredServiceType, static (t, f) => new ServiceRegistrationInfo(f.Value, t, f.Key));
 
         ServiceRegistrationInfo[] openGenericItems = null;
         if (requiredItemType.IsClosedGeneric())
         {
             var requiredItemOpenGenericType = requiredItemType.GetGenericTypeDefinition();
-            openGenericItems = GetAllServiceFactories(requiredItemOpenGenericType)
+            openGenericItems = GetAllServiceFactoriesExcludingFallback(requiredItemOpenGenericType)
                 .Map(requiredItemOpenGenericType, requiredServiceType,
                     static (gt, t, x) => new ServiceRegistrationInfo(x.Value, t, new ServiceKeyAndRequiredOpenGenericType(gt, x.Key)));
         }
@@ -1182,6 +1183,13 @@ public partial class Container : IContainer
 
             if (singleMatchedFactory != null)
             {
+                // Before returning the reuse-selected factory, check if a single conditioned factory should take priority.
+                // Conditioned factories are more specific and should be preferred over a "default" factory selected by reuse lifespan (GHIssue #631).
+                // Only consider conditioned factories that also pass the reuse matching criteria.
+                var conditionedReuseMatchedFactories = reuseMatchedFactories.Match(static f => f.Value.Setup.Condition != null);
+                if (conditionedReuseMatchedFactories.Length == 1)
+                    singleMatchedFactory = conditionedReuseMatchedFactories[0];
+
                 // Add asResolutionCall or change the serviceKey to prevent the caching of expression as default (BBIssue: #382)
                 if (!request.IsResolutionCall)
                     singleMatchedFactory.Value.SetAsResolutionCall();
@@ -1467,6 +1475,22 @@ public partial class Container : IContainer
         if (Rules.DynamicRegistrationProviders != null &&
             !serviceType.IsExcludedGeneralPurposeServiceType())
             return CombineRegisteredServiceWithDynamicFactories(factories, serviceType, null);
+
+        return factories;
+    }
+
+    // Used by collection resolving (GetArrayExpression, ResolveMany) to exclude AsFallback dynamic registrations,
+    // so that concrete types that are not explicitly registered are not included in the collection.
+    internal KV<object, Factory>[] GetAllServiceFactoriesExcludingFallback(Type serviceType)
+    {
+        var serviceFactories = Registry.GetServiceFactories(_registry.Value);
+        var entry = serviceFactories.GetValueOrDefault(serviceType);
+
+        var factories = FactoriesEntry.ToNotNullKeyedFactories(entry);
+
+        if (Rules.DynamicRegistrationProviders != null &&
+            !serviceType.IsExcludedGeneralPurposeServiceType())
+            return CombineRegisteredServiceWithDynamicFactories(factories, serviceType, null, serviceKey: null, forCollection: true);
 
         return factories;
     }
@@ -1892,10 +1916,12 @@ public partial class Container : IContainer
 
     // todo: @perf split into with and without the serviceKey
     private KV<object, Factory>[] CombineRegisteredServiceWithDynamicFactories(
-        KV<object, Factory>[] factories, Type serviceType, Type openGenericServiceType, object serviceKey = null)
+        KV<object, Factory>[] factories, Type serviceType, Type openGenericServiceType, object serviceKey = null, bool forCollection = false)
     {
         var withFlags = DynamicRegistrationFlags.Service;
         var withoutFlags = factories.Length != 0 ? DynamicRegistrationFlags.AsFallback : DynamicRegistrationFlags.NoFlags;
+        if (forCollection)
+            withoutFlags |= DynamicRegistrationFlags.ExcludeFromCollectionWrapper;
 
         // Assign unique continuous keys across all of the dynamic providers,
         // to prevent duplicate keys and peeking the wrong factory by collection wrappers
@@ -4395,6 +4421,17 @@ public static class FactoryDelegateCompiler
             if (factoryDelegate != null)
                 return factoryDelegate;
         }
+        else
+        {
+            // When UseInterpretation=true, avoid calling Expression.Compile() (and FEC) which may internally use
+            // DynamicMethod - that is not supported on AOT platforms like Xamarin.iOS in release/TestFlight mode.
+            // Instead, return a delegate that wraps the DryIoc interpreter so that no code is compiled or emitted at runtime.
+            // If the expression cannot be interpreted (e.g., it uses ExpressionFactory with complex arbitrary expressions
+            // not covered by the DryIoc Interpreter), a ContainerException with a helpful message is thrown.
+            return r => Interpreter.TryInterpretAndUnwrapContainerException(r, expression, out var result)
+                ? result
+                : Throw.For<object>(Error.UnableToInterpretExpression, expression);
+        }
 
         // It is required for the expression based Made.Of (sigh...) and ExpressionFactory with an arbitrary expressions, not covered by the own DryIoc Interpreter (sigh...).
         // Or as a fallback to the platforms where FastExpressionCompiler is not able to compile the expression.
@@ -5160,6 +5197,16 @@ public static class ResolverContext
             ? RootOrSelfExpr
             : FactoryDelegateCompiler.ResolverContextParamExpr;
 
+    /// <summary>Finds the correct resolver context expression for directly injecting container interfaces (IResolver, IResolverContext, etc.).
+    /// Unlike <see cref="GetRootOrSelfExpr"/>, this always returns the root container expression for singletons,
+    /// regardless of the <see cref="Rules.ThrowIfDependencyHasShorterReuseLifespan"/> rule - see GH issue #686.</summary>
+    internal static Expression GetRootOrSelfExprForContainerInterface(Request request) =>
+        request.Reuse is CurrentScopeReuse == false
+        && request.DirectParent.IsSingletonOrDependencyOfSingleton
+        && !request.OpensResolutionScopeUpToResolutionCall()
+            ? RootOrSelfExpr
+            : FactoryDelegateCompiler.ResolverContextParamExpr;
+
     private static bool OpensResolutionScopeUpToResolutionCall(this Request r)
     {
         var p = r.DirectParent;
@@ -5459,13 +5506,13 @@ public static class WrappersSupport
     private static ImHashMap<Type, object> AddContainerInterfaces(this ImHashMap<Type, object> wrappers)
     {
         var resolverContextExpr = new WrapperExpressionFactory.OfContainer(
-            static (r, _) => ResolverContext.GetRootOrSelfExpr(r));
+            static (r, _) => ResolverContext.GetRootOrSelfExprForContainerInterface(r));
 
         var containerExpr = new WrapperExpressionFactory.OfContainer(
-            static (r, _) => TryConvertIntrinsic<IContainer>(ResolverContext.GetRootOrSelfExpr(r)));
+            static (r, _) => TryConvertIntrinsic<IContainer>(ResolverContext.GetRootOrSelfExprForContainerInterface(r)));
 
         var registratorExpr = new WrapperExpressionFactory.OfContainer(
-            static (r, _) => TryConvertIntrinsic<IRegistrator>(ResolverContext.GetRootOrSelfExpr(r)));
+            static (r, _) => TryConvertIntrinsic<IRegistrator>(ResolverContext.GetRootOrSelfExprForContainerInterface(r)));
 
         return wrappers
             .AddSureNotPresent(typeof(IContainer), containerExpr)
@@ -5496,13 +5543,13 @@ public static class WrappersSupport
         var details = request.GetServiceDetails();
         var requiredItemType = container.GetWrappedType(serviceType, details.RequiredServiceType);
 
-        var items = container.GetAllServiceFactories(requiredItemType)
+        var items = container.GetAllServiceFactoriesExcludingFallback(requiredItemType)
             .Map(requiredItemType, static (t, x) => new ServiceRegistrationInfo(x.Value, t, x.Key));
 
         if (requiredItemType.IsClosedGeneric())
         {
             var requiredItemOpenGenericType = requiredItemType.GetGenericTypeDefinition();
-            var openGenericItems = container.GetAllServiceFactories(requiredItemOpenGenericType)
+            var openGenericItems = container.GetAllServiceFactoriesExcludingFallback(requiredItemOpenGenericType)
                 .Map(requiredItemOpenGenericType, requiredItemType,
                     static (gt, t, f) => new ServiceRegistrationInfo(f.Value, t, new ServiceKeyAndRequiredOpenGenericType(gt, f.Key)));
             items = items.Append(openGenericItems);
@@ -5990,6 +6037,10 @@ public enum DynamicRegistrationFlags : byte
     Decorator = 1 << 2,
     /// <summary>Specifies that provider should be asked for the `object` service type to get the decorator for the generic `T` service</summary>
     DecoratorOfAnyTypeViaObjectServiceType = 1 << 3,
+    /// <summary>Specifies that provider should be excluded from collection wrapper resolution (IEnumerable, arrays, IList, etc.).
+    /// Used by <see cref="Rules.WithConcreteTypeDynamicRegistrations(System.Func{System.Type,object,bool},IReuse)"/> to prevent unintended instantiation of concrete types
+    /// when resolving collection wrappers for unregistered service types.</summary>
+    ExcludeFromCollectionWrapper = 1 << 4,
 }
 
 internal sealed class UniqueRegisteredServiceKey : IPrintable, IConvertibleToExpression
@@ -6624,13 +6675,13 @@ public sealed class Rules
 
     /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.</summary>
     public Rules WithConcreteTypeDynamicRegistrations(Func<Type, object, bool> condition = null, IReuse reuse = null) =>
-        WithDynamicRegistrationsAsFallback(ConcreteTypeDynamicRegistrations(condition, reuse));
+        WithDynamicRegistrationsAsFallback(DefaultDynamicRegistrationFlags | DryIoc.DynamicRegistrationFlags.ExcludeFromCollectionWrapper, ConcreteTypeDynamicRegistrations(condition, reuse));
 
     /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.
     /// Pass `IfUnresolved.ReturnDefault` or `IfUnresolved.ReturnDefaultIfNotRegistered` to `ifConcreteTypeIsUnresolved`
     /// to allow fallback to the next rule.</summary>
     public Rules WithConcreteTypeDynamicRegistrations(IfUnresolved ifConcreteTypeIsUnresolved, Func<Type, object, bool> condition = null, IReuse reuse = null) =>
-        WithDynamicRegistrationsAsFallback(ConcreteTypeDynamicRegistrations(ifConcreteTypeIsUnresolved, condition, reuse));
+        WithDynamicRegistrationsAsFallback(DefaultDynamicRegistrationFlags | DryIoc.DynamicRegistrationFlags.ExcludeFromCollectionWrapper, ConcreteTypeDynamicRegistrations(ifConcreteTypeIsUnresolved, condition, reuse));
 
     /// [Obsolete("Replaced with `WithConcreteTypeDynamicRegistrations`")]
     public Rules WithAutoConcreteTypeResolution(Func<Request, bool> condition = null)
@@ -16677,7 +16728,12 @@ public static class Error
             "For all those reasons DryIoc has a timeout to prevent the infinite waiting. " + NewLine +
             $"You may change the default timeout via setting the static `Scope.{nameof(Scope.WaitForScopedServiceIsCreatedTimeoutMilliseconds)}`"),
         ServiceTypeIsNull = Of("Registered service type is null"),
-        RegisterAttributedUnsupportedReuseType = Of("Not support reuse type {0} in the RegisterAttribute.");
+        RegisterAttributedUnsupportedReuseType = Of("Not support reuse type {0} in the RegisterAttribute."),
+        UnableToInterpretExpression = Of(
+            "DryIoc is configured with `Rules.WithUseInterpretation()` to avoid code compilation (e.g. for AOT platforms like Xamarin.iOS), " + NewLine +
+            "but the DryIoc Interpreter is unable to interpret the following expression:" + NewLine + "{0}" + NewLine +
+            "To fix this, simplify the registration (e.g. avoid using Made.Of or custom ExpressionFactory with complex expressions that DryIoc Interpreter does not support), " + NewLine +
+            "or use `Rules.WithoutUseInterpretation()` to allow code compilation on platforms that support it.");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 
@@ -16872,24 +16928,11 @@ public static class ReflectionTools
     internal static readonly ConstructorInfo WeakReferenceCtor =
         typeof(WeakReference).GetConstructor(new[] { typeof(object) });
 
-    // todo: @perf preserve the stack trace by the modern means, e.g. via ExceptionDispatchInfo.Capture
-    private const string InternalPreserveStackTraceMethod = nameof(InternalPreserveStackTrace);
-#if NET8_0_OR_GREATER
-    [UnsafeAccessor(UnsafeAccessorKind.Method, Name = InternalPreserveStackTraceMethod)]
-    private static extern void InternalPreserveStackTrace(Exception exception);
-#else
-    private static Lazy<Action<Exception>> _preserveExceptionStackTraceAction = new Lazy<Action<Exception>>(() =>
-        typeof(Exception).GetMethod(InternalPreserveStackTraceMethod, BindingFlags.Instance | BindingFlags.NonPublic)
-        ?.To(static x => x.CreateDelegate(typeof(Action<Exception>)).To<Action<Exception>>()));
-    private static void InternalPreserveStackTrace(Exception exception) =>
-        _preserveExceptionStackTraceAction.Value?.Invoke(exception);
-#endif
-
     /// <summary>Preserves the stack trace before re-throwing.</summary>
     public static Exception TryRethrowWithPreservedStackTrace(this Exception ex)
     {
-        InternalPreserveStackTrace(ex);
-        return ex;
+        ExceptionDispatchInfo.Capture(ex).Throw();
+        return ex; // unreachable, just for the compiler
     }
 
     /// <summary>Flags for <see cref="GetImplementedTypes"/> method.</summary>

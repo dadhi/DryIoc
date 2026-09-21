@@ -397,6 +397,7 @@ public class Program
             new Microsoft.DependencyInjection.Specification.Tests.GHIssue432_Resolving_interfaces_with_contravariant_type_parameter_fails_with_RegisteringImplementationNotAssignableToServiceType_error(),
             new GHIssue434_ReturnDefaultIfNotRegistered_is_not_respected_between_scopes(),
             new Microsoft.DependencyInjection.Specification.Tests.GHIssue435_hangfire_use_dryioc_report_ContainerIsDisposed(),
+            new Microsoft.DependencyInjection.Specification.Tests.GHIssue_DryIocServiceProvider_IAsyncDisposable(),
             new GHIssue446_Resolving_a_record_without_registration_causes_a_StackOverflowException(),
             new GHIssue448_Dynamic_registration_does_not_work_for_resolve_with_service_key(),
             new GHIssue449_Optional_dependency_shouldnt_treat_its_dependencies_as_optional(),
@@ -434,11 +435,16 @@ public class Program
             new GHIssue610_CustomDynamicRegistrationProvider_ConstructorWithResolvableArguments(),
             new GHIssue619_FaultySingletonDependency(),
             new GHIssue623_Scoped_service_decorator(),
+            new GHIssue631_Conditional_registrations(),
+            new GHIssue636_ServiceKey_in_RegisterDelegate_parameters(),
+            new GHIssue643_WithConcreteTypeDynamicRegistrations_results_in_unintended_instantiation(),
             new GHIssue653_KeyValuePair_exposes_internal_DryIoc_structures(),
             new GHIssue659_Can_I_inspect_a_scope_for_all_the_dependencies_resolved_in_the_scope(),
             new GHIssue669_Unable_to_resolve_type_with_optional_arguments_with_both_MefAttributedModel_and_MS_DI(),
             new GHIssue678_Scope_is_lost_in_disposable_service(),
             new GHIssue685_Creating_scopes_via_funcs_is_not_threadsafe_and_fails_sporadically_with_NullRef_exception(),
+            new GHIssue686_Singleton_service_resolved_by_scoped_container_not_root_container(),
+            new GHIssue692_Resolve_failed_on_Android_Avalonia(),
         };
 
         var totalPassed = 0;

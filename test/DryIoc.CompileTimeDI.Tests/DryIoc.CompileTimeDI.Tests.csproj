@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- End-to-end test for the DryIoc.dll NuGet package CompileTime DI install experience.
+         Uses a PackageReference (not ProjectReference) to simulate the real NuGet install.
+         The package must be built first: dotnet build src/DryIoc/DryIoc.csproj -c Release
+         NuGet.Config in this folder points to ../../.dist/packages.
+         Run test-e2e.sh for the full automated end-to-end test. -->
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsTestProject>false</IsTestProject>
+    <SkipCompTimeGen>true</SkipCompTimeGen>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DryIoc.dll" Version="6.0.0-preview-09" />
+  </ItemGroup>
+
+</Project>
