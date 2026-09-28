@@ -9516,36 +9516,142 @@ public static class Registrator
         Registrator.RegisterMapping(container,
             typeof(TService), typeof(TRegisteredService), ifAlreadyRegistered, serviceKey, registeredServiceKey);
 
-    /// <summary>Returns the number of the actual registrations made.</summary>
+    /// <summary>Returns the number of the actual registrations made from
+    /// <see cref="RegisterAttribute"/> on the target type and its members (methods, properties, fields).</summary>
     public static int RegisterByRegisterAttributes(this IRegistrator registrator, Type registrationAttributesTarget)
     {
-        var attrs = registrationAttributesTarget.GetCustomAttributes<RegisterAttribute>(inherit: true);
         var regCount = 0;
+        var typeRegisteredAsFactory = false;
 
-        foreach (var a in attrs)
+        // Type-level attributes. Config/static classes may host [Register(service, impl)] without being implementations themselves.
         {
-            // When ImplementationType is null, use the target type (allows putting [Register] directly on the implementation class)
-            var implType = a.ImplementationType ?? registrationAttributesTarget;
-            var factory = CreateFactory(a, implType);
-
-            registrator.Register(factory, a.ServiceType ?? implType, a.ServiceKey, a.IfAlreadyRegistered,
-                isStaticallyChecked: a.TypesAreStaticallyChecked);
-
-            ++regCount;
+            var attrs = registrationAttributesTarget.GetCustomAttributes(typeof(RegisterAttribute), inherit: true);
+            for (var i = 0; i < attrs.Length; i++)
+            {
+                var a = (RegisterAttribute)attrs[i];
+                // When ImplementationType is null, use the target type (allows putting [Register] directly on the implementation class)
+                var implType = a.ImplementationType ?? registrationAttributesTarget;
+                // Skip when the only available implementation type cannot be constructed (static/abstract) and no Made is provided
+                if (a.ImplementationType == null && !implType.IsImplementationType())
+                    continue;
+                regCount += RegisterByAttribute(registrator, a, implType, made: null);
+            }
         }
+
+        // Member-level attributes (factory methods / properties / fields)
+        foreach (var member in registrationAttributesTarget.GetAllMembers(includeBase: true))
+        {
+            // skip special/backing/indexer members and constructors (not returned by GetAllMembers anyway)
+            if (member is MethodInfo method && (method.IsSpecialName || method.IsAbstract || method.IsGenericMethodDefinition))
+                continue;
+            if (member is PropertyInfo prop && prop.IsIndexer())
+                continue;
+            if (member is FieldInfo field && field.IsBackingField())
+                continue;
+
+            Attribute[] memberAttrs;
+            if (member is MethodInfo)
+                memberAttrs = member.GetCustomAttributes(typeof(RegisterAttribute), inherit: true).Cast<Attribute>().ToArrayOrSelf();
+            else
+                memberAttrs = member.GetAttributes(typeof(RegisterAttribute), inherit: true).ToArrayOrSelf();
+
+            if (memberAttrs.Length == 0)
+                continue;
+
+            ServiceInfo factoryInfo = null;
+            if (!member.IsStatic())
+            {
+                // Ensure declaring type can be resolved as the instance factory
+                if (!typeRegisteredAsFactory)
+                {
+                    registrator.Register(ReflectionFactory.Of(registrationAttributesTarget),
+                        registrationAttributesTarget, serviceKey: null,
+                        ifAlreadyRegistered: IfAlreadyRegistered.Keep, isStaticallyChecked: true);
+                    typeRegisteredAsFactory = true;
+                    ++regCount;
+                }
+                factoryInfo = ServiceInfo.Of(registrationAttributesTarget);
+            }
+
+            var made = Made.Of(member, factoryInfo);
+            var returnType = member.GetReturnTypeOrDefault();
+
+            for (var i = 0; i < memberAttrs.Length; i++)
+            {
+                var a = (RegisterAttribute)memberAttrs[i];
+                var implType = a.ImplementationType ?? returnType;
+                regCount += RegisterByAttribute(registrator, a, implType, made);
+            }
+        }
+
         return regCount;
     }
 
-    internal static ReflectionFactory CreateFactory(RegisterAttribute attr, Type implementationType = null)
+    /// <summary>Registers one or many services from a single <see cref="RegisterAttribute"/>.</summary>
+    private static int RegisterByAttribute(IRegistrator registrator, RegisterAttribute attr, Type implType, Made made)
+    {
+        var factory = CreateFactory(attr, implType, made);
+        var regCount = 0;
+
+        Type[] serviceTypes = null;
+        if (attr.RegisterMany)
+        {
+            serviceTypes = implType.GetRegisterManyImplementedServiceTypes(attr.NonPublicServiceTypes);
+            if (!attr.Except.IsNullOrEmpty())
+                serviceTypes = serviceTypes.Except(attr.Except).ToArrayOrSelf();
+            // Prefer an explicit ServiceType when provided, by ensuring it is included
+            if (attr.ServiceType != null && Array.IndexOf(serviceTypes, attr.ServiceType) < 0)
+                serviceTypes = serviceTypes.Append(attr.ServiceType);
+        }
+        else if (!attr.ServiceTypes.IsNullOrEmpty())
+            serviceTypes = attr.ServiceTypes;
+
+        if (serviceTypes != null)
+        {
+            for (var i = 0; i < serviceTypes.Length; i++)
+            {
+                var ifAlready = attr.GetIfAlreadyRegisteredOrNull();
+                registrator.Register(factory, serviceTypes[i], attr.ServiceKey, ifAlready,
+                    isStaticallyChecked: attr.TypesAreStaticallyChecked);
+                ++regCount;
+            }
+            return regCount;
+        }
+
+        registrator.Register(factory, attr.ServiceType ?? implType, attr.ServiceKey, attr.GetIfAlreadyRegisteredOrNull(),
+            isStaticallyChecked: attr.TypesAreStaticallyChecked);
+        return 1;
+    }
+
+    internal static ReflectionFactory CreateFactory(RegisterAttribute attr, Type implementationType = null, Made made = null)
     {
         var reuse = TryGetReuse(attr);
-        var made = Made.Default;
+        made ??= TryGetMade(attr);
         var setup = GetSetup(attr);
         return ReflectionFactory.Of(implementationType ?? attr.ImplementationType, reuse, made, setup);
     }
 
-    internal static IReuse TryGetReuse(RegisterAttribute attr) =>
-        attr.ReuseAs switch
+    internal static Made TryGetMade(RegisterAttribute attr) =>
+        attr.FactoryMethod switch
+        {
+            MadeFactoryMethod.ConstructorWithResolvableArguments =>
+                Made.Of(FactoryMethod.ConstructorWithResolvableArguments),
+            MadeFactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic =>
+                Made.Of(FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic),
+            _ => Made.Default
+        };
+
+    internal static IReuse TryGetReuse(RegisterAttribute attr)
+    {
+        if (attr.CustomReuseType != null)
+            return
+                attr.ReuseScopeName == null && (attr.ReuseScopeNames == null || attr.ReuseScopeNames.Length == 0) ?
+                    (IReuse)Activator.CreateInstance(attr.CustomReuseType) :
+                attr.ReuseScopeName != null ?
+                    (IReuse)Activator.CreateInstance(attr.CustomReuseType, attr.ReuseScopeName) :
+                    (IReuse)Activator.CreateInstance(attr.CustomReuseType, new object[] { attr.ReuseScopeNames });
+
+        return attr.ReuseAs switch
         {
             ReuseAs.ContainerRulesDefaultReuse => null, // default container reuse
             ReuseAs.Transient => Reuse.Transient,
@@ -9560,6 +9666,7 @@ public static class Registrator
                 attr.ReuseScopeNames != null ? Reuse.ScopedTo(attr.ReuseScopeNames, true) : Reuse.ScopedTo(attr.ReuseScopeName, true),
             var r => Throw.For<IReuse>(Error.RegisterAttributedUnsupportedReuseType, r)
         };
+    }
 
     internal static Setup GetSetup(RegisterAttribute attr)
     {
@@ -17628,6 +17735,36 @@ public enum ReuseAs : byte
     ScopedOrSingleton,
 }
 
+/// <summary>Selects how the implementation constructor is chosen for <see cref="RegisterAttribute"/>,
+/// corresponding to <see cref="FactoryMethod"/> selectors used by <c>Register(..., made: ...)</c>.</summary>
+public enum MadeFactoryMethod : byte
+{
+    /// <summary>Use container default constructor selection rules.</summary>
+    Default = 0,
+    /// <summary>Use <see cref="FactoryMethod.ConstructorWithResolvableArguments"/>.</summary>
+    ConstructorWithResolvableArguments,
+    /// <summary>Use <see cref="FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic"/>.</summary>
+    ConstructorWithResolvableArgumentsIncludingNonPublic,
+}
+
+/// <summary>Attribute-friendly counterpart of <see cref="IfAlreadyRegistered"/> with an extra
+/// <see cref="UseContainerRules"/> default (nullable enums cannot be attribute arguments).</summary>
+public enum RegisterIfAlready : byte
+{
+    /// <summary>Use <see cref="Rules.DefaultIfAlreadyRegistered"/> from the container.</summary>
+    UseContainerRules = 0,
+    /// <summary><see cref="IfAlreadyRegistered.AppendNotKeyed"/></summary>
+    AppendNotKeyed,
+    /// <summary><see cref="IfAlreadyRegistered.Throw"/></summary>
+    Throw,
+    /// <summary><see cref="IfAlreadyRegistered.Keep"/></summary>
+    Keep,
+    /// <summary><see cref="IfAlreadyRegistered.Replace"/></summary>
+    Replace,
+    /// <summary><see cref="IfAlreadyRegistered.AppendNewImplementation"/></summary>
+    AppendNewImplementation,
+}
+
 /// <summary>Abstract base class for condition attributes to be used with <see cref="RegisterAttribute.ConditionType"/>.
 /// Implement this to provide a custom condition controlling when the registered factory is used for a resolution request.</summary>
 public abstract class RegisterConditionAttribute : Attribute
@@ -17636,9 +17773,12 @@ public abstract class RegisterConditionAttribute : Attribute
     public abstract bool Evaluate(Request request);
 }
 
-/// <summary>Base registration attribute,
-/// there may be descendant predefined and custom attributes simplifying the registration setup.</summary>
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
+/// <summary>Base registration attribute covering the same surface as
+/// <c>Register(serviceType, implementationType, reuse, made, setup, ifAlreadyRegistered, serviceKey)</c>
+/// and <c>RegisterMany</c>. Place on implementation classes or on factory methods/properties/fields.
+/// Descendant predefined and custom attributes may simplify the registration setup further.</summary>
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface
+    | AttributeTargets.Method | AttributeTargets.Property | AttributeTargets.Field,
     AllowMultiple = true, Inherited = true)]
 public class RegisterAttribute : Attribute
 {
@@ -17648,11 +17788,29 @@ public class RegisterAttribute : Attribute
     /// <summary>A service type. If null, the target type (when attribute is on the implementation class) or the implementation type is used.</summary>
     public Type ServiceType;
 
-    /// <summary>An implementation type. If null, inferred from the type the attribute is applied to.</summary>
+    /// <summary>Optional explicit list of service types to register the same factory for.
+    /// When set, takes precedence over single <see cref="ServiceType"/> unless <see cref="RegisterMany"/> is true.</summary>
+    public Type[] ServiceTypes;
+
+    /// <summary>An implementation type. If null, inferred from the type the attribute is applied to (or member return type).</summary>
     public Type ImplementationType;
 
-    /// <summary>One of the IReuse implementation types.</summary>
+    /// <summary>When true, registers the implementation for all of its sensible public service types
+    /// (same discovery rules as <c>RegisterMany</c>). Combine with <see cref="Except"/> and <see cref="NonPublicServiceTypes"/>.</summary>
+    public bool RegisterMany;
+
+    /// <summary>Service types to exclude when <see cref="RegisterMany"/> is true.</summary>
+    public Type[] Except;
+
+    /// <summary>When <see cref="RegisterMany"/> is true, also include non-public service types.</summary>
+    public bool NonPublicServiceTypes;
+
+    /// <summary>One of the IReuse implementation types. Ignored when <see cref="CustomReuseType"/> is set.</summary>
     public ReuseAs ReuseAs;
+
+    /// <summary>Optional custom <see cref="IReuse"/> implementation type. When set, overrides <see cref="ReuseAs"/>.
+    /// Instantiated with a parameterless ctor, or with <see cref="ReuseScopeName"/> / <see cref="ReuseScopeNames"/> when provided.</summary>
+    public Type CustomReuseType;
 
     /// <summary>Optional name of the bound scope for the `ReuseAs.Scoped`</summary>
     public object ReuseScopeName;
@@ -17669,11 +17827,15 @@ public class RegisterAttribute : Attribute
     /// <summary>A service key</summary>
     public object ServiceKey;
 
-    /// <summary>Uses the global container rules by default</summary>
-    public IfAlreadyRegistered? IfAlreadyRegistered;
+    /// <summary>How to handle an already registered service. Defaults to <see cref="RegisterIfAlready.UseContainerRules"/>.</summary>
+    public RegisterIfAlready IfAlreadyRegistered;
 
     /// <summary>How to track the disposable transient. Defaults to using container rules.</summary>
     public DisposableTracking TrackDisposableTransient;
+
+    /// <summary>Selects the constructor selection strategy corresponding to <c>Register(..., made: FactoryMethod....)</c>.
+    /// Ignored when the attribute is applied to a factory method/property/field (member itself is the Made).</summary>
+    public MadeFactoryMethod FactoryMethod;
 
     /// <summary>The factory type: <see cref="DryIoc.FactoryType.Service"/> (default), 
     /// <see cref="DryIoc.FactoryType.Decorator"/>, or <see cref="DryIoc.FactoryType.Wrapper"/>.</summary>
@@ -17764,10 +17926,24 @@ public class RegisterAttribute : Attribute
     {
         ReuseAs = reuseAs;
     }
+
+    /// <summary>Maps <see cref="IfAlreadyRegistered"/> to the nullable value expected by <c>Register</c>.</summary>
+    public IfAlreadyRegistered? GetIfAlreadyRegisteredOrNull() =>
+        IfAlreadyRegistered switch
+        {
+            RegisterIfAlready.UseContainerRules => null,
+            RegisterIfAlready.AppendNotKeyed => DryIoc.IfAlreadyRegistered.AppendNotKeyed,
+            RegisterIfAlready.Throw => DryIoc.IfAlreadyRegistered.Throw,
+            RegisterIfAlready.Keep => DryIoc.IfAlreadyRegistered.Keep,
+            RegisterIfAlready.Replace => DryIoc.IfAlreadyRegistered.Replace,
+            RegisterIfAlready.AppendNewImplementation => DryIoc.IfAlreadyRegistered.AppendNewImplementation,
+            _ => null
+        };
 }
 
 /// <summary>A single registration attribute with statically-checked service and implementation types.</summary>
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface
+    | AttributeTargets.Method | AttributeTargets.Property | AttributeTargets.Field,
     AllowMultiple = true, Inherited = true)]
 public class RegisterAttribute<TService, TImplementation> : RegisterAttribute
 {
@@ -17780,7 +17956,8 @@ public class RegisterAttribute<TService, TImplementation> : RegisterAttribute
 }
 
 /// <summary>Register with <typeparamref name="TImplementation"/> as both service and implementation type.</summary>
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface
+    | AttributeTargets.Method | AttributeTargets.Property | AttributeTargets.Field,
     AllowMultiple = true, Inherited = true)]
 public class RegisterAttribute<TImplementation> : RegisterAttribute
 {

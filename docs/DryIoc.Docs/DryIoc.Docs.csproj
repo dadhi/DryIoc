@@ -80,6 +80,10 @@
       <Generator>CsToMd</Generator>
       <LastGenOutput>RegisterResolve.md</LastGenOutput>
     </Compile>
+    <Compile Update="RegisterAttribute.cs">
+      <Generator>CsToMd</Generator>
+      <LastGenOutput>RegisterAttribute.md</LastGenOutput>
+    </Compile>
     <Compile Update="RequiredServiceType.cs">
       <Generator>CsToMd</Generator>
       <LastGenOutput>RequiredServiceType.md</LastGenOutput>
@@ -164,6 +168,11 @@
       <DesignTime>True</DesignTime>
       <AutoGen>True</AutoGen>
       <DependentUpon>RegisterResolve.cs</DependentUpon>
+    </None>
+    <None Update="RegisterAttribute.md">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>RegisterAttribute.cs</DependentUpon>
     </None>
     <None Update="RequiredServiceType.md">
       <DesignTime>True</DesignTime>

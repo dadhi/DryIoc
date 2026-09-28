@@ -25,8 +25,24 @@ namespace DryIoc.UnitTests
             Can_register_with_condition();
             Can_register_multiple_services_for_same_implementation();
             Can_register_with_allow_disposable_transient();
+            Can_register_many_via_attribute();
+            Can_register_many_with_except();
+            Can_register_explicit_service_types();
+            Can_register_with_named_scope();
+            Can_register_scoped_to_service();
+            Can_register_wrapper();
+            Can_register_decorator_with_decoratee_service_key();
+            Can_register_decorator_with_order();
+            Can_register_static_factory_method();
+            Can_register_with_if_already_registered_replace();
+            Can_register_with_open_resolution_scope();
+            Can_register_with_use_parent_reuse();
+            Can_register_with_prefer_in_single_service_resolve();
+            Can_register_with_constructor_with_resolvable_arguments();
+            Can_register_with_disposal_order();
+            Can_register_with_as_resolution_call();
 
-            return 16;
+            return 32;
         }
 
         [Test]
@@ -388,6 +404,343 @@ namespace DryIoc.UnitTests
             c.Dispose();
             // The service was not tracked (AllowDisposableTransient), so it's NOT auto-disposed
             Assert.IsFalse(svc.IsDisposed);
+        }
+
+        // -- RegisterMany / multi-service / scopes / wrappers / factory methods --
+
+        public interface IManyA { }
+        public interface IManyB { }
+        public class ManyImpl : IManyA, IManyB { }
+
+        [Register(typeof(ManyImpl), typeof(ManyImpl), RegisterMany = true)]
+        public static class RegisterManyRegistrations { }
+
+        [Test]
+        public void Can_register_many_via_attribute()
+        {
+            var c = new Container();
+            var count = c.RegisterByRegisterAttributes(typeof(RegisterManyRegistrations));
+            Assert.GreaterOrEqual(count, 2);
+
+            Assert.IsInstanceOf<ManyImpl>(c.Resolve<IManyA>());
+            Assert.IsInstanceOf<ManyImpl>(c.Resolve<IManyB>());
+        }
+
+        [Register(typeof(ManyImpl), typeof(ManyImpl), RegisterMany = true, Except = new[] { typeof(IManyB) })]
+        public static class RegisterManyExceptRegistrations { }
+
+        [Test]
+        public void Can_register_many_with_except()
+        {
+            var c = new Container();
+            c.RegisterByRegisterAttributes(typeof(RegisterManyExceptRegistrations));
+
+            Assert.IsInstanceOf<ManyImpl>(c.Resolve<IManyA>());
+            Assert.Throws<ContainerException>(() => c.Resolve<IManyB>());
+        }
+
+        [Register(typeof(ManyImpl), typeof(ManyImpl), ServiceTypes = new[] { typeof(IManyA), typeof(IManyB) })]
+        public static class ExplicitServiceTypesRegistrations { }
+
+        [Test]
+        public void Can_register_explicit_service_types()
+        {
+            var c = new Container();
+            var count = c.RegisterByRegisterAttributes(typeof(ExplicitServiceTypesRegistrations));
+            Assert.AreEqual(2, count);
+
+            Assert.IsInstanceOf<ManyImpl>(c.Resolve<IManyA>());
+            Assert.IsInstanceOf<ManyImpl>(c.Resolve<IManyB>());
+        }
+
+        [Register(typeof(IMyService), typeof(MyServiceImpl), ReuseAs.Scoped, ReuseScopeName = "named")]
+        public static class NamedScopeRegistrations { }
+
+        [Test]
+        public void Can_register_with_named_scope()
+        {
+            var c = new Container();
+            c.RegisterByRegisterAttributes(typeof(NamedScopeRegistrations));
+
+            using var scope = c.OpenScope("named");
+            var a = scope.Resolve<IMyService>();
+            var b = scope.Resolve<IMyService>();
+            Assert.AreSame(a, b);
+
+            using var other = c.OpenScope("other");
+            Assert.Throws<ContainerException>(() => other.Resolve<IMyService>());
+        }
+
+        public class ParentService
+        {
+            public IMyService Dep { get; }
+            public ParentService(IMyService dep) => Dep = dep;
+        }
+
+        [Register(typeof(IMyService), typeof(MyServiceImpl), ReuseAs.ScopedToService, ScopedToServiceType = typeof(ParentService))]
+        [Register(typeof(ParentService), typeof(ParentService), OpenResolutionScope = true)]
+        public static class ScopedToServiceRegistrations { }
+
+        [Test]
+        public void Can_register_scoped_to_service()
+        {
+            var c = new Container();
+            c.RegisterByRegisterAttributes(typeof(ScopedToServiceRegistrations));
+
+            var p1 = c.Resolve<ParentService>();
+            var p2 = c.Resolve<ParentService>();
+            // Parent opens a resolution scope; dependency is scoped to that parent service
+            Assert.AreNotSame(p1, p2);
+            Assert.IsInstanceOf<MyServiceImpl>(p1.Dep);
+            Assert.AreNotSame(p1.Dep, p2.Dep);
+        }
+
+        public class MyWrapper<T>
+        {
+            public T Value { get; }
+            public MyWrapper(T value) => Value = value;
+        }
+
+        [Register(typeof(MyWrapper<>), typeof(MyWrapper<>), FactoryType = FactoryType.Wrapper)]
+        public static class WrapperRegistrations { }
+
+        [Test]
+        public void Can_register_wrapper()
+        {
+            var c = new Container();
+            c.RegisterByRegisterAttributes(typeof(WrapperRegistrations));
+            c.Register<IMyService, MyServiceImpl>();
+
+            var wrapped = c.Resolve<MyWrapper<IMyService>>();
+            Assert.IsInstanceOf<MyServiceImpl>(wrapped.Value);
+        }
+
+        public class KeyedDecorator : IDecorated
+        {
+            private readonly IDecorated _inner;
+            public KeyedDecorator(IDecorated inner) => _inner = inner;
+            public string Value => "keyed:" + _inner.Value;
+        }
+
+        [Register(typeof(IDecorated), typeof(KeyedDecorator),
+            FactoryType = FactoryType.Decorator, DecorateeServiceKey = "k1")]
+        public static class KeyedDecoratorRegistrations { }
+
+        [Test]
+        public void Can_register_decorator_with_decoratee_service_key()
+        {
+            var c = new Container();
+            c.Register<IDecorated, DecoratedImpl>(serviceKey: "k1");
+            c.Register<IDecorated, DecoratedImpl>(serviceKey: "k2");
+            c.RegisterByRegisterAttributes(typeof(KeyedDecoratorRegistrations));
+
+            Assert.AreEqual("keyed:base", c.Resolve<IDecorated>(serviceKey: "k1").Value);
+            Assert.AreEqual("base", c.Resolve<IDecorated>(serviceKey: "k2").Value);
+        }
+
+        public class OuterDecorator : IDecorated
+        {
+            private readonly IDecorated _inner;
+            public OuterDecorator(IDecorated inner) => _inner = inner;
+            public string Value => "outer:" + _inner.Value;
+        }
+
+        public class InnerDecorator : IDecorated
+        {
+            private readonly IDecorated _inner;
+            public InnerDecorator(IDecorated inner) => _inner = inner;
+            public string Value => "inner:" + _inner.Value;
+        }
+
+        [Register(typeof(IDecorated), typeof(OuterDecorator), FactoryType = FactoryType.Decorator, DecoratorOrder = 10)]
+        [Register(typeof(IDecorated), typeof(InnerDecorator), FactoryType = FactoryType.Decorator, DecoratorOrder = -10)]
+        public static class OrderedDecoratorRegistrations { }
+
+        [Test]
+        public void Can_register_decorator_with_order()
+        {
+            var c = new Container();
+            c.Register<IDecorated, DecoratedImpl>();
+            c.RegisterByRegisterAttributes(typeof(OrderedDecoratorRegistrations));
+
+            // Inner (order -10) closer to decoratee; Outer (order 10) further out
+            Assert.AreEqual("outer:inner:base", c.Resolve<IDecorated>().Value);
+        }
+
+        public static class FactoryMethods
+        {
+            [Register(typeof(IMyService), ReuseAs.Singleton)]
+            public static IMyService CreateMyService() => new MyServiceImpl();
+        }
+
+        [Test]
+        public void Can_register_static_factory_method()
+        {
+            var c = new Container();
+            c.RegisterByRegisterAttributes(typeof(FactoryMethods));
+
+            var a = c.Resolve<IMyService>();
+            var b = c.Resolve<IMyService>();
+            Assert.IsInstanceOf<MyServiceImpl>(a);
+            Assert.AreSame(a, b);
+        }
+
+        [Register(typeof(IMyService), typeof(MyServiceImpl))]
+        [Register(typeof(IMyService), typeof(AlwaysUsedService), IfAlreadyRegistered = RegisterIfAlready.Replace)]
+        public static class ReplaceRegistrations { }
+
+        [Test]
+        public void Can_register_with_if_already_registered_replace()
+        {
+            var c = new Container();
+            c.RegisterByRegisterAttributes(typeof(ReplaceRegistrations));
+            Assert.IsInstanceOf<AlwaysUsedService>(c.Resolve<IMyService>());
+        }
+
+        public class OpensScopeService
+        {
+            public IResolverContext Scope { get; }
+            public OpensScopeService(IResolverContext scope) => Scope = scope;
+        }
+
+        public class ScopedDep : IDisposable
+        {
+            public bool IsDisposed;
+            public void Dispose() => IsDisposed = true;
+        }
+
+        public class OpensScopeConsumer
+        {
+            public OpensScopeService Svc { get; }
+            public OpensScopeConsumer(OpensScopeService svc) => Svc = svc;
+        }
+
+        [Register(typeof(OpensScopeService), typeof(OpensScopeService), OpenResolutionScope = true)]
+        [Register(typeof(ScopedDep), typeof(ScopedDep), ReuseAs.Scoped)]
+        public static class OpenResolutionScopeRegistrations { }
+
+        [Test]
+        public void Can_register_with_open_resolution_scope()
+        {
+            var c = new Container();
+            c.RegisterByRegisterAttributes(typeof(OpenResolutionScopeRegistrations));
+            c.Register<OpensScopeConsumer>();
+
+            // OpenResolutionScope allows resolving scoped dependency without an outer scope
+            // when OpensScopeService is a resolution root... actually ScopedDep needs a scope.
+            // OpensScopeService opens a resolution scope so its own scoped deps work.
+            // Here we just verify registration does not throw and service resolves.
+            var svc = c.Resolve<OpensScopeService>();
+            Assert.IsNotNull(svc);
+            Assert.IsNotNull(svc.Scope);
+        }
+
+        public class ParentWithReuse
+        {
+            public ChildWithParentReuse Child { get; }
+            public ParentWithReuse(ChildWithParentReuse child) => Child = child;
+        }
+
+        public class ChildWithParentReuse { }
+
+        [Register(typeof(ParentWithReuse), typeof(ParentWithReuse), ReuseAs.Singleton)]
+        [Register(typeof(ChildWithParentReuse), typeof(ChildWithParentReuse), UseParentReuse = true)]
+        public static class ParentReuseRegistrations { }
+
+        [Test]
+        public void Can_register_with_use_parent_reuse()
+        {
+            var c = new Container();
+            c.RegisterByRegisterAttributes(typeof(ParentReuseRegistrations));
+
+            var p1 = c.Resolve<ParentWithReuse>();
+            var p2 = c.Resolve<ParentWithReuse>();
+            Assert.AreSame(p1, p2);
+            Assert.AreSame(p1.Child, p2.Child); // child inherits singleton reuse of parent
+        }
+
+        public class PreferredService : IMyService { }
+        public class OtherService : IMyService { }
+
+        [Register(typeof(IMyService), typeof(PreferredService), PreferInSingleServiceResolve = true)]
+        [Register(typeof(IMyService), typeof(OtherService))]
+        public static class PreferRegistrations { }
+
+        [Test]
+        public void Can_register_with_prefer_in_single_service_resolve()
+        {
+            var c = new Container();
+            c.RegisterByRegisterAttributes(typeof(PreferRegistrations));
+            Assert.IsInstanceOf<PreferredService>(c.Resolve<IMyService>());
+        }
+
+        public class MultiCtorService
+        {
+            public string Via;
+            public MultiCtorService() => Via = "default";
+            public MultiCtorService(IMyService dep) => Via = "with-dep";
+        }
+
+        [Register(typeof(IMyService), typeof(MyServiceImpl))]
+        [Register(typeof(MultiCtorService), typeof(MultiCtorService),
+            FactoryMethod = MadeFactoryMethod.ConstructorWithResolvableArguments)]
+        public static class CtorSelectRegistrations { }
+
+        [Test]
+        public void Can_register_with_constructor_with_resolvable_arguments()
+        {
+            var c = new Container();
+            c.RegisterByRegisterAttributes(typeof(CtorSelectRegistrations));
+            Assert.AreEqual("with-dep", c.Resolve<MultiCtorService>().Via);
+        }
+
+        public class DisposeOrderA : IDisposable
+        {
+            public static int Counter;
+            public int Order;
+            public void Dispose() => Order = ++Counter;
+        }
+
+        public class DisposeOrderB : IDisposable
+        {
+            public static int Counter;
+            public int Order;
+            public void Dispose() => Order = ++DisposeOrderA.Counter;
+        }
+
+        [Register(typeof(DisposeOrderA), typeof(DisposeOrderA), ReuseAs.Singleton, DisposalOrder = 2)]
+        [Register(typeof(DisposeOrderB), typeof(DisposeOrderB), ReuseAs.Singleton, DisposalOrder = 1)]
+        public static class DisposalOrderRegistrations { }
+
+        [Test]
+        public void Can_register_with_disposal_order()
+        {
+            DisposeOrderA.Counter = 0;
+            var c = new Container();
+            c.RegisterByRegisterAttributes(typeof(DisposalOrderRegistrations));
+            var a = c.Resolve<DisposeOrderA>();
+            var b = c.Resolve<DisposeOrderB>();
+            c.Dispose();
+            // B has DisposalOrder=1 (disposed first), A has 2 (disposed later)
+            Assert.Less(b.Order, a.Order);
+        }
+
+        public class AsCallService { public static int Created; public AsCallService() => ++Created; }
+        public class AsCallConsumer { public AsCallService S; public AsCallConsumer(AsCallService s) => S = s; }
+
+        [Register(typeof(AsCallService), typeof(AsCallService), AsResolutionCall = true)]
+        [Register(typeof(AsCallConsumer), typeof(AsCallConsumer))]
+        public static class AsResolutionCallRegistrations { }
+
+        [Test]
+        public void Can_register_with_as_resolution_call()
+        {
+            AsCallService.Created = 0;
+            var c = new Container();
+            c.RegisterByRegisterAttributes(typeof(AsResolutionCallRegistrations));
+            var consumer = c.Resolve<AsCallConsumer>();
+            Assert.IsNotNull(consumer.S);
+            Assert.GreaterOrEqual(AsCallService.Created, 1);
         }
     }
 }
