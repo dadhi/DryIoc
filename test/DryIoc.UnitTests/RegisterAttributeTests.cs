@@ -41,8 +41,12 @@ namespace DryIoc.UnitTests
             Can_register_with_constructor_with_resolvable_arguments();
             Can_register_with_disposal_order();
             Can_register_with_as_resolution_call();
-
+#if NET7_0_OR_GREATER
+            Can_register_service_with_generic_register_attribute();
+            return 33;
+#else
             return 32;
+#endif
         }
 
         [Test]
@@ -60,8 +64,23 @@ namespace DryIoc.UnitTests
             Assert.IsTrue(((AD)ad).IsDisposed);
         }
 
-        [Register<ID, AD>(TrackDisposableTransient = DisposableTracking.TrackDisposableTransient)]
+        // Non-generic form works on all TFMs including net472 (generic attributes need .NET 7+ runtime).
+        [Register(typeof(ID), typeof(AD), TrackDisposableTransient = DisposableTracking.TrackDisposableTransient)]
         public static class Registrations { }
+
+#if NET7_0_OR_GREATER
+        [Test]
+        public void Can_register_service_with_generic_register_attribute()
+        {
+            var c = new Container();
+            var count = c.RegisterByRegisterAttributes(typeof(GenericRegistrations));
+            Assert.AreEqual(1, count);
+            Assert.IsInstanceOf<A>(c.Resolve<IA>());
+        }
+
+        [Register<IA, A>(ReuseAs.Singleton)]
+        public static class GenericRegistrations { }
+#endif
 
         public interface ID { }
 

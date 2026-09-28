@@ -16616,14 +16616,17 @@ public class ContainerException : InvalidOperationException
         var e = Error;
         if (e == DryIoc.Error.WaitForScopedServiceIsCreatedTimeoutExpired)
         {
-            var factoryId = (int)Details;
+            // Combined id may be negative when DecoratedFactoryID >= 0x8000 because packing uses signed int
+            // (see Request.GetCombinedDecoratorAndFactoryID). Always unpack via unsigned bits.
+            var combinedId = (uint)(int)Details;
             string decoratorMessage = null;
+            int factoryId;
 
-            // check `Request.CombineDecoratorWithDecoratedFactoryID()` for why is this logic
-            if (factoryId > ushort.MaxValue)
+            // High 16 bits set means decorator FactoryID was packed with DecoratedFactoryID
+            if (combinedId > ushort.MaxValue)
             {
-                var decoratorFactoryId = factoryId & ushort.MaxValue;
-                factoryId >>= 16; // should be logical `>>>` but C# <- 11 does not support it yet
+                var decoratorFactoryId = (int)(combinedId & ushort.MaxValue);
+                factoryId = (int)(combinedId >> 16);
                 decoratorMessage = GetDecoratorMessage(container, decoratorFactoryId);
                 static string GetDecoratorMessage(IRegistrator container, int decoratorFactoryId)
                 {
@@ -16644,6 +16647,8 @@ public class ContainerException : InvalidOperationException
                     return $"Unable to find the Decorator registration for the problematic factory with FactoryID={decoratorFactoryId}";
                 }
             }
+            else
+                factoryId = (int)combinedId;
 
             var serviceMessage = GetServiceMessage(container, factoryId);
             static string GetServiceMessage(IRegistrator container, int factoryId)
@@ -17941,7 +17946,11 @@ public class RegisterAttribute : Attribute
         };
 }
 
-/// <summary>A single registration attribute with statically-checked service and implementation types.</summary>
+// Generic attributes require runtime support available only on .NET 7+
+// (on older runtimes GetCustomAttributes throws NotSupportedException: "Generic types are not valid.").
+#if NET7_0_OR_GREATER
+/// <summary>A single registration attribute with statically-checked service and implementation types.
+/// Available on .NET 7+ only (generic attributes are not supported by older runtimes).</summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface
     | AttributeTargets.Method | AttributeTargets.Property | AttributeTargets.Field,
     AllowMultiple = true, Inherited = true)]
@@ -17955,7 +17964,8 @@ public class RegisterAttribute<TService, TImplementation> : RegisterAttribute
         : base(typeof(TService), typeof(TImplementation), reuseAs) { }
 }
 
-/// <summary>Register with <typeparamref name="TImplementation"/> as both service and implementation type.</summary>
+/// <summary>Register with <typeparamref name="TImplementation"/> as both service and implementation type.
+/// Available on .NET 7+ only (generic attributes are not supported by older runtimes).</summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface
     | AttributeTargets.Method | AttributeTargets.Property | AttributeTargets.Field,
     AllowMultiple = true, Inherited = true)]
@@ -17968,6 +17978,7 @@ public class RegisterAttribute<TImplementation> : RegisterAttribute
     public RegisterAttribute(ReuseAs reuseAs = ReuseAs.ContainerRulesDefaultReuse)
         : base(typeof(TImplementation), typeof(TImplementation), reuseAs) { }
 }
+#endif
 
 /// <summary>Provide declarative arguments to the `GenerateCompileTimeContainerCSharpCode` for the Source Generator</summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface,

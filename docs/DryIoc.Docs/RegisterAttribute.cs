@@ -77,9 +77,12 @@ public class RegisterAttribute_basic
 } /*md
 ```
 
-Generic variants provide compile-time type checking:
+Generic variants provide compile-time type checking. They require **.NET 7+**
+(generic attributes are not supported by .NET Framework / older runtimes — reflection throws
+`NotSupportedException: Generic types are not valid`). On older targets use the non-generic form above.
 
 ```cs
+// .NET 7+ only
 [Register<IService, Service>(ReuseAs.Singleton)]
 [Register<SelfService>]
 public static class TypedConfig { }
