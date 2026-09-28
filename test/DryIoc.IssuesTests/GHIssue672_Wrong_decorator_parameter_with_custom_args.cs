@@ -8,7 +8,7 @@ public class GHIssue672_Wrong_decorator_parameter_with_custom_args : ITest
 {
     public int Run()
     {
-        // Original_case();
+        Original_case();
         Case_without_args();
         return 2;
     }
@@ -33,7 +33,7 @@ public class GHIssue672_Wrong_decorator_parameter_with_custom_args : ITest
 
         var res = container.Resolve<object>("xyz", args: new object[] { now });
 
-        // Assert.IsInstanceOf<B>(res); // todo: @fixme
+        Assert.IsInstanceOf<B>(res);
     }
 
     [Test]
