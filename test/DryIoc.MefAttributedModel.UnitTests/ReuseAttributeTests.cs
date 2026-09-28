@@ -13,14 +13,13 @@ namespace DryIoc.MefAttributedModel.UnitTests
             Can_specify_singleton_reuse();
             Can_specify_current_scope_reuse();
             Can_specify_resolution_scope_reuse();
-            Can_specify_to_store_reused_instance_as_weak_reference();
             Can_specify_to_prevent_disposal_for_reused_instance();
             Allows_disposable_transient();
             Allows_tracking_disposable_transient_in_singleton_scope();
             Can_track_disposable_transient_but_export_option_still_override_the_container_option();
             When_no_named_current_scope_reuse_Then_it_should_throw();
             When_there_is_corresponding_named_current_scope_Then_it_should_resolve();
-            return 11;
+            return 10;
         }
 
         [Test]

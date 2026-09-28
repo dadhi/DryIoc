@@ -2,7 +2,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2016-2024 Maksim Volkau
+Copyright (c) 2016-2026 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22,6 +22,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
+
+#if NETSTANDARD2_1 || NET5_0_OR_GREATER
+#define SUPPORTS_ASYNC_DISPOSABLE
+#endif
 
 using System;
 using System.Collections.Generic;
@@ -432,6 +436,9 @@ public static class DryIocAdapter
 
 /// <summary>Impl of `IsRegistered`, `GetRequiredService`, `CreateScope`.</summary>
 public sealed class DryIocServiceProvider : IDisposable,
+#if SUPPORTS_ASYNC_DISPOSABLE
+    IAsyncDisposable,
+#endif
     IServiceProvider, IServiceScopeFactory, IServiceScope,
     IServiceProviderIsService, ISupportRequiredService,
     IKeyedServiceProvider, IServiceProviderIsKeyedService
@@ -491,6 +498,13 @@ public sealed class DryIocServiceProvider : IDisposable,
             serviceType == typeof(IKeyedServiceProvider) |
             serviceType == typeof(IServiceProviderIsKeyedService))
             return true;
+
+        // Compile-time container is primary; runtime registrations are the fallback.
+        var compTimeRoots = Container.Rules.CompileTimeContainer?.GetResolutionRoots();
+        if (compTimeRoots != null)
+            foreach (var (type, _) in compTimeRoots)
+                if (type == serviceType)
+                    return true;
 
         if (Container.IsRegistered(serviceType))
             return true;
@@ -553,6 +567,11 @@ public sealed class DryIocServiceProvider : IDisposable,
 
     /// <inheritdoc />
     public void Dispose() => Container.Dispose();
+
+#if SUPPORTS_ASYNC_DISPOSABLE
+    /// <inheritdoc />
+    public System.Threading.Tasks.ValueTask DisposeAsync() => Container.DisposeAsync();
+#endif
 }
 
 #nullable restore
