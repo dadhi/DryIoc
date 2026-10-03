@@ -87,6 +87,7 @@ and to support the __extensibility__ and __testability__ of the code.
 - [Installing DryIoc](InstallationOptions.md)
 - [Creating and Disposing Container](CreatingAndDisposingContainer.md)
 - [Register and Resolve](RegisterResolve.md)
+- [RegisterAttribute](RegisterAttribute.md)
 - [Open-generics](OpenGenerics.md)
 - [Specifying Constructor or Factory Method](SelectConstructorOrFactoryMethod.md)
 - [Specifying Dependency and Primitive values](SpecifyDependencyAndPrimitiveValues.md)

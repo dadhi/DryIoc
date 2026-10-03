@@ -15,14 +15,14 @@ namespace Example
 
     public class DependencyA : IDependencyA { }
 
-    // let's make it struct for fun
+    // let's make a struct for fun
     public struct DependencyB<T>
     {
         public readonly IDependencyA A;
         public DependencyB(IDependencyA a) => A = a;
     }
 
-    public class RuntimeDependencyC {}
+    public class RuntimeDependencyC { }
 
     public abstract class BaseA { }
     public class KeyedA : BaseA { }

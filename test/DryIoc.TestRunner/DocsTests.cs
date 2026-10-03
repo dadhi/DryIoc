@@ -143,6 +143,23 @@ public class RegisterResolve : ITest
     }
 }
 
+public class RegisterAttributeDocs : ITest
+{
+    public int Run()
+    {
+        new RegisterAttribute_basic().Example();
+        new RegisterAttribute_reuse_and_key().Example();
+        new RegisterAttribute_register_many().Example_many();
+        new RegisterAttribute_register_many().Example_explicit();
+        new RegisterAttribute_setup_flags().Example();
+        new RegisterAttribute_decorators().Example();
+        new RegisterAttribute_condition_and_metadata().Example();
+        new RegisterAttribute_factory_methods().Example();
+        new RegisterAttribute_constructor_selection().Example();
+        return 9;
+    }
+}
+
 public class RequiredServiceType : ITest
 {
     public int Run()
