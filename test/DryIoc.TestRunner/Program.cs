@@ -34,8 +34,8 @@ public class Program
         Console.WriteLine("USE_COMPILATION_ONLY=true");
         Rules.UnsafeResetDefaultRulesToUseCompilationOnly();
 #endif
-        // note: @important to remember to do the Thread.Sleep in tests less that this setting, 
-        // if you don't intentionally want the Error.WaitForScopedServiceIsCreatedTimeoutExpired exception, 
+        // note: @important to remember to do the Thread.Sleep in tests less that this setting,
+        // if you don't intentionally want the Error.WaitForScopedServiceIsCreatedTimeoutExpired exception,
         // e.g. see GHIssue337_Singleton_is_created_twice, GHIssue391_Deadlock_during_Resolve, Issue157_ContainerResolveFactoryIsNotThreadSafe
 #if DEBUG
         Scope.WaitForScopedServiceIsCreatedTimeoutMilliseconds = 2_000;
@@ -446,6 +446,7 @@ public class Program
             new GHIssue672_Wrong_decorator_parameter_with_custom_args(),
             new GHIssue678_Scope_is_lost_in_disposable_service(),
             new GHIssue685_Creating_scopes_via_funcs_is_not_threadsafe_and_fails_sporadically_with_NullRef_exception(),
+            new GHIssue710_ConstructorWithResolvableArguments_conflicts_with_Mef(),
             new GHIssue686_Singleton_service_resolved_by_scoped_container_not_root_container(),
             new GHIssue692_Resolve_failed_on_Android_Avalonia(),
         };
