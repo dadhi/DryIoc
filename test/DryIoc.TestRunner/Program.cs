@@ -9,11 +9,12 @@ public class Program
 {
     public static void Main()
     {
-        new RegisterAttributeTests().Run();
+        // new RegisterAttributeTests().Run();
+
+        // new GHIssue710_ConstructorWithResolvableArguments_conflicts_with_Mef().Run();
 
         // new GHIssue223_IAsyncDisposable().Run();
-
-        // new GHIssue685_Creating_scopes_via_funcs_is_not_threadsafe_and_fails_sporadically_with_NullRef_exception().Run();
+        // new GHIssue685_Creating_scopes_via_funcs_is_not_thread_safe_and_fails_sporadically_with_NullRef_exception().Run();
         // new GHIssue678_Scope_is_lost_in_disposable_service().Run();
         // new RulesTests().Run();
 
@@ -446,9 +447,9 @@ public class Program
             new GHIssue672_Wrong_decorator_parameter_with_custom_args(),
             new GHIssue678_Scope_is_lost_in_disposable_service(),
             new GHIssue685_Creating_scopes_via_funcs_is_not_threadsafe_and_fails_sporadically_with_NullRef_exception(),
-            new GHIssue710_ConstructorWithResolvableArguments_conflicts_with_Mef(),
             new GHIssue686_Singleton_service_resolved_by_scoped_container_not_root_container(),
             new GHIssue692_Resolve_failed_on_Android_Avalonia(),
+            new GHIssue710_ConstructorWithResolvableArguments_conflicts_with_Mef(),
         };
 
         var totalPassed = 0;

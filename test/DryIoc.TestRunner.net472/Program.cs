@@ -438,6 +438,7 @@ public class Program
             new GHIssue685_Creating_scopes_via_funcs_is_not_threadsafe_and_fails_sporadically_with_NullRef_exception(),
             new GHIssue686_Singleton_service_resolved_by_scoped_container_not_root_container(),
             new GHIssue692_Resolve_failed_on_Android_Avalonia(),
+            new GHIssue710_ConstructorWithResolvableArguments_conflicts_with_Mef(),
         };
 
         var totalPassed = 0;

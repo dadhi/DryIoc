@@ -6337,13 +6337,25 @@ public sealed class Rules
             ? made.PropertiesAndFields.OverrideWith(PropertiesAndFields)
             : PropertiesAndFields.OverrideWith(made.PropertiesAndFields);
 
-    /// <summary>Returns new instance of the rules new Made composed out of
-    /// provided factory method, parameters, propertiesAndFields.</summary>
+    /// <summary>Returns a new instance of the rules with the Made composed out of provided factory method, parameters, propertiesAndFields.
+    /// NOTE: Not providing values for the parameters means they set to the default values, erasing the previous With custom rules.
+    /// If you want to preserve the previous custom configuration use WithOverride instead.</summary>
     public Rules With(
         FactoryMethodSelector factoryMethod = null,
         ParameterSelector parameters = null,
         PropertiesAndFieldsSelector propertiesAndFields = null) =>
         With(Made.Create(factoryMethod, parameters, propertiesAndFields, false));
+
+    /// <summary>Returns a new instance of the rules with the Made composed out of
+    /// provided factory method or previous one, parameters overriding the previous ones, propertiesAndFields overriding the previous ones.</summary>
+    public Rules WithOverride(
+        FactoryMethodSelector factoryMethod = null,
+        ParameterSelector parameters = null,
+        PropertiesAndFieldsSelector propertiesAndFields = null) =>
+        With(Made.Create(factoryMethod ?? _made.FactoryMethodOrSelector,
+            _made.Parameters.OverrideWith(parameters),
+            _made.PropertiesAndFields.OverrideWith(propertiesAndFields),
+            false));
 
     /// <summary>Returns new instance of the rules with specified <see cref="Made"/>.</summary>
     /// <param name="made">New Made.Of rules.</param>
