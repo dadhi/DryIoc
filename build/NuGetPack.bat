@@ -1,9 +1,15 @@
 @echo off
 setlocal EnableDelayedExpansion
 
-set NUGET=.nuget\NuGet.exe
+set NUGET=.nuget\nuget.exe
 set NUSPECS=nuspecs
 set PACKAGEDIR=.dist\packages
+
+if not exist %NUGET% (
+    echo:Downloading nuget.exe to %NUGET% . . .
+    curl -fsSL -o %NUGET% https://dist.nuget.org/win-x86-commandline/latest/nuget.exe
+    if errorlevel 1 exit /b 1
+)
 
 echo:
 echo:Packing NuGet packages into %PACKAGEDIR% . . .

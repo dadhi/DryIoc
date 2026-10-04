@@ -34,5 +34,5 @@
     "files.watcherExclude": {
         "**/target": true
     },
-    "dotnet.defaultSolution": "DryIoc.sln"
+    "dotnet.defaultSolution": "DryIoc.slnx"
 }

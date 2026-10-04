@@ -52,7 +52,7 @@ Make sure that there are no project build errors or failing tests.
 
 ### Develop in Visual Studio 2017+
 
-Open `DryIoc.sln` solution and re-build it. If something is failing you may try to close VS, run `b.bat` in the root folder, open VS and try to build again.
+Open `DryIoc.slnx` solution and re-build it. If something is failing you may try to close VS, run `b.bat` in the root folder, open VS and try to build again.
 
 __Productivity hint:__ I am using [NCrunch](http://www.ncrunch.net/) extension for the MS Visual Studio to build and run the tests continuously and to get the immediate feedback, quickly find regressions, and generally experiment with the code.
 

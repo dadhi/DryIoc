@@ -351,3 +351,5 @@ ApiKey.txt
 .metals/
 .temp/
 .nuget/nuget.exe
+
+.nuget/*.exe
