@@ -10,7 +10,7 @@ echo:# Build and Run TestRunner with .NET 9.0
 echo:[started at %started_at%]
 echo:
 
-dotnet run -v:m -c:Release -f:net9.0 -p:LatestSupportedNet=net9.0 --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+dotnet run -v:m -c:Release -f:net11.0 -p:LatestSupportedNet=net11.0 --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
 if %ERRORLEVEL% neq 0 goto :error
 
 rem Calculate elapsed time

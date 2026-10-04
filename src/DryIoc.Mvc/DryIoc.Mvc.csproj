@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>net45</TargetFramework>
+        <TargetFramework>net472</TargetFramework>
 
         <Product>DryIoc.Mvc</Product>
         <VersionPrefix>6.0.0</VersionPrefix>

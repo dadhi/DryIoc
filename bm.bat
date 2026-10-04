@@ -1,1 +1,1 @@
-dotnet run -f:net9.0 -c:Release --project playground/Playground
+dotnet run -f:net11.0 -c:Release --project playground/Playground

@@ -4,7 +4,7 @@
         <id>DryIoc.Web</id>
         <version>6.0.0</version>
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2013-2023 Maksim Volkau</copyright>
+        <copyright>Copyright © 2013-2026 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
         <license type="expression">MIT</license>
         <icon>logo.png</icon>
@@ -57,8 +57,8 @@
         <file src="..\nuspecs\DryIoc.snk" />
         <file src="..\logo\logo128.png" target="logo.png" />
 
-        <!-- net45 -->
-        <file src="..\src\DryIoc.Web\DryIocWeb.cs" target="content\net45\DryIoc\Web" />
+        <!-- net472 -->
+        <file src="..\src\DryIoc.Web\DryIocWeb.cs" target="content\net472\DryIoc\Web" />
 
     </files>
 </package>

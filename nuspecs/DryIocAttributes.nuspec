@@ -4,7 +4,7 @@
     <id>DryIocAttributes</id>
     <version>7.0.0</version>
     <authors>Maksim Volkau</authors>
-    <copyright>Copyright © 2013-2023 Maksim Volkau</copyright>
+    <copyright>Copyright © 2013-2026 Maksim Volkau</copyright>
     <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
     <license type="expression">MIT</license>
     <icon>logo.png</icon>
@@ -24,10 +24,10 @@ Breaking:
       <files include="cs/**/*.*" buildAction="Compile" />
     </contentFiles>
       <dependencies>
-          <group targetFramework="net45">
+          <group targetFramework="net472">
               <dependency id="System.ComponentModel.Composition" version="4.7.0" exclude="Build,Analyzers" />
           </group>
-          <group targetFramework="netstandard2.0">
+          <group targetFramework="netstandard2.1">
               <dependency id="System.ComponentModel.Composition" version="4.7.0" exclude="Build,Analyzers" />
           </group>
       </dependencies>
@@ -37,14 +37,14 @@ Breaking:
     <file src="..\nuspecs\DryIoc.snk" />
     <file src="..\logo\logo128.png" target="logo.png" />
 
-    <file src="_._" target="lib\net45\" />
-    <file src="_._" target="lib\netstandard2.0\" />
+    <file src="_._" target="lib\net472\" />
+    <file src="_._" target="lib\netstandard2.1\" />
 
-    <!-- net45 -->
-    <file src="..\src\DryIocAttributes\Attributes.cs" target="content\net45\DryIocAttributes" />
+    <!-- net472 -->
+    <file src="..\src\DryIocAttributes\Attributes.cs" target="content\net472\DryIocAttributes" />
 
-    <!-- NetStandard2.0 (based on Net45) -->
-    <file src="..\src\DryIocAttributes\Attributes.cs"   target="contentFiles\cs\netstandard2.0\DryIocAttributes" />
+    <!-- NetStandard2.1 (based on Net45) -->
+    <file src="..\src\DryIocAttributes\Attributes.cs"   target="contentFiles\cs\netstandard2.1\DryIocAttributes" />
 
   </files>
 </package>

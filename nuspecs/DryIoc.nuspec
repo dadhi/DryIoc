@@ -2,9 +2,9 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc</id>
-        <version>6.0.0-preview-08</version>
+        <version>6.0.0</version>
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2013-2023 Maksim Volkau</copyright>
+        <copyright>Copyright © 2013-2026 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
         <license type="expression">MIT</license>
         <icon>logo.png</icon>
@@ -29,11 +29,11 @@
             <files include="cs/**/*.ttinclude" buildAction="None" />
         </contentFiles>
         <dependencies>
-            <group targetFramework="net45" />
+            <group targetFramework="net472" />
             <group targetFramework="netstandard2.1" />
-            <group targetFramework="netstandard2.0">
-                <dependency id="System.Reflection.Emit.Lightweight" version="4.7.0" />
-            </group>
+            <group targetFramework="net8.0" />
+            <group targetFramework="net10.0" />
+            <group targetFramework="net11.0" />
         </dependencies>
     </metadata>
     <files>
@@ -52,24 +52,24 @@
         <file src="..\src\DryIoc\CompileTimeDI\CompileTimeExampleServices.cs" target="CompileTimeDI" />
         <file src="..\src\DryIoc\.config\dotnet-tools.json"                         target="CompileTimeDI" />
 
-        <!--net45-->
-        <file src="..\src\DryIoc\Container.cs"                                      target="content\net45\DryIoc" />
-        <file src="..\src\DryIoc\ImTools.cs"                                        target="content\net45\DryIoc" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs"                         target="content\net45\DryIoc" />
-        <file src="..\src\DryIoc\Expression.cs"                                     target="content\net45\DryIoc" />
-        <file src="..\src\DryIoc\Messages.cs"                                       target="content\net45\DryIoc" />
+        <!--net472-->
+        <file src="..\src\DryIoc\Container.cs"                                      target="content\net472\DryIoc" />
+        <file src="..\src\DryIoc\ImTools.cs"                                        target="content\net472\DryIoc" />
+        <file src="..\src\DryIoc\FastExpressionCompiler.cs"                         target="content\net472\DryIoc" />
+        <file src="..\src\DryIoc\Expression.cs"                                     target="content\net472\DryIoc" />
+        <file src="..\src\DryIoc\Messages.cs"                                       target="content\net472\DryIoc" />
 
-        <file src="..\src\DryIoc\Container.cs"                                      target="contentFiles\cs\net45\DryIoc" />
-        <file src="..\src\DryIoc\ImTools.cs"                                        target="contentFiles\cs\net45\DryIoc" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs"                         target="contentFiles\cs\net45\DryIoc" />
-        <file src="..\src\DryIoc\Expression.cs"                                     target="contentFiles\cs\net45\DryIoc" />
-        <file src="..\src\DryIoc\Messages.cs"                                       target="contentFiles\cs\net45\DryIoc" />
+        <file src="..\src\DryIoc\Container.cs"                                      target="contentFiles\cs\net472\DryIoc" />
+        <file src="..\src\DryIoc\ImTools.cs"                                        target="contentFiles\cs\net472\DryIoc" />
+        <file src="..\src\DryIoc\FastExpressionCompiler.cs"                         target="contentFiles\cs\net472\DryIoc" />
+        <file src="..\src\DryIoc\Expression.cs"                                     target="contentFiles\cs\net472\DryIoc" />
+        <file src="..\src\DryIoc\Messages.cs"                                       target="contentFiles\cs\net472\DryIoc" />
 
-        <!-- .netstandard 2.0 -->
-        <file src="..\src\DryIoc\Container.cs"                                      target="contentFiles\cs\netstandard2.0\DryIoc" />
-        <file src="..\src\DryIoc\ImTools.cs"                                        target="contentFiles\cs\netstandard2.0\DryIoc" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs"                         target="contentFiles\cs\netstandard2.0\DryIoc" />
-        <file src="..\src\DryIoc\Expression.cs"                                     target="contentFiles\cs\netstandard2.0\DryIoc" />
-        <file src="..\src\DryIoc\Messages.cs"                                       target="contentFiles\cs\netstandard2.0\DryIoc" />
+        <!-- .netstandard 2.1 -->
+        <file src="..\src\DryIoc\Container.cs"                                      target="contentFiles\cs\netstandard2.1\DryIoc" />
+        <file src="..\src\DryIoc\ImTools.cs"                                        target="contentFiles\cs\netstandard2.1\DryIoc" />
+        <file src="..\src\DryIoc\FastExpressionCompiler.cs"                         target="contentFiles\cs\netstandard2.1\DryIoc" />
+        <file src="..\src\DryIoc\Expression.cs"                                     target="contentFiles\cs\netstandard2.1\DryIoc" />
+        <file src="..\src\DryIoc\Messages.cs"                                       target="contentFiles\cs\netstandard2.1\DryIoc" />
     </files>
 </package>

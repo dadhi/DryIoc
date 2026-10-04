@@ -1,13 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks Condition="'$(LatestSupportedNet)' == 'net9.0'">net45;netstandard2.0;netstandard2.1;net6.0;net8.0;net9.0</TargetFrameworks>
-    <TargetFrameworks Condition="'$(LatestSupportedNet)' == 'net8.0'">net45;netstandard2.0;netstandard2.1;net6.0;net8.0</TargetFrameworks>
-    <TargetFrameworks Condition="'$(LatestSupportedNet)' == 'net7.0'">net45;netstandard2.0;netstandard2.1;net6.0;net7.0</TargetFrameworks>
+    <TargetFrameworks>net472;netstandard2.1;net8.0;net10.0;net11.0</TargetFrameworks>
 
     <Product>DryIoc</Product>
 
     <VersionPrefix>6.0.0</VersionPrefix>
-    <VersionSuffix>preview-09</VersionSuffix>
+    <VersionSuffix></VersionSuffix>
 
     <AssemblyName>$(Product)</AssemblyName>
     <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -23,6 +21,7 @@
       <![CDATA[
 ## v6.0.0 Major feature release
 
+- 10, 11 is now supported; interim .net versions dropped; net45 -> net472; netstandard2.0 dropped-> netstandard2.1 is still supported
 - Decrease memory footprint
 - Remove Obsolete API
 - Compile-time Dependency Injection (T4-based, AOT-friendly; see `readme.md` in the DryIoc.dll NuGet package)
@@ -51,10 +50,6 @@
     <SkipCompTimeGen>true</SkipCompTimeGen>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
-    <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.7.0" />
-  </ItemGroup>
-
   <Target Name="BeforeCompile">
     <Message Importance="high" Text="MSBuildNodeCount: $(MSBuildNodeCount)"/>
   </Target>
@@ -62,7 +57,7 @@
   <!-- Run compile-time generation only in debug configuration,
       for the one of target frameworks (highest),
       when DryIoc was already built (TargetPath exists) in order to consume its types via dotnet-t4 -->
-  <Target Name="CompileTimeGenerate" BeforeTargets="PrepareForBuild" Condition="('$(TargetFramework)' == 'net9.0' OR '$(TargetFramework)' == 'net8.0') AND '$(SkipCompTimeGen)' != 'true' AND '$(Configuration)' == 'Debug' AND Exists('$(ProjectDir)CompileTimeDI') AND Exists('$(TargetPath)')">
+  <Target Name="CompileTimeGenerate" BeforeTargets="PrepareForBuild" Condition="('$(TargetFramework)' == 'net10.0' OR '$(TargetFramework)' == 'net8.0') AND '$(SkipCompTimeGen)' != 'true' AND '$(Configuration)' == 'Debug' AND Exists('$(ProjectDir)CompileTimeDI') AND Exists('$(TargetPath)')">
 
     <Message Text="[DryIoc] Generating compile-time container for $(TargetFramework)..." Importance="high"/>
 

@@ -4,7 +4,7 @@
     <id>DryIoc.Microsoft.DependencyInjection.src</id>
     <version>8.0.0</version>
     <authors>Maksim Volkau</authors>
-    <copyright>Copyright © 2013-2023 Maksim Volkau</copyright>
+    <copyright>Copyright © 2013-2026 Maksim Volkau</copyright>
     <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
     <license type="expression">MIT</license>
     <icon>logo.png</icon>
@@ -36,11 +36,11 @@
     <file src="..\nuspecs\DryIoc.snk" />
     <file src="..\logo\logo128.png" target="logo.png" />
 
-    <!-- NetStandard2.0 -->
-    <file src="..\src\DryIoc.Microsoft.DependencyInjection\DryIocAdapter.cs" target="contentFiles\cs\netstandard2.0\DryIoc.Microsoft.DependencyInjection" />
+    <!-- NetStandard2.1 -->
+    <file src="..\src\DryIoc.Microsoft.DependencyInjection\DryIocAdapter.cs" target="contentFiles\cs\netstandard2.1\DryIoc.Microsoft.DependencyInjection" />
 
-    <!-- Net6.0 -->
-    <file src="..\src\DryIoc.Microsoft.DependencyInjection\DryIocAdapter.cs" target="contentFiles\cs\net6.0\DryIoc.Microsoft.DependencyInjection" />
+    <!-- Net8.0 -->
+    <file src="..\src\DryIoc.Microsoft.DependencyInjection\DryIocAdapter.cs" target="contentFiles\cs\net8.0\DryIoc.Microsoft.DependencyInjection" />
 
   </files>
 </package>

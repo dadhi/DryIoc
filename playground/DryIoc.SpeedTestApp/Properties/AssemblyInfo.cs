@@ -9,7 +9,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("DryIoc.SpeedTestApp")]
-[assembly: AssemblyCopyright("Copyright © 2013 Maksim Volkau")]
+[assembly: AssemblyCopyright("Copyright © 2013-2026 Maksim Volkau")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

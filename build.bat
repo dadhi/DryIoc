@@ -5,8 +5,8 @@ rem Calculate start time (1-prefix avoids set /a octal errors on 08/09; spaces -
 set "started_at=%time: =0%"
 set /a started_at_ms=1%started_at:~0,2%*24*60*100-100+1%started_at:~3,2%*60*100+1%started_at:~6,2%*100+1%started_at:~9,2%
 
-set "FrameworkParam=-f:net9.0"
-set "LatestSupportedNetProp=-p:LatestSupportedNet=net9.0"
+set "FrameworkParam=-f:net11.0"
+set "LatestSupportedNetProp=-p:LatestSupportedNet=net11.0"
 if [%1] NEQ [] (
     set "FrameworkParam=-f:%1"
     set "LatestSupportedNetProp=-p:LatestSupportedNet=%1"
@@ -67,8 +67,8 @@ echo:
 echo:## Starting: Documentation generation
 echo:
 
-dotnet build docs\DryIoc.Docs\DryIoc.Docs.csproj -f:net7.0 -target:MdGenerate
-
+dotnet build docs\DryIoc.Docs\DryIoc.Docs.csproj -f:net8.0 -target:MdGenerate
+nus
 echo:
 echo:## Finished: Documentation generation
 echo:

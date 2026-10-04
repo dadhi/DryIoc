@@ -1,14 +1,14 @@
 <Project>
     <PropertyGroup>
         <Authors>Maksim Volkau</Authors>
-        <Copyright>Copyright © 2013-2024 Maksim Volkau</Copyright>
+        <Copyright>Copyright © 2013-2026 Maksim Volkau</Copyright>
 
         <LangVersion>latest</LangVersion>
 
         <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
         <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
 
-        <LatestSupportedNet>net9.0</LatestSupportedNet>
+        <LatestSupportedNet>net11.0</LatestSupportedNet>
 
         <NoWarn>NETSDK1138;NETSDK1005;NU5104;NU1900</NoWarn>
 

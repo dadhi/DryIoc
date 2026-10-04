@@ -10,7 +10,7 @@ echo:# Build and Run TestRunners for Latest supported .NET and .NET FRAMEWORK 4.
 echo:[started at %started_at%]
 echo:
 echo:## Latest supported .NET
-dotnet run -v:m -f:net9.0 -c:Release -p:UseCompilationOnly=true --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+dotnet run -v:m -f:net11.0 -c:Release -p:UseCompilationOnly=true --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
 echo:
 echo:## .NET FRAMEWORK 4.7.2
 dotnet run -v:m -c:Release -p:UseCompilationOnly=true --project test/DryIoc.TestRunner.net472/DryIoc.TestRunner.net472.csproj
