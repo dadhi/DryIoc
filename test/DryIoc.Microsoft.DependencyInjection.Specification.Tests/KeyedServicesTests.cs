@@ -286,7 +286,8 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 
             var services = provider.GetKeyedServices<IFakeOpenGenericService<PocoClass>>(KeyedService.AnyKey).ToArrayOrSelf();
 
-            Assert.Equal(new[] { service1, service2 }, services);
+            // MS.DI 11 RC1: the AnyKey registration is not included into the AnyKey query
+            Assert.Equal(new[] { service2 }, services);
         }
 
         [Fact]

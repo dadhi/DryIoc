@@ -9,7 +9,7 @@ TEST_DIR="$SCRIPT_DIR"
 echo "=== DryIoc CompileTimeDI NuGet E2E Test ==="
 
 echo "--- Pack DryIoc.dll ---"
-dotnet build "$ROOT_DIR/src/DryIoc/DryIoc.csproj" -c Release -p:SkipCompTimeGen=true -p:LatestSupportedNet=net9.0 -v:minimal
+dotnet build "$ROOT_DIR/src/DryIoc/DryIoc.csproj" -c Release -p:SkipCompTimeGen=true -p:LatestSupportedNet=net10.0 -v:minimal
 ls "$ROOT_DIR/.dist/packages"/DryIoc.dll.*.nupkg
 
 echo "--- Fresh install (clear caches) ---"

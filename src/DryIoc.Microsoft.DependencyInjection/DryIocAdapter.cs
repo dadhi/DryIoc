@@ -153,14 +153,18 @@ public static class DryIocAdapter
             if (par.IsDefined(typeof(FromKeyedServicesAttribute), false))
             {
                 var attr = par.GetCustomAttribute<FromKeyedServicesAttribute>(false);
-                if (attr.Key == null)
-                    return ParameterServiceInfo.DefinitelyUnresolvedParameter;
-
-                var theKey = attr.Key;
-                if (theKey == KeyedService.AnyKey)
+                var theKey = attr.Key ?? req.ServiceKey;
+                if (theKey is Registrator.AnyServiceKey parentAnyKey)
+                    theKey = parentAnyKey.ResolutionKey;
+                else if (theKey == KeyedService.AnyKey)
                     theKey = Registrator.AnyKey;
 
-                return ParameterServiceInfo.Of(par, ServiceDetails.OfServiceKey(theKey));
+                if (theKey == null)
+                    return null;
+
+                return ParameterServiceInfo.Of(par, par.HasDefaultValue
+                    ? ServiceDetails.Of(null, theKey, IfUnresolved.ReturnDefaultIfNotRegistered, par.DefaultValue)
+                    : ServiceDetails.OfServiceKey(theKey));
             }
 
             return null;
@@ -476,8 +480,16 @@ public sealed class DryIocServiceProvider : IDisposable,
 
     /// <inheritdoc />
     public object GetService(Type serviceType) =>
-        Container.Resolve(serviceType, IfUnresolved);
+        IfUnresolved == IfUnresolved.Throw
+            ? Container.Resolve(serviceType, IfUnresolved.Throw)
+            : GetServiceAndWrapContainerExceptionInInvalidOperation(serviceType);
 
+    // MS.DI contract: the failure to create a registered service (e.g. the missing dependency) is an `InvalidOperationException`
+    private object GetServiceAndWrapContainerExceptionInInvalidOperation(Type serviceType)
+    {
+        try { return Container.Resolve(serviceType, IfUnresolved); }
+        catch (ContainerException ex) { throw new InvalidOperationException(ex.Message, ex); }
+    }
     /// <inheritdoc />
     public object GetRequiredService(Type serviceType) =>
         Container.Resolve(serviceType, IfUnresolved.Throw);
@@ -517,40 +529,88 @@ public sealed class DryIocServiceProvider : IDisposable,
     }
 
     /// <inheritdoc />
-    public object GetKeyedService(Type serviceType, object serviceKey)
-    {
-        if (serviceKey == null)
-            return GetService(serviceType);
-
-        if (serviceKey == KeyedService.AnyKey)
-            return Container.Resolve(serviceType, Registrator.AnyKey, IfUnresolved);
-
-        var keyedService = Container.Resolve(serviceType, serviceKey, IfUnresolved.ReturnDefaultIfNotRegistered);
-        if (keyedService != null)
-            return keyedService;
-        return Container.Resolve(serviceType, Registrator.AnyKeyOfResolutionKey(serviceKey), IfUnresolved);
-    }
+    public object GetKeyedService(Type serviceType, object serviceKey) =>
+        serviceKey == null 
+            ? GetService(serviceType) 
+            : ResolveKeyed(serviceType, serviceKey, false);
 
     /// <inheritdoc />
-    public object GetRequiredKeyedService(Type serviceType, object serviceKey)
+    public object GetRequiredKeyedService(Type serviceType, object serviceKey) =>
+        serviceKey == null 
+        ? GetRequiredService(serviceType) 
+        : ResolveKeyed(serviceType, serviceKey, required: true);
+
+    // The cache of the `AnyKey` collections per service type, to return the same collection instance on the repeated calls
+    private ImHashMap<Type, object> _anyKeyCollections = ImHashMap<Type, object>.Empty;
+
+    private object GetOrAddAnyKeyCollection(Type serviceType)
     {
-        if (serviceKey == null)
-            return GetRequiredService(serviceType);
+        var items = _anyKeyCollections.GetValueOrDefault(serviceType);
+        if (items != null)
+            return items;
 
-        if (serviceKey == KeyedService.AnyKey)
-            return Container.Resolve(serviceType, Registrator.AnyKey, IfUnresolved.Throw);
-
-        var keyedService = Container.Resolve(serviceType, serviceKey, IfUnresolved.ReturnDefaultIfNotRegistered);
-        if (keyedService != null)
-            return keyedService;
-        return Container.Resolve(serviceType, Registrator.AnyKeyOfResolutionKey(serviceKey), IfUnresolved.Throw);
+        items = Container.Resolve(serviceType, Registrator.AnyKey, IfUnresolved.Throw);
+        var map = _anyKeyCollections;
+        while (true)
+        {
+            var existing = map.GetValueOrDefault(serviceType);
+            if (existing != null)
+                return existing;
+            var newMap = map.AddOrUpdate(serviceType, items);
+            var oldMap = System.Threading.Interlocked.CompareExchange(ref _anyKeyCollections, newMap, map);
+            if (ReferenceEquals(oldMap, map))
+                return items;
+            map = oldMap;
+        }
     }
 
+    private object ResolveKeyed(Type serviceType, object serviceKey, bool required)
+    {
+        try
+        {
+            if (serviceKey == KeyedService.AnyKey)
+            {
+                if (!(serviceType.IsGenericType && serviceType.GetGenericTypeDefinition() == typeof(IEnumerable<>)))
+                    throw new InvalidOperationException(
+                        $"Cannot resolve the single service of type '{serviceType}' with the `KeyedService.AnyKey`, use the `IEnumerable<>` instead.");
+                // the enumerable is cached per provider to be consistent between the calls
+                return GetOrAddAnyKeyCollection(serviceType);
+            }
+
+            if (Container.IsRegistered(serviceType, serviceKey))
+                return Container.Resolve(serviceType, serviceKey, IfUnresolved.Throw);
+
+            var anyKey = Registrator.AnyKeyOfResolutionKey(serviceKey);
+            if (Container.IsRegistered(serviceType, anyKey))
+                return Container.Resolve(serviceType, anyKey, IfUnresolved.Throw);
+
+            var service = Container.Resolve(serviceType, serviceKey, IfUnresolved.ReturnDefaultIfNotRegistered);
+            if (service != null)
+                return service;
+        }
+        catch (ContainerException ex)
+        {
+            throw new InvalidOperationException(ex.Message, ex);
+        }
+
+        if (required)
+            throw new InvalidOperationException(
+                $"No service for type '{serviceType}' and key of type '{serviceKey.GetType().FullName}' has been registered.");
+        return null;
+    }
     /// <inheritdoc />
     public bool IsKeyedService(Type serviceType, object serviceKey)
     {
         if (serviceType.IsGenericTypeDefinition)
             return false;
+
+        if (serviceType == typeof(IServiceProvider) |
+            serviceType == typeof(IServiceScopeFactory) |
+            serviceType == typeof(ISupportRequiredService) |
+            serviceType == typeof(IServiceProviderIsService) |
+            serviceType == typeof(IKeyedServiceProvider) |
+            serviceType == typeof(IServiceProviderIsKeyedService))
+            return serviceKey == null;
 
         if (serviceKey == KeyedService.AnyKey)
             serviceKey = Registrator.AnyKey;

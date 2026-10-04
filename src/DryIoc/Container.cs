@@ -1147,6 +1147,8 @@ public partial class Container : IContainer
                     r.MatchFactoryConditionAndMetadata(d, x.Value));
                 if (factories.Length == 1)
                     return factories[0].Value;
+                if (factories.Length > 1 && rules.IsSelectLastRegisteredFactory)
+                    return factories[factories.Length - 1].Value;
             }
             else
             {
@@ -6074,7 +6076,9 @@ internal sealed class UniqueRegisteredServiceKey : IPrintable, IConvertibleToExp
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool Equals(UniqueRegisteredServiceKey key, object obj) =>
         obj is UniqueRegisteredServiceKey other && other.Index == key.Index &&
-        (ReferenceEquals(other.ServiceKey, key.ServiceKey) || Equals(other.ServiceKey, key.ServiceKey));
+        (ReferenceEquals(other.ServiceKey, key.ServiceKey) ||
+         // AnyKey is a wildcard, so it should be equal only to another AnyKey here
+         (other.ServiceKey is Registrator.AnyServiceKey) == (key.ServiceKey is Registrator.AnyServiceKey) && Equals(other.ServiceKey, key.ServiceKey));
 
     /// <summary>Returns true if both key and the index are equal.</summary>
     public override bool Equals(object obj) => Equals(this, obj);
@@ -8476,7 +8480,8 @@ public static class Registrator
                 return registeredKey is Registrator.AnyServiceKey;
 
             // otherwise it's enough to be non-default to match with Any resolution key
-            return registeredKey is not DefaultKey & registeredKey is not DefaultDynamicKey;
+            // the AnyKey registration itself is not included, as in MS.DI
+            return registeredKey is not DefaultKey & registeredKey is not DefaultDynamicKey & registeredKey is not Registrator.AnyServiceKey;
         }
 
         return registeredKey.Equals(resolutionKey);

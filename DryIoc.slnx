@@ -56,11 +56,9 @@
     <Project Path="src/DryIoc.MefAttributedModel/DryIoc.MefAttributedModel.csproj" />
     <Project Path="src/DryIoc.Microsoft.DependencyInjection/DryIoc.Microsoft.DependencyInjection.csproj" />
     <Project Path="src/DryIoc.Mvc/DryIoc.Mvc.csproj" />
-    <Project Path="src/DryIoc.Owin/DryIoc.Owin.csproj" />
     <Project Path="src/DryIoc.SignalR/DryIoc.SignalR.csproj" />
     <Project Path="src/DryIoc.Syntax.Autofac/DryIoc.Syntax.Autofac.csproj" />
     <Project Path="src/DryIoc.Web/DryIoc.Web.csproj" />
-    <Project Path="src/DryIoc.WebApi.Owin/DryIoc.WebApi.Owin.csproj" />
     <Project Path="src/DryIoc.WebApi/DryIoc.WebApi.csproj" />
     <Project Path="src/DryIoc/DryIoc.csproj" />
     <Project Path="src/DryIocAttributes/DryIocAttributes.csproj" />
@@ -75,14 +73,12 @@
     <Project Path="test/DryIoc.MefAttributedModel.UnitTests/DryIoc.MefAttributedModel.UnitTests.csproj" />
     <Project Path="test/DryIoc.Microsoft.DependencyInjection.Specification.Tests/DryIoc.Microsoft.DependencyInjection.Specification.Tests.csproj" />
     <Project Path="test/DryIoc.Mvc.UnitTests/DryIoc.Mvc.UnitTests.csproj" />
-    <Project Path="test/DryIoc.Owin.UnitTests/DryIoc.Owin.UnitTests.csproj" />
     <Project Path="test/DryIoc.SignalR.UnitTests/DryIoc.SignalR.UnitTests.csproj" />
     <Project Path="test/DryIoc.Syntax.Autofac.UnitTests/DryIoc.Syntax.Autofac.UnitTests.csproj" />
     <Project Path="test/DryIoc.TestRunner.net472/DryIoc.TestRunner.net472.csproj" />
     <Project Path="test/DryIoc.TestRunner/DryIoc.TestRunner.csproj" />
     <Project Path="test/DryIoc.UnitTests/DryIoc.UnitTests.csproj" />
     <Project Path="test/DryIoc.Web.UnitTests/DryIoc.Web.UnitTests.csproj" />
-    <Project Path="test/DryIoc.WebApi.Owin.UnitTests/DryIoc.WebApi.Owin.UnitTests.csproj" />
     <Project Path="test/DryIoc.WebApi.UnitTests/DryIoc.WebApi.UnitTests.csproj" />
     <Project Path="test/FastExpressionCompiler.ILDecoder/FastExpressionCompiler.ILDecoder.csproj" />
   </Folder>

@@ -21,21 +21,21 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: |
-            9.0.x
+            10.0.x
             11.0.x
           include-prerelease: true
 
       - name: Test
         if: runner.os != 'Windows'
         run: |
-          dotnet run -v:minimal -c:Release -p:LatestSupportedNet=net9.0 -f:net9.0 --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
-          dotnet run -v:minimal -c:Release -p:LatestSupportedNet=net9.0 -f:net9.0 -p:UseCompilationOnly=true --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+          dotnet run -v:minimal -c:Release -p:LatestSupportedNet=net10.0 -f:net10.0 --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+          dotnet run -v:minimal -c:Release -p:LatestSupportedNet=net10.0 -f:net10.0 -p:UseCompilationOnly=true --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
           dotnet test -v:minimal -c:Release samples/MinimalWeb.Tests/MinimalWeb.Tests.csproj
 
       - name: Build, test and pack
         if: runner.os == 'Windows'
         shell: cmd
-        run: build.bat net9.0
+        run: build.bat net10.0
 
       - name: Test MinimalWeb sample
         if: runner.os == 'Windows'
