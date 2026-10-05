@@ -424,7 +424,10 @@ public static class DryIocAdapter
             }
             else if (descriptor.ImplementationFactory != null)
             {
-                container.Register(DelegateFactory.Of(descriptor.ImplementationFactory, descriptor.Lifetime.ToReuse()), serviceType,
+                var implFactory = descriptor.ImplementationFactory;
+                Func<IResolverContext, object> factoryDelegate = r =>
+                    implFactory(r.Resolve<IServiceProvider>(IfUnresolved.ReturnDefault) ?? r);
+                container.Register(DelegateFactory.Of(factoryDelegate, descriptor.Lifetime.ToReuse()), serviceType,
                     serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
             }
             else
