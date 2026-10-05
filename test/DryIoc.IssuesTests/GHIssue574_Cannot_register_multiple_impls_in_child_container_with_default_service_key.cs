@@ -44,9 +44,9 @@ namespace DryIoc.IssuesTests
                 childContainer.Resolve<IEnumerable<IPrinter>>().Count(),
                 Is.EqualTo(msContainer.GetRequiredService<IEnumerable<IPrinter>>().Count()));
 
-            Assert.That(
-                msContainer.GetRequiredService<IEnumerable<IPrinter>>().Count(),
-                Is.EqualTo(4));
+            // keyed services are excluded from the IEnumerable, as in MS.DI RC1
+            Assert.That(msContainer.GetRequiredService<IEnumerable<IPrinter>>().Count(), Is.EqualTo(0));
+            Assert.That(msContainer.GetKeyedServices<IPrinter>("child-stamp").Count(), Is.EqualTo(4));
         }
 
         [Test]
@@ -69,14 +69,8 @@ namespace DryIoc.IssuesTests
             );
 
             var msContainer = childContainer.GetServiceProvider();
-
-            Assert.That(
-                childContainer.Resolve<IEnumerable<IPrinter>>().Count(),
-                Is.EqualTo(msContainer.GetRequiredService<IEnumerable<IPrinter>>().Count()));
-
-            Assert.That(
-                msContainer.GetRequiredService<IEnumerable<IPrinter>>().Count(),
-                Is.EqualTo(4));
+            Assert.That(msContainer.GetRequiredService<IEnumerable<IPrinter>>().Count(), Is.EqualTo(0));
+            Assert.That(msContainer.GetKeyedServices<IPrinter>("child-stamp").Count(), Is.EqualTo(4));
         }
 
         [Test]
@@ -93,11 +87,10 @@ namespace DryIoc.IssuesTests
                 typeof(NeighborPrinter)
             );
 
-            // all printers with and without the name, this is the default behavior of the Collection wrapper
+            // only the printers without the name, keyed ones are excluded as in MS.DI RC1
             var ps = container.Resolve<IPrinter[]>();  
             CollectionAssert.AreEquivalent(
-                new[] { typeof(Printer), typeof(PrinterA), typeof(PrinterB), 
-                    typeof(NeighborPrinter) }, 
+                new[] { typeof(NeighborPrinter) },
                 ps.Select(p => p.GetType()));
 
             // only printers with the specific StampName

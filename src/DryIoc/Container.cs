@@ -666,6 +666,14 @@ public partial class Container : IContainer
             if (variantGenericItems != null && variantGenericItems.Length != 0)
                 variantGenericItems = variantGenericItems.Match(serviceKey, static (k, x) => k.MatchToNotNullRegisteredKey(x.OptionalServiceKey));
         }
+        else if (Rules.ExcludeKeyedServicesFromCollection && !WrappersSupport.ExposesServiceKey(serviceType))
+        {
+            items = items.Match(static x => WrappersSupport.IsNotKeyedItem(x.OptionalServiceKey));
+            if (openGenericItems != null && openGenericItems.Length != 0)
+                openGenericItems = openGenericItems.Match(static x => WrappersSupport.IsNotKeyedItem(x.OptionalServiceKey));
+            if (variantGenericItems != null && variantGenericItems.Length != 0)
+                variantGenericItems = variantGenericItems.Match(static x => WrappersSupport.IsNotKeyedItem(x.OptionalServiceKey));
+        }
 
         var d = preResolveParent.GetServiceDetails();
         var metadataKey = d.MetadataKey;
@@ -699,6 +707,9 @@ public partial class Container : IContainer
             : variantGenericItems == null ? items.Append(openGenericItems)
             : openGenericItems == null ? items.Append(variantGenericItems)
             : items.Append(openGenericItems).Append(variantGenericItems);
+
+        if (serviceKey != null && Rules.ExcludeKeyedServicesFromCollection)
+            allItems = WrappersSupport.DropAnyKeyItemsIfKeyIsMatchedExactly(serviceKey, allItems);
 
         var multipleSameServiceKeySupport = Rules.HasMultipleSameServiceKeyForTheServiceType;
 
@@ -2311,16 +2322,23 @@ public partial class Container : IContainer
                     for (var x = (KeyedFactoryCacheEntry)entry.Value; x != null && result == null; x = x.Rest)
                         if (ReferenceEquals(x.Key, key))
                             result = x;
-                        else if (x.Key.Equals(key))
+                        else if (CacheKeysEqual(x.Key, key))
                             result = x;
             }
             return result != null;
         }
 
+        // The AnyServiceKey.Equals matches any non-default key, which is wrong for the cache lookup, so the AnyKey is compared only with the AnyKey
+        [MethodImpl((MethodImplOptions)256)]
+        private static bool CacheKeysEqual(object cachedKey, object key) =>
+            cachedKey is Registrator.AnyServiceKey cachedAnyKey
+                ? key is Registrator.AnyServiceKey anyKey && (ReferenceEquals(cachedAnyKey.ResolutionKey, anyKey.ResolutionKey) || cachedAnyKey.ResolutionKey.Equals(anyKey.ResolutionKey))
+                : cachedKey.Equals(key);
+
         internal static object SetOrAddKeyedCacheFactory(object x, object k, object f)
         {
             for (var entry = (KeyedFactoryCacheEntry)x; entry != null; entry = entry.Rest)
-                if (entry.Key.Equals(k))
+                if (CacheKeysEqual(entry.Key, k))
                 {
                     entry.Factory = f;
                     return x;
@@ -5593,6 +5611,11 @@ public static class WrappersSupport
         var serviceKey = details.ServiceKey;
         if (serviceKey != null)
             items = items.Match(serviceKey, static (key, x) => key.MatchToNotNullRegisteredKey(x.OptionalServiceKey));
+        else if (rules.ExcludeKeyedServicesFromCollection && !ExposesServiceKey(serviceType))
+            items = items.Match(static x => IsNotKeyedItem(x.OptionalServiceKey));
+
+        if (serviceKey != null && rules.ExcludeKeyedServicesFromCollection)
+            items = DropAnyKeyItemsIfKeyIsMatchedExactly(serviceKey, items);
 
         var metadataKey = details.MetadataKey;
         var metadata = details.Metadata;
@@ -5633,6 +5656,44 @@ public static class WrappersSupport
             Array.Resize(ref itemExprs, itemExprIndex);
 
         return NewArrayInit(serviceType, itemExprs);
+    }
+
+    // The exact key registrations take precedence over the AnyKey registration, as in MS.DI
+    internal static ServiceRegistrationInfo[] DropAnyKeyItemsIfKeyIsMatchedExactly(object resolutionKey, ServiceRegistrationInfo[] items)
+    {
+        if (items == null || items.Length < 2 || resolutionKey is Registrator.AnyServiceKey)
+            return items;
+        var hasAny = false;
+        var hasExact = false;
+        foreach (var x in items)
+            if (IsAnyKeyItem(x.OptionalServiceKey)) hasAny = true; else hasExact = true;
+        return hasAny & hasExact ? items.Match(static x => !IsAnyKeyItem(x.OptionalServiceKey)) : items;
+    }
+
+    private static bool IsAnyKeyItem(object itemKey)
+    {
+        if (itemKey is ServiceKeyAndRequiredOpenGenericType wrapped)
+            itemKey = wrapped.ServiceKey;
+        if (itemKey is UniqueRegisteredServiceKey unique)
+            itemKey = unique.ServiceKey;
+        return itemKey is Registrator.AnyServiceKey;
+    }
+
+    // The wrappers which explicitly expose the service key, so the keyed services should stay in the collection
+    [MethodImpl((MethodImplOptions)256)]
+    internal static bool ExposesServiceKey(Type itemType)
+    {
+        var def = itemType.GetGenericDefinitionOrNull();
+        return def == typeof(KeyValuePair<,>) || def == typeof(Meta<,>);
+    }
+
+    internal static bool IsNotKeyedItem(object itemKey)
+    {
+        if (itemKey is ServiceKeyAndRequiredOpenGenericType wrapped)
+            itemKey = wrapped.ServiceKey;
+        if (itemKey is UniqueRegisteredServiceKey unique)
+            itemKey = unique.ServiceKey;
+        return itemKey == null || itemKey is DefaultKey || itemKey is DefaultDynamicKey;
     }
 
     internal static object EnsureItemKeyCanBeMatched(object resolutionKey, object itemKey, bool multipleSameServiceKeySupport)
@@ -6221,7 +6282,8 @@ public sealed class Rules
 
         newRules._settings = (rules._settings
             | Settings.TrackingDisposableTransients
-            | Settings.SelectLastRegisteredFactory)
+            | Settings.SelectLastRegisteredFactory
+            | Settings.ExcludeKeyedServicesFromCollection)
             & ~Settings.ThrowOnRegisteringDisposableTransient
             & ~Settings.VariantGenericTypesInResolvedCollection;
 
@@ -6259,6 +6321,7 @@ public sealed class Rules
             FactorySelector == SelectLastRegisteredFactory &&
             _serviceKeyToTypeIndex != null &&
             (_settings & Settings.SelectLastRegisteredFactory) != 0 &&
+            (_settings & Settings.ExcludeKeyedServicesFromCollection) != 0 &&
             (_settings & Settings.TrackingDisposableTransients) != 0 &&
             (_settings & Settings.ThrowOnRegisteringDisposableTransient) == 0 &&
             (_settings & Settings.VariantGenericTypesInResolvedCollection) == 0;
@@ -6433,6 +6496,9 @@ public sealed class Rules
 
     /// <summary>A commonly used rule, the flag is for optimization</summary>
     public bool IsSelectLastRegisteredFactory => (_settings & Settings.SelectLastRegisteredFactory) != 0;
+
+    /// <summary>The collection wrappers resolved without the service key (e.g. IEnumerable of T) include only the not-keyed services, as in Microsoft.Extensions.DependencyInjection.</summary>
+    public bool ExcludeKeyedServicesFromCollection => (_settings & Settings.ExcludeKeyedServicesFromCollection) != 0;
 
     /// <summary>Tries to select a single factory based on the minimal reuse life-span ignoring the Transients</summary>
     public static FactorySelectorRule SelectFactoryWithTheMinReuseLifespan() => SelectLastRegisteredFactory;
@@ -7204,7 +7270,8 @@ public sealed class Rules
         ServiceProviderGetServiceShouldThrowIfUnresolved = 1 << 22,
         ThrowIfScopedOrSingletonHasTransientDependency = 1 << 23,
         VariantGenericTypesInResolve = 1 << 24,
-        GenerateResolutionCallForMissingDependency = 1 << 25
+        GenerateResolutionCallForMissingDependency = 1 << 25,
+        ExcludeKeyedServicesFromCollection = 1 << 26
     }
 
     internal const Settings DEFAULT_SETTINGS

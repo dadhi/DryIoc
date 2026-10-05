@@ -1,3 +1,4 @@
+using DryIoc.Microsoft.DependencyInjection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -37,8 +38,9 @@ namespace DryIoc.AspNetCore31.WebApi.Sample
                     request.ServiceType.Name.EndsWith("Controller") ? PropertiesAndFields.Properties()(request) : null)
             );
 
-        public void ConfigureContainer(IContainer container)
+        public void ConfigureContainer(DryIocServiceProvider provider)
         {
+            var container = provider.Container;
             // You may place your registrations here or split them in different classes, or organize them in some kind of modules, e.g:
             BasicServicesRegistrator.Register(container);
             SpecialServicesRegistrator.Register(container);

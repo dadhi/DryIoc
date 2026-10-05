@@ -200,7 +200,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             var provider = CreateServiceProvider(serviceCollection);
 
             var services = provider.GetKeyedServices<IFakeOpenGenericService<PocoClass>>("some-key").ToArrayOrSelf();
-            Assert.Equal(new[] { service1, service2 }, services);
+            Assert.Equal(new[] { service2 }, services);
         }
 
         [Fact]
@@ -216,10 +216,8 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             var container = BuildProvider(serviceCollection).Container;
 
             var services = container.ResolveMany<IFakeOpenGenericService<PocoClass>>(serviceKey: "some-key").ToArrayOrSelf();
-            Assert.Equal(2, services.Length);
-            Assert.NotSame(services[0], services[1]);
-            Assert.Same(service1, services[0]);
-            Assert.Same(service2, services[1]);
+            Assert.Single(services);
+            Assert.Same(service2, services[0]);
         }
 
         [Fact]
@@ -238,13 +236,10 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 
             var services = provider.GetKeyedServices<IFakeOpenGenericService<PocoClass>>("the key").ToArrayOrSelf();
 
-            Assert.Equal(3, services.Length);
-            Assert.False(services[0] == services[1], "services[0] == services[1]");
-            Assert.False(services[0] == services[2], "services[0] == services[2]");
-            Assert.False(services[1] == services[2], "services[1] == services[2]");
+            Assert.Equal(2, services.Length);
+            Assert.NotSame(services[0], services[1]);
             Assert.Same(service0, services[0]);
             Assert.Same(service1, services[1]);
-            Assert.Same(service2, services[2]);
         }
 
         [Fact]
@@ -263,13 +258,11 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 
             var services = provider.GetKeyedServices<IFakeOpenGenericService<PocoClass>>(serviceKey: "the key").ToArrayOrSelf();
 
-            Assert.Equal(3, services.Length);
+            // the exactly matched keys take precedence over the AnyKey registration, as in MS.DI RC1
+            Assert.Equal(2, services.Length);
             Assert.False(services[0] == services[1], "services[0] == services[1]");
-            Assert.False(services[0] == services[2], "services[0] == services[2]");
-            Assert.False(services[1] == services[2], "services[1] == services[2]");
             Assert.Same(service0, services[0]);
             Assert.Same(service1, services[1]);
-            Assert.Same(service2, services[2]);
         }
 
         [Fact]
