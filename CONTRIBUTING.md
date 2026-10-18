@@ -47,8 +47,9 @@ If you found the problem with DryIoc:
 
 Before sending the Pull Request please build the solution with the `b.bat` located in the root folder.
 
-It will build all projects for in the Release configuration, will run unit tests and [generate the documentation](#tldr).
+It builds and runs the test runners for the latest supported .NET and .NET Framework 4.7.2 in the Release configuration.
 Make sure that there are no project build errors or failing tests.
+To [generate the documentation](#tldr), run `b_docs.bat` separately.
 
 ### Develop in Visual Studio 2017+
 
@@ -62,7 +63,7 @@ DryIoc provides the friendly VSCode developing experience.
 
 Basically you need just the **C# extension** installed. 
 
-Then you may run the `build_with_packaging.bat` from the shell to ensure packages are restored, code is built, tests are passing and packages are created.
+Then you may run the `build.bat` from the shell to ensure packages are restored, code is built, tests are passing and packages are created.
 
 You may go to the test projects in the _test_ sub-folder and Run or Debug the tests via the editor lens provided by the extension.
 
@@ -71,7 +72,7 @@ You may go to the test projects in the _test_ sub-folder and Run or Debug the te
 ### TL;DR;
 
 - Edit the selected document **.cs** (not the .md) file in the _docs\DryIoc.Docs_ sub-folder.
-- Run the `build_the_docs.bat` file from the root folder in the shell.
+- Run the `b_docs.bat` file from the root folder in the shell.
 - Check the updated .md file. You may preview the markdown files with the respective markdown extension in VSCode or in Visual Studio.
 - Commit the changes both for .cs and .md and follow the usual PR GitHub workflow.
 
@@ -97,4 +98,4 @@ Try edit the `.cs` file then save it and see that the `.md` file is automaticall
 The result markdown file may be automatically previewed inside the Visual Studio with the help of 
 [Markdown Editor extension](https://marketplace.visualstudio.com/items?itemName=MadsKristensen.MarkdownEditor).
 
-In VSCode you need to run the `build_the_docs.bat` to see the changes or just build the `DryIoc.Docs` project in the Debug mode (the default).
+In VSCode you need to run `b_docs.bat` to see the changes or just build the `DryIoc.Docs` project for `net8.0` in the Debug mode (the default).

@@ -126,7 +126,7 @@ for [MEF Attributed Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs
 - ASP.NET: 
 
     - [DryIoc.Web](https://www.nuget.org/packages/DryIoc.Web/) 
-    - [DryIoc.Mvc](https://www.nuget.org/packages/DryIoc.WebApi.dll/)
+    - [DryIoc.Mvc](https://www.nuget.org/packages/DryIoc.Mvc.dll/)
     - [DryIoc.WepApi](https://www.nuget.org/packages/DryIoc.WebApi.dll/)
     - [DryIoc.SignalR](Extensions/SignalR)
     - [DryIoc.Microsoft.DependencyInjection](https://www.nuget.org/packages/DryIoc.Microsoft.DependencyInjection) adapter for [.NET Core DI](https://github.com/aspnet/DependencyInjection)
@@ -141,7 +141,7 @@ for [MEF Attributed Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs
 
 ## Samples
 
-Located in this repo in the [samples]((https://github.com/dadhi/DryIoc/tree/master/samples) folder.
+Located in this repo in the [samples](https://github.com/dadhi/DryIoc/tree/master/samples) folder.
 
 
 ## Latest Version

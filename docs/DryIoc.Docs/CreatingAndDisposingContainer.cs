@@ -94,7 +94,7 @@ Disposing container will:
 
 - Dispose resolved Singletons.
 - Remove all registrations.
-- Set Rules to `Rules.Empty`.
+- Set Rules to `Rules.Default`.
 
 Usage of disposed Container will end-up with exception.
 
