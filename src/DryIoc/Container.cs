@@ -8005,6 +8005,10 @@ public class Made
         ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null, bool isConditionalImplementation = false) =>
         Create(factoryMethodSelector, parameters, propertiesAndFields, isConditionalImplementation);
 
+    /// <summary>Specifies injections rules for FactoryMethod</summary>
+    [MethodImpl((MethodImplOptions)256)]
+    public static Made OfFactoryMethod(FactoryMethod factoryMethod) => new Made(factoryMethod);
+
     /// <summary>Specifies injections rules for FactoryMethod and Parameters.</summary>
     [MethodImpl((MethodImplOptions)256)]
     public static Made OfFactoryMethodAndParameters(FactoryMethod factoryMethod, ParameterSelector parameters) =>
@@ -9070,7 +9074,8 @@ public static class Registrator
     private const string InvokeMethodName = "Invoke";
     private static object ToFuncWithObjResult<TService>(this Func<TService> f) => f();
 
-    private static object ToFuncWithObjParams<D1, TService>(this Func<D1, TService> f, object d1) => f((D1)d1);
+    /// <summary>Exposed for the MS.DI DryIocAdapter</summary>
+    public static object ToFuncWithObjParams<D1, TService>(this Func<D1, TService> f, object d1) => f((D1)d1);
     private static Func<object, object> GetCheckedFuncWithObjParams<D1>(this Func<D1, object> f, Type serviceType) =>
         d1 => f((D1)d1).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType);
 
@@ -9080,27 +9085,32 @@ public static class Registrator
     private static Func<object, object, object> GetCheckedFuncWithObjParams<D1, D2>(this Func<D1, D2, object> f, Type serviceType) =>
         (d1, d2) => f((D1)d1, (D2)d2).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType);
 
-    private static object ToFuncWithObjParams<D1, D2, D3, TService>(this Func<D1, D2, D3, TService> f,
+    /// <summary>Exposed</summary>
+    public static object ToFuncWithObjParams<D1, D2, D3, TService>(this Func<D1, D2, D3, TService> f,
         object d1, object d2, object d3) => f((D1)d1, (D2)d2, (D3)d3);
     private static Func<object, object, object, object> GetCheckedFuncWithObjParams<D1, D2, D3>(this Func<D1, D2, D3, object> f, Type serviceType) =>
         (d1, d2, d3) => f((D1)d1, (D2)d2, (D3)d3).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType);
 
-    private static object ToFuncWithObjParams<D1, D2, D3, D4, TService>(this Func<D1, D2, D3, D4, TService> f,
+    /// <summary>Exposed</summary>
+    public static object ToFuncWithObjParams<D1, D2, D3, D4, TService>(this Func<D1, D2, D3, D4, TService> f,
         object d1, object d2, object d3, object d4) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4);
     private static Func<object, object, object, object, object> GetCheckedFuncWithObjParams<D1, D2, D3, D4>(this Func<D1, D2, D3, D4, object> f, Type serviceType) =>
         (d1, d2, d3, d4) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType);
 
-    private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, TService>(this Func<D1, D2, D3, D4, D5, TService> f,
+    /// <summary>Exposed</summary>
+    public static object ToFuncWithObjParams<D1, D2, D3, D4, D5, TService>(this Func<D1, D2, D3, D4, D5, TService> f,
         object d1, object d2, object d3, object d4, object d5) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5);
     private static Func<object, object, object, object, object, object> GetCheckedFuncWithObjParams<D1, D2, D3, D4, D5>(this Func<D1, D2, D3, D4, D5, object> f, Type serviceType) =>
         (d1, d2, d3, d4, d5) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType);
 
-    private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, D6, TService>(this Func<D1, D2, D3, D4, D5, D6, TService> f,
+    /// <summary>Exposed</summary>
+    public static object ToFuncWithObjParams<D1, D2, D3, D4, D5, D6, TService>(this Func<D1, D2, D3, D4, D5, D6, TService> f,
         object d1, object d2, object d3, object d4, object d5, object d6) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6);
     private static Func<object, object, object, object, object, object, object> GetCheckedFuncWithObjParams<D1, D2, D3, D4, D5, D6>(this Func<D1, D2, D3, D4, D5, D6, object> f, Type serviceType) =>
         (d1, d2, d3, d4, d5, d6) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType);
 
-    private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, D6, D7, TService>(this Func<D1, D2, D3, D4, D5, D6, D7, TService> f,
+    /// <summary>Exposed</summary>
+    public static object ToFuncWithObjParams<D1, D2, D3, D4, D5, D6, D7, TService>(this Func<D1, D2, D3, D4, D5, D6, D7, TService> f,
         object d1, object d2, object d3, object d4, object d5, object d6, object d7) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6, (D7)d7);
     private static Func<object, object, object, object, object, object, object, object> GetCheckedFuncWithObjParams<D1, D2, D3, D4, D5, D6, D7>(this Func<D1, D2, D3, D4, D5, D6, D7, object> f, Type serviceType) =>
         (d1, d2, d3, d4, d5, d6, d7) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6, (D7)d7).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType);

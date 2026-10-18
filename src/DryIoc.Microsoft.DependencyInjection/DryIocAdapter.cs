@@ -261,7 +261,6 @@ public static class DryIocAdapter
         var serviceProvider = new DryIocServiceProvider(container);
 
         // those are singleton capabilities
-        // we
         var singletons = container.SingletonScope;
         singletons.Use<IServiceProvider>(serviceProvider);
         singletons.Use<ISupportRequiredService>(serviceProvider);
@@ -414,7 +413,7 @@ public static class DryIocAdapter
                 container.TrackDisposable(keyedInstance); // todo: @incompatible calling this method depends on the `ifAlreadyRegistered` policy
             }
         }
-        else
+        else // non-keyed service
         {
             var implType = descriptor.ImplementationType;
             if (implType != null)
@@ -425,6 +424,7 @@ public static class DryIocAdapter
             else if (descriptor.ImplementationFactory != null)
             {
                 var implFactory = descriptor.ImplementationFactory;
+                // todo: @perf can we use a similar things to the `descriptor.KeyedImplementationFactory != null`
                 Func<IResolverContext, object> factoryDelegate = r =>
                     implFactory(r.Resolve<IServiceProvider>(IfUnresolved.ReturnDefault) ?? r);
                 container.Register(DelegateFactory.Of(factoryDelegate, descriptor.Lifetime.ToReuse()), serviceType,
