@@ -25,6 +25,7 @@
     - [RegisterInitializer with the reuse different from the initialized object](#registerinitializer-with-the-reuse-different-from-the-initialized-object)
   - [RegisterPlaceholder](#registerplaceholder)
   - [RegisterDisposer](#registerdisposer)
+  - [Resolve with arguments](#resolve-with-arguments)
 
 
 ## DryIoc Glossary
@@ -1162,3 +1163,23 @@ container.RegisterDisposer<IClosable>(closable => closable.Close(),
 
 __NOTE__: The `RegisterDisposer` is just for adapt / compensate absence of `IDisposable` interface in third-party code. 
 If you in control, please implement `IDisposable` interface instead - it will cleanly state the intent without any DI tool involved.
+
+## Resolve with arguments
+
+`Resolve` accepts an array of arguments, e.g. `container.Resolve<Foo>(new object[] { bar })`, 
+which are used instead of the registered (or unregistered) services of the matching types:
+```cs
+var foo = container.Resolve<Foo>(new object[] { myBar }); // Foo gets `myBar` instead of the registered Bar
+```
+
+__Note:__ The arguments are passed down the __whole__ dependency graph of the resolved service (deep), not just to the resolved service constructor:
+
+- Any dependency of the matching type, at any depth, is replaced by the passed argument.
+- The arguments are optional to use: the argument not used by any dependency is simply ignored.
+- The arguments replace both registered and unregistered services of the matching types.
+
+Therefore a service in the graph which has no registration and cannot be resolved without the argument still fails with `Error.UnableToResolveFromRegisteredServices`, 
+and the error message mentions "with passed arguments". Make sure that all other dependencies are resolvable. 
+The same applies to the `Func<Arg, Service>` wrapper, see [Func of A with parameters](Wrappers#func-of-a-with-parameters).
+
+The more granular control over which services are replaced is tracked in [issue #222](https://github.com/dadhi/DryIoc/issues/222).
