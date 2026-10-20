@@ -486,6 +486,27 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Can_supply_args_matched_by_specified_type_and_param_name()
+        {
+            var c = new Container();
+            c.Register<SS>();
+
+            var ss2 = c.Resolve<SS>(new object[] { Arg.Passed("b", "y"), Arg.Passed("a", "x") });
+            Assert.AreEqual("x", ss2.A);
+            Assert.AreEqual("y", ss2.B);
+
+            c.Register<ObjHolder>();
+            var h = c.Resolve<ObjHolder>(new object[] { Arg.Passed<object>("x") });
+            Assert.AreEqual("x", h.O);
+        }
+
+        class ObjHolder
+        {
+            public object O { get; }
+            public ObjHolder(object o) { O = o; }
+        }
+
+        [Test]
         public void Can_supply_fresh_args_in_multiple_resolve_call_Using_the_rule_for_ignoring_Reuse()
         {
             var c = new Container(r => r.WithIgnoringReuseForFuncWithArgs());
