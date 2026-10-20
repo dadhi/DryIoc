@@ -7765,7 +7765,7 @@ public class FactoryMethod
                 var param = maxParamsCtorParams[i];
                 if (inputArgs != null)
                 {
-                    var inputArgExpr = ReflectionFactory.TryGetExpressionFromInputArgs(param.ParameterType, inputArgs, ref argsUsedMask);
+                    var inputArgExpr = ReflectionFactory.TryGetExpressionFromInputArgs(param.ParameterType, param.Name, inputArgs, ref argsUsedMask);
                     if (inputArgExpr != null)
                     {
                         ++usedInputArgOrUsedOrCustomValueCount;
@@ -8439,10 +8439,44 @@ public class Made
     }
 }
 
+/// <summary>Specifies the type and optionally the parameter name to match the argument passed to <c>Resolve(args)</c>. Created via <see cref="Arg.Passed{TArg}(TArg)"/>.</summary>
+public sealed class PassedArg
+{
+    /// <summary>The type to match the parameter with.</summary>
+    public readonly Type Type;
+    /// <summary>The argument value.</summary>
+    public readonly object Value;
+    /// <summary>Optional parameter name to match.</summary>
+    public readonly string Name;
+    internal PassedArg(Type type, object value, string name) { Type = type; Value = value; Name = name; }
+    internal Expression ToExpression() => Name == null ? Constant(Value, Type) : new NamedArgConstantExpression(Value, Type, Name);
+}
+
+/// <summary>Constant input argument which should match the parameter by name in addition to the type.</summary>
+internal sealed class NamedArgConstantExpression : ConstantExpression
+{
+    public override Type Type { get; }
+    public override object Value { get; }
+    public readonly string Name;
+    internal NamedArgConstantExpression(object value, Type type, string name) { Value = value; Type = type; Name = name; }
+}
+
 /// <summary>Class for defining parameters/properties/fields service info in <see cref="Made"/> expressions.
 /// Arg methods are NOT actually called, they just used to reflect service info from call expression.</summary>
 public static class Arg
 {
+    /// <summary>Wraps the value to pass to <c>Resolve(args)</c> to be matched by the specified <typeparamref name="TArg"/> type instead of <c>value.GetType()</c>.</summary>
+    public static PassedArg Passed<TArg>(TArg value) => new PassedArg(typeof(TArg), value, null);
+
+    /// <summary>Wraps the value to pass to <c>Resolve(args)</c> to be matched by the specified <typeparamref name="TArg"/> type and the parameter name.</summary>
+    public static PassedArg Passed<TArg>(string paramName, TArg value) => new PassedArg(typeof(TArg), value, paramName);
+
+    /// <summary>Wraps the value to pass to <c>Resolve(args)</c> to be matched by the runtime specified <paramref name="type"/>.</summary>
+    public static PassedArg Passed(Type type, object value) => new PassedArg(type, value, null);
+
+    /// <summary>Wraps the value to pass to <c>Resolve(args)</c> to be matched by the runtime specified <paramref name="type"/> and the parameter name.</summary>
+    public static PassedArg Passed(Type type, string paramName, object value) => new PassedArg(type, value, paramName);
+
     /// <summary>Specifies required service type of parameter or member. If required type is the same as parameter/member type,
     /// the method is just a placeholder to help detect constructor or factory method, and does not have additional meaning.</summary>
     public static TRequired Of<TRequired>() => default(TRequired);
@@ -10828,7 +10862,7 @@ public sealed class Request : IEnumerable<Request>, IPrintable
         }
 
         var actualServiceType = serviceTypeOrInfo as Type ?? ((ServiceInfo)serviceTypeOrInfo).GetActualServiceType();
-        var inputArgExprs = inputArgs?.Map(static a => Constant(a));
+        var inputArgExprs = inputArgs?.Map(static a => a is PassedArg ra ? ra.ToExpression() : Constant(a));
 
         var req = RentRequestOrNull();
         return req == null
@@ -13463,7 +13497,7 @@ public class ReflectionFactory : Factory
             if (inputArgs != null &&
                 !(isDecoratorRequest && paramType.IsAssignableFrom(decoratorServiceType)))
             {
-                var inputArgExpr = TryGetExpressionFromInputArgs(paramType, inputArgs, ref argsUsedMask);
+                var inputArgExpr = TryGetExpressionFromInputArgs(paramType, param.Name, inputArgs, ref argsUsedMask);
                 if (inputArgExpr != null)
                 {
                     if (paramExprs != null)
@@ -13661,12 +13695,13 @@ public class ReflectionFactory : Factory
     }
 
     // Check not yet used arguments provided via `Func<Arg, TService>` or `Resolve(.., args: new[] { arg })`
-    internal static Expression TryGetExpressionFromInputArgs(Type paramType, Expression[] inputArgs, ref int argsUsedMask)
+    internal static Expression TryGetExpressionFromInputArgs(Type paramType, string paramName, Expression[] inputArgs, ref int argsUsedMask)
     {
         for (var a = 0; a < inputArgs.Length; ++a)
         {
             var inputArg = inputArgs[a];
-            if ((argsUsedMask & 1 << a) == 0 && paramType.IsAssignableFrom(inputArg.Type))
+            if ((argsUsedMask & 1 << a) == 0 && paramType.IsAssignableFrom(inputArg.Type) &&
+                (inputArg is not NamedArgConstantExpression named || named.Name == paramName))
             {
                 argsUsedMask |= 1 << a; // mark that argument was used
                 return inputArg;
