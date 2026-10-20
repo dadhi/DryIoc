@@ -12,6 +12,7 @@
     - [Func of A](#func-of-a)
     - [Really "lazy" Lazy and Func](#really-lazy-lazy-and-func)
     - [Func of A with parameters](#func-of-a-with-parameters)
+      - [Passing arguments to Resolve with the specified type or parameter name](#passing-arguments-to-resolve-with-the-specified-type-or-parameter-name)
       - [Func with single argument to resolve service by key](#func-with-single-argument-to-resolve-service-by-key)
     - [KeyValuePair of Service Key and A](#keyvaluepair-of-service-key-and-a)
     - [Meta or Tuple of A with Metadata](#meta-or-tuple-of-a-with-metadata)
@@ -252,6 +253,42 @@ public class Func_with_args_with_rule_ignoring_reuse
     {
         public string Greeting { get; }
         public A(string greeting) { Greeting = greeting; }
+    }
+}
+```
+
+#### Passing arguments to Resolve with the specified type or parameter name
+
+The same matching works for the `args` passed directly to `Resolve` (or combined with `Func` arguments, see [#222](https://github.com/dadhi/DryIoc/issues/222)). 
+By default, a plain argument is matched by its runtime `GetType()`. 
+To be more precise wrap the argument with `Arg.Passed`:
+
+- `Arg.Passed<TArg>(value)` matches the parameter by the declared `TArg` type instead of the `value.GetType()`.
+- `Arg.Passed<TArg>(paramName, value)` additionally requires the parameter name to be equal (case-sensitive).
+
+```cs
+public class Passing_args_to_resolve_with_type_and_name
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
+        container.Register<A>();
+
+        var a = container.Resolve<A>(new object[] { Arg.Passed("second", "2"), Arg.Passed("first", "1") });
+        Assert.AreEqual("1", a.First);
+        Assert.AreEqual("2", a.Second);
+
+        // Combined with the Func argument
+        var getA = container.Resolve<Func<string, A>>(new object[] { Arg.Passed("second", "2") });
+        Assert.AreEqual("1", getA("1").First);
+        Assert.AreEqual("2", getA("1").Second);
+    }
+
+    class A
+    {
+        public string First { get; }
+        public string Second { get; }
+        public A(string first, string second) { First = first; Second = second; }
     }
 }
 ```

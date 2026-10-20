@@ -8440,7 +8440,7 @@ public class Made
 }
 
 /// <summary>Specifies the type and optionally the parameter name to match the argument passed to <c>Resolve(args)</c>. Created via <see cref="Arg.Passed{TArg}(TArg)"/>.</summary>
-public sealed class ResolveArg
+public sealed class PassedArg
 {
     /// <summary>The type to match the parameter with.</summary>
     public readonly Type Type;
@@ -8448,7 +8448,7 @@ public sealed class ResolveArg
     public readonly object Value;
     /// <summary>Optional parameter name to match.</summary>
     public readonly string Name;
-    internal ResolveArg(Type type, object value, string name) { Type = type; Value = value; Name = name; }
+    internal PassedArg(Type type, object value, string name) { Type = type; Value = value; Name = name; }
     internal Expression ToExpression() => Name == null ? Constant(Value, Type) : new NamedArgConstantExpression(Value, Type, Name);
 }
 
@@ -8466,10 +8466,10 @@ internal sealed class NamedArgConstantExpression : ConstantExpression
 public static class Arg
 {
     /// <summary>Wraps the value to pass to <c>Resolve(args)</c> to be matched by the specified <typeparamref name="TArg"/> type instead of <c>value.GetType()</c>.</summary>
-    public static ResolveArg Passed<TArg>(TArg value) => new ResolveArg(typeof(TArg), value, null);
+    public static PassedArg Passed<TArg>(TArg value) => new PassedArg(typeof(TArg), value, null);
 
     /// <summary>Wraps the value to pass to <c>Resolve(args)</c> to be matched by the specified <typeparamref name="TArg"/> type and the parameter name.</summary>
-    public static ResolveArg Passed<TArg>(string paramName, TArg value) => new ResolveArg(typeof(TArg), value, paramName);
+    public static PassedArg Passed<TArg>(string paramName, TArg value) => new PassedArg(typeof(TArg), value, paramName);
 
     /// <summary>Specifies required service type of parameter or member. If required type is the same as parameter/member type,
     /// the method is just a placeholder to help detect constructor or factory method, and does not have additional meaning.</summary>
@@ -10856,7 +10856,7 @@ public sealed class Request : IEnumerable<Request>, IPrintable
         }
 
         var actualServiceType = serviceTypeOrInfo as Type ?? ((ServiceInfo)serviceTypeOrInfo).GetActualServiceType();
-        var inputArgExprs = inputArgs?.Map(static a => a is ResolveArg ra ? ra.ToExpression() : Constant(a));
+        var inputArgExprs = inputArgs?.Map(static a => a is PassedArg ra ? ra.ToExpression() : Constant(a));
 
         var req = RentRequestOrNull();
         return req == null
