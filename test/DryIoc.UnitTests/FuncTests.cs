@@ -45,6 +45,8 @@ namespace DryIoc.UnitTests
             Can_combine_passed_named_arg_with_Func_arg();
             Can_combine_passed_typed_arg_with_Func_arg();
             Passed_named_arg_with_not_matching_name_is_not_used();
+            Can_supply_args_matched_by_runtime_type_and_param_name();
+            Can_combine_runtime_typed_passed_arg_with_Func_arg();
             Can_supply_fresh_args_in_multiple_resolve_call_Using_the_rule_for_ignoring_Reuse();
             Can_supply_fresh_args_in_different_open_scopes();
             For_Func_returned_type_with_lazy_dependency_Func_parameters_are_correctly_passed();
@@ -551,6 +553,33 @@ namespace DryIoc.UnitTests
             public object O { get; }
             public string S { get; }
             public ObjStr(string s, object o) { O = o; S = s; }
+        }
+
+        [Test]
+        public void Can_supply_args_matched_by_runtime_type_and_param_name()
+        {
+            var c = new Container();
+            c.Register<SS>();
+            c.Register<ObjHolder>();
+
+            var h = c.Resolve<ObjHolder>(new object[] { Arg.Passed(typeof(object), "x") });
+            Assert.AreEqual("x", h.O);
+
+            var ss = c.Resolve<SS>(new object[] { Arg.Passed(typeof(string), "b", "y"), Arg.Passed(typeof(string), "a", "x") });
+            Assert.AreEqual("x", ss.A);
+            Assert.AreEqual("y", ss.B);
+        }
+
+        [Test]
+        public void Can_combine_runtime_typed_passed_arg_with_Func_arg()
+        {
+            var c = new Container();
+            c.Register<ObjStr>();
+
+            var f = c.Resolve<Func<string, ObjStr>>(new object[] { Arg.Passed(typeof(object), "o") });
+            var r = f("s");
+            Assert.AreEqual("o", r.O);
+            Assert.AreEqual("s", r.S);
         }
 
         [Test]

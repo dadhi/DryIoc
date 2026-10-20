@@ -8471,6 +8471,12 @@ public static class Arg
     /// <summary>Wraps the value to pass to <c>Resolve(args)</c> to be matched by the specified <typeparamref name="TArg"/> type and the parameter name.</summary>
     public static PassedArg Passed<TArg>(string paramName, TArg value) => new PassedArg(typeof(TArg), value, paramName);
 
+    /// <summary>Wraps the value to pass to <c>Resolve(args)</c> to be matched by the runtime specified <paramref name="type"/>.</summary>
+    public static PassedArg Passed(Type type, object value) => new PassedArg(type, value, null);
+
+    /// <summary>Wraps the value to pass to <c>Resolve(args)</c> to be matched by the runtime specified <paramref name="type"/> and the parameter name.</summary>
+    public static PassedArg Passed(Type type, string paramName, object value) => new PassedArg(type, value, paramName);
+
     /// <summary>Specifies required service type of parameter or member. If required type is the same as parameter/member type,
     /// the method is just a placeholder to help detect constructor or factory method, and does not have additional meaning.</summary>
     public static TRequired Of<TRequired>() => default(TRequired);
