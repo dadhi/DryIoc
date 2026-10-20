@@ -8528,8 +8528,12 @@ public static class Registrator
     // todo: @feature We may need the paired DefaultKey to request/filter collections by default key, because AnyKey does not include DefaultKey
     /// <summary>When registered with it, the the service can be resolved any service key provided</summary>
     public static readonly object AnyKey = new AnyServiceKey();
+    /// <summary>When used to resolve a collection, includes only non-keyed services.</summary>
+    public static readonly object NonKeyedServices = new NonKeyedServicesKey();
     /// <summary>Wrap the resolution key</summary>
     public static object AnyKeyOfResolutionKey(object key) => new AnyServiceKey(key);
+
+    private sealed class NonKeyedServicesKey { }
 
     // todo: @wip add IConvertibleToExpression impl
     /// <summary>Represents the **registered** key that you may resolve with any resolution service key</summary>
@@ -8551,6 +8555,9 @@ public static class Registrator
     public static bool MatchToNotNullRegisteredKey(this object resolutionKey, object registeredKey)
     {
         Debug.Assert(registeredKey != null);
+
+        if (resolutionKey is Registrator.NonKeyedServicesKey)
+            return WrappersSupport.IsNotKeyedItem(registeredKey);
 
         // first try to unpack the key-required type pair
         if (resolutionKey is ServiceKeyAndRequiredOpenGenericType keyAndType)

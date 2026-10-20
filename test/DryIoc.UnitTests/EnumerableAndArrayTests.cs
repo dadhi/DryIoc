@@ -16,6 +16,7 @@ namespace DryIoc.UnitTests
             I_can_resolve_mixed_array_of_singletons_and_transients();
             Resolving_enumerable_of_service_should_return_enumerable_type();
             Resolving_enumerable_with_default_and_one_named_service_will_return_both_services();
+            Resolving_enumerable_with_non_keyed_services_key_returns_only_non_keyed_services();
             Resolving_enumerable_of_service_registered_with_func_should_return_enumerable_with_single_service();
             I_can_resolve_array_of_open_generics(true);
             I_can_resolve_array_of_open_generics(false);
@@ -39,7 +40,7 @@ namespace DryIoc.UnitTests
             Can_resolve_array_of_strings();
             Can_resolve_array_of_asResolutionCall_service();
             Inject_Enumerable_in_the_class_with_the_base_constructor();
-            return 28;
+            return 29;
         }
 
         [Test]
@@ -98,6 +99,27 @@ namespace DryIoc.UnitTests
             var services = container.Resolve<IEnumerable<IService>>();
 
             Assert.That(services.Count(), Is.EqualTo(2));
+        }
+
+        [Test]
+        public void Resolving_enumerable_with_non_keyed_services_key_returns_only_non_keyed_services()
+        {
+            foreach (var lazyEnumerable in new[] { false, true })
+            {
+                IContainer container = new Container();
+                if (lazyEnumerable)
+                    container = container.With(r => r.WithResolveIEnumerableAsLazyEnumerable());
+
+                container.Register(typeof(IService), typeof(OneService));
+                container.Register(typeof(IService), typeof(AnotherService));
+                container.Register(typeof(IService), typeof(Service), serviceKey: "keyed");
+
+                var services = container.Resolve<IEnumerable<IService>>(Registrator.NonKeyedServices).ToArray();
+
+                Assert.That(services.Length, Is.EqualTo(2));
+                Assert.That(services[0], Is.InstanceOf<OneService>());
+                Assert.That(services[1], Is.InstanceOf<AnotherService>());
+            }
         }
 
         [Test]
