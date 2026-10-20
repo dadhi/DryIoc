@@ -114,7 +114,7 @@ namespace DryIoc.UnitTests
                 container.Register(typeof(IService), typeof(AnotherService));
                 container.Register(typeof(IService), typeof(Service), serviceKey: "keyed");
 
-                var services = container.Resolve<IEnumerable<IService>>(Registrator.NonKeyedServices).ToArray();
+                var services = container.Resolve<IEnumerable<IService>>(DefaultKey.Value).ToArray();
 
                 Assert.That(services.Length, Is.EqualTo(2));
                 Assert.That(services[0], Is.InstanceOf<OneService>());
