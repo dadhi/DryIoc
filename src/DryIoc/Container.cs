@@ -610,7 +610,8 @@ public partial class Container : IContainer
 
         var requiredItemType = requiredServiceType ?? serviceType;
         if (serviceKey != null)
-            generatedFactories = generatedFactories.Match(serviceKey, static (sk, x) => sk.MatchToNotNullRegisteredKey(x.ServiceKey));
+            generatedFactories = generatedFactories.Match(serviceKey,
+                static (sk, x) => WrappersSupport.MatchCollectionServiceKey(sk, x.ServiceKey));
         if (requiredServiceType != null)
             generatedFactories = generatedFactories.Match(requiredServiceType, static (rst, x) => rst == x.RequiredServiceType);
 
@@ -660,11 +661,14 @@ public partial class Container : IContainer
 
         if (serviceKey != null)
         {
-            items = items.Match(serviceKey, static (k, x) => k.MatchToNotNullRegisteredKey(x.OptionalServiceKey));
+            items = items.Match(serviceKey,
+                static (k, x) => WrappersSupport.MatchCollectionServiceKey(k, x.OptionalServiceKey));
             if (openGenericItems != null && openGenericItems.Length != 0)
-                openGenericItems = openGenericItems.Match(serviceKey, static (k, x) => k.MatchToNotNullRegisteredKey(x.OptionalServiceKey));
+                openGenericItems = openGenericItems.Match(serviceKey,
+                    static (k, x) => WrappersSupport.MatchCollectionServiceKey(k, x.OptionalServiceKey));
             if (variantGenericItems != null && variantGenericItems.Length != 0)
-                variantGenericItems = variantGenericItems.Match(serviceKey, static (k, x) => k.MatchToNotNullRegisteredKey(x.OptionalServiceKey));
+                variantGenericItems = variantGenericItems.Match(serviceKey,
+                    static (k, x) => WrappersSupport.MatchCollectionServiceKey(k, x.OptionalServiceKey));
         }
         else if (Rules.ExcludeKeyedServicesFromCollection && !WrappersSupport.ExposesServiceKey(serviceType))
         {
@@ -5610,7 +5614,8 @@ public static class WrappersSupport
         // Return collection of items matched the specified key.
         var serviceKey = details.ServiceKey;
         if (serviceKey != null)
-            items = items.Match(serviceKey, static (key, x) => key.MatchToNotNullRegisteredKey(x.OptionalServiceKey));
+            items = items.Match(serviceKey,
+                static (key, x) => MatchCollectionServiceKey(key, x.OptionalServiceKey));
         else if (rules.ExcludeKeyedServicesFromCollection && !ExposesServiceKey(serviceType))
             items = items.Match(static x => IsNotKeyedItem(x.OptionalServiceKey));
 
@@ -5695,6 +5700,11 @@ public static class WrappersSupport
             itemKey = unique.ServiceKey;
         return itemKey == null || itemKey is DefaultKey || itemKey is DefaultDynamicKey;
     }
+
+    internal static bool MatchCollectionServiceKey(object resolutionKey, object registeredKey) =>
+        resolutionKey is DefaultKey defaultKey && defaultKey.RegistrationOrder == 0
+            ? IsNotKeyedItem(registeredKey)
+            : resolutionKey.MatchToNotNullRegisteredKey(registeredKey);
 
     internal static object EnsureItemKeyCanBeMatched(object resolutionKey, object itemKey, bool multipleSameServiceKeySupport)
     {
@@ -8525,7 +8535,6 @@ public static class Arg
 /// <summary>Contains <see cref="IRegistrator"/> extension methods to simplify general use cases.</summary>
 public static class Registrator
 {
-    // todo: @feature We may need the paired DefaultKey to request/filter collections by default key, because AnyKey does not include DefaultKey
     /// <summary>When registered with it, the the service can be resolved any service key provided</summary>
     public static readonly object AnyKey = new AnyServiceKey();
     /// <summary>Wrap the resolution key</summary>
