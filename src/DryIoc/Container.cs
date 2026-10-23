@@ -5675,15 +5675,6 @@ public static class WrappersSupport
         return hasAny & hasExact ? items.Match(static x => !IsAnyKeyItem(x.OptionalServiceKey)) : items;
     }
 
-    private static bool IsAnyKeyItem(object itemKey)
-    {
-        if (itemKey is ServiceKeyAndRequiredOpenGenericType wrapped)
-            itemKey = wrapped.ServiceKey;
-        if (itemKey is UniqueRegisteredServiceKey unique)
-            itemKey = unique.ServiceKey;
-        return itemKey is Registrator.AnyServiceKey;
-    }
-
     // The wrappers which explicitly expose the service key, so the keyed services should stay in the collection
     [MethodImpl((MethodImplOptions)256)]
     internal static bool ExposesServiceKey(Type itemType)
@@ -5692,15 +5683,19 @@ public static class WrappersSupport
         return def == typeof(KeyValuePair<,>) || def == typeof(Meta<,>);
     }
 
-    internal static bool IsNotKeyedItem(object itemKey)
-    {
-        if (itemKey is ServiceKeyAndRequiredOpenGenericType wrapped)
-            itemKey = wrapped.ServiceKey;
-        if (itemKey is UniqueRegisteredServiceKey unique)
-            itemKey = unique.ServiceKey;
-        return itemKey == null || itemKey is DefaultKey || itemKey is DefaultDynamicKey;
-    }
+    [MethodImpl((MethodImplOptions)256)]
+    private static object UnwrapServiceKey(object itemKey) =>
+        itemKey is ServiceKeyAndRequiredOpenGenericType wrapped ? wrapped.ServiceKey :
+        itemKey is UniqueRegisteredServiceKey unique ? unique.ServiceKey :
+        itemKey;
 
+    private static bool IsAnyKeyItem(object itemKey) =>
+        UnwrapServiceKey(itemKey) is Registrator.AnyServiceKey;
+
+    internal static bool IsNotKeyedItem(object itemKey) =>
+        UnwrapServiceKey(itemKey) is null or DefaultKey or DefaultDynamicKey;
+
+    [MethodImpl((MethodImplOptions)256)]
     internal static bool MatchCollectionServiceKey(object resolutionKey, object registeredKey) =>
         resolutionKey is DefaultKey defaultKey && defaultKey.RegistrationOrder == 0
             ? IsNotKeyedItem(registeredKey)
