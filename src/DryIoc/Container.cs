@@ -18227,7 +18227,7 @@ public sealed class AsyncExecutionFlowScopeContext : IScopeContext
     public void Dispose() { }
 
 #if SUPPORTS_ASYNC_DISPOSABLE
-    /// <summary>Nothing to dispose because... todo: @wip explain</summary>
+    /// <summary>The context does not own the ambient scope, so there is nothing to dispose.</summary>
     public ValueTask DisposeAsync() => default;
 #endif
 }
