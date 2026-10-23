@@ -267,7 +267,7 @@ To be more precise wrap the argument with `Arg.Passed`:
 - `Arg.Passed<TArg>(paramName, value)` additionally requires the parameter name to be equal (case-sensitive).
 - `Arg.Passed(type, value)` and `Arg.Passed(type, paramName, value)` do the same when the type is known only at runtime, e.g. `Arg.Passed(typeof(IFoo), "foo", fooImpl)`.
 
-```cs
+```cs 
 public class Passing_args_to_resolve_with_type_and_name
 {
     [Test] public void Example()

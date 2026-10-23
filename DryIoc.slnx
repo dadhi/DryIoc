@@ -26,9 +26,7 @@
   </Folder>
   <Folder Name="/playground/">
     <File Path="playground/Directory.Build.props" />
-    <Project Path="playground/DryIoc.CompileTimeDIGenerator/DryIoc.CompileTimeDIGenerator.csproj" />
     <Project Path="playground/DryIoc.Messages.MediatRLikeExample/DryIoc.Messages.MediatRLikeExample.csproj" />
-    <Project Path="playground/DryIoc.TestCompileTimeDIGenerator/DryIoc.TestCompileTimeDIGenerator.csproj" />
     <Project Path="playground/LoadTest/LoadTest.csproj" />
     <Project Path="playground/Playground/Playground.csproj" />
   </Folder>

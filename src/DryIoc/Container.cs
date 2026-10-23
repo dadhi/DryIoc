@@ -17835,13 +17835,6 @@ public static class PrintTools
     public static string Print(this object x) => new StringBuilder().Print(x).ToString();
 }
 
-// todo: @wip @comptime
-/// <summary>Put it on the method like `GetContainerWithRegistrations` to generate CompileTimeDI</summary>
-[AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
-public class CompileTimeRegisterAttribute : Attribute
-{
-}
-
 /// <summary>Per-registration rules to handle the disposable transient</summary>
 public enum DisposableTracking : byte
 {
