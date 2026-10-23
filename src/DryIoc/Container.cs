@@ -16356,7 +16356,6 @@ public static class CompileTimeContainerGeneration
 
                         """);
 
-                // todo: @wip remove unnecessary info from the output
                 sb.Append(
                     $"""
 

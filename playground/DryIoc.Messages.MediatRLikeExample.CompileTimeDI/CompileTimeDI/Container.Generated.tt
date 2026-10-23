@@ -117,7 +117,7 @@ WARNINGS: Some dependencies are missing. Register them at runtime or add to the 
         WriteLine("- `{0}` {1}in {2}", 
             dc.ServiceTypeOnly,
             dc.ServiceKeyObject == null ? "" : "with key " + dc.ServiceKey + " ",
-            dc.PreResolveParentObject); // todo: @wip remove unnecessary info from the output
+            dc.PreResolveParentObject);
     }
 
 if (hasNotResolvedDeps)

@@ -152,7 +152,6 @@ public sealed class GHIssue503_Compile_time_container : ITest
 
                         """);
 
-                // todo: @wip remove unnecessary info from the output
                 sb.Append(
                     $"""
 
