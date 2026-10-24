@@ -8989,7 +8989,6 @@ public static class Registrator
             Throw.It(Error.NoServicesWereRegisteredByRegisterMany, implTypes);
     }
 
-    // todo: @wip do we really need this method?
     /// <summary>
     /// Batch registering the implementations with possibly many service types,
     /// ignoring the case when there are no services types to register.
@@ -9012,10 +9011,7 @@ public static class Registrator
             {
                 var factory = getImplFactory(implType);
                 foreach (var st in serviceTypes)
-                {
-                    // todo: @wip do we need to validate the registration?
                     registrator.Register(st, factory, ifAlreadyRegistered, getServiceKey?.Invoke(implType, st));
-                }
             }
         }
     }
