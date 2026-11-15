@@ -153,7 +153,20 @@ public static class DryIocAdapter
             if (par.IsDefined(typeof(FromKeyedServicesAttribute), false))
             {
                 var attr = par.GetCustomAttribute<FromKeyedServicesAttribute>(false);
-                var theKey = attr.Key ?? req.ServiceKey;
+                // Null Key is both "unkeyed" and "inherit"; LookupMode is what tells them apart (.NET 11).
+                object theKey;
+                switch (attr.LookupMode)
+                {
+                    case ServiceKeyLookupMode.NullKey:
+                        return null;
+                    case ServiceKeyLookupMode.InheritKey:
+                        theKey = req.ServiceKey;
+                        break;
+                    default:
+                        theKey = attr.Key;
+                        break;
+                }
+
                 if (theKey is Registrator.AnyServiceKey parentAnyKey)
                     theKey = parentAnyKey.ResolutionKey;
                 else if (theKey == KeyedService.AnyKey)

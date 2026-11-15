@@ -61,7 +61,61 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             NonKeyedServiceWithIsKeyedService();
             testCount += 30;
 
+            // .NET 11 keyed semantics (AnyKey query, LookupMode)
+            CombinationalRegistration();
+            ResolveKeyedServicesAnyKey();
+            ResolveKeyedServicesAnyKeyWithAnyKeyRegistration();
+            ResolveKeyedServicesAnyKeyConsistency();
+            ResolveKeyedServicesAnyKeyConsistencyWithAnyKeyRegistration();
+            ResolveWithAnyKeyQuery_Constructor(true);
+            ResolveWithAnyKeyQuery_Constructor(false);
+            ResolveWithAnyKeyQuery_Constructor_Duplicates(true);
+            ResolveWithAnyKeyQuery_Constructor_Duplicates(false);
+            ResolveWithAnyKeyQuery_InstanceProvided(true);
+            ResolveWithAnyKeyQuery_InstanceProvided(false);
+            ResolveWithAnyKeyQuery_InstanceProvided_Duplicates(true);
+            ResolveWithAnyKeyQuery_InstanceProvided_Duplicates(false);
+            ResolveKeyedServicesAnyKeyOrdering();
+            ResolveKeyedServiceWithKeyedParameter_MissingRegistration_SecondParameter();
+            ResolveKeyedServiceWithKeyedParameter_MissingRegistration_FirstParameter();
+            ResolveKeyedServiceWithKeyedParameter_MissingRegistrationButWithDefaults();
+            ResolveKeyedServiceWithKeyedParameter_MissingRegistrationButWithUnkeyedService();
+            ResolveRequiredKeyedServiceThrowsIfNotFound();
+#if NET10_0_OR_GREATER
+            // These live only in the net10/net11 assets of the specification package.
+            ResolveKeyedServiceWithFromServiceKeyAttribute();
+            ResolveKeyedServiceWithFromServiceKeyAttribute_NotFound();
+            ResolveKeyedServiceWithFromServiceKeyAttribute_NotFound_WithUnkeyed();
+            ResolveUnkeyedServiceWithFromServiceKeyAttributeWithNullKey();
+#endif
+            FromKeyedServices_null_on_keyed_parent_resolves_unkeyed();
+            testCount += 20;
+#if NET10_0_OR_GREATER
+            testCount += 4;
+#endif
+
             return testCount;
+        }
+
+        [Fact]
+        public void FromKeyedServices_null_on_keyed_parent_resolves_unkeyed()
+        {
+            var services = new ServiceCollection();
+            services.AddSingleton<UnkeyedDep>();
+            services.AddKeyedSingleton<KeyedParent>("k");
+            var provider = CreateServiceProvider(services);
+
+            var parent = provider.GetRequiredKeyedService<KeyedParent>("k");
+            Assert.NotNull(parent.Dep);
+            Assert.Null(provider.GetKeyedService<UnkeyedDep>("k"));
+        }
+
+        private sealed class UnkeyedDep { }
+
+        private sealed class KeyedParent
+        {
+            public UnkeyedDep Dep { get; }
+            public KeyedParent([FromKeyedServices(null)] UnkeyedDep dep) => Dep = dep;
         }
 
         private static DryIocServiceProvider BuildProvider(IServiceCollection collection) =>

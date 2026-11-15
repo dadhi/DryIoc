@@ -139,6 +139,7 @@ public class Program
             new Microsoft.DependencyInjection.Specification.Tests.ValidateCaptiveDependencyTests(),
             new Microsoft.DependencyInjection.Specification.Tests.GetRequiredServiceTests(),
             new Microsoft.DependencyInjection.Specification.Tests.ServicesTests(),
+            new Microsoft.DependencyInjection.Specification.Tests.KeyedServicesTests(),
 
             new CommonServiceLocator.UnitTests.DryIocServiceLocatorTests(),
         };

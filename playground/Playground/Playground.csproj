@@ -24,7 +24,6 @@
         <PackageReference Include="LightInject" Version="7.0.1" />
         <PackageReference Include="Microsoft.Experimental.Collections" Version="1.0.6-e190117-3" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
         <PackageReference Include="SimpleInjector" Version="5.5.0" />
         <PackageReference Include="Lamar" Version="14.0.1" />
     </ItemGroup>
