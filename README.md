@@ -101,25 +101,26 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 
 #### Hot run - Opening the scope and resolving the root scoped service for the Nth time
 
-DryIoc 6.0.0 (.MsDI 8.0.0), MsDI 9.0.0, Grace 7.2.1 (.MsDI 7.1.0), Autofac 8.1.1 (.MsDI 10.0.0), Lamar 14.0.1
+.NET 11. DryIoc 6.0.0 (.MsDI 8.0.0), MsDI 11.0.0, Grace 7.2.1 (.MsDI 7.1.0), Autofac 9.3.4 (.MsDI 11.0.2), Lamar 16.0.0
 
 ```md
-BenchmarkDotNet v0.14.0, Windows 11 (10.0.22631.4391/23H2/2023Update/SunValley3)
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26200.9711/25H2/2025Update/HudsonValley2)
 Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
-.NET SDK 9.0.100
-  [Host]     : .NET 9.0.0 (9.0.24.52809), X64 RyuJIT AVX2
-  DefaultJob : .NET 9.0.0 (9.0.24.52809), X64 RyuJIT AVX2
+Memory: 31.72 GB Total, 6.08 GB Available
+.NET SDK 11.0.100
+  [Host]     : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v3
+  DefaultJob : .NET 11.0.0 (11.0.0, 11.0.26.53018), X64 RyuJIT x86-64-v3
 
-| Method       |      Mean |     Error |    StdDev | Ratio | RatioSD |    Gen0 |   Gen1 | Allocated | Alloc Ratio |
-| ------------ | --------: | --------: | --------: | ----: | ------: | ------: | -----: | --------: | ----------: |
-| DryIoc       |  1.357 us | 0.0105 us | 0.0093 us |  1.00 |    0.01 |  0.4730 | 0.0038 |   2.91 KB |        1.00 |
-| DryIoc_MsDI  |  1.815 us | 0.0126 us | 0.0118 us |  1.34 |    0.01 |  0.5074 | 0.0038 |   3.11 KB |        1.07 |
-| MsDI         |  2.800 us | 0.0146 us | 0.0114 us |  2.06 |    0.02 |  0.7896 | 0.0114 |   4.85 KB |        1.67 |
-| Grace        |  1.535 us | 0.0125 us | 0.0117 us |  1.13 |    0.01 |  0.5169 | 0.0038 |   3.17 KB |        1.09 |
-| Grace_MsDI   |  1.709 us | 0.0249 us | 0.0256 us |  1.26 |    0.02 |  0.5493 | 0.0038 |   3.37 KB |        1.16 |
-| Lamar_MsDI   |  5.314 us | 0.0197 us | 0.0184 us |  3.92 |    0.03 |  0.9689 | 0.9613 |   5.95 KB |        2.05 |
-| Autofac      | 36.715 us | 0.2231 us | 0.1863 us | 27.06 |    0.22 |  7.2021 | 0.4883 |  44.49 KB |       15.31 |
-| Autofac_MsDI | 48.139 us | 0.6987 us | 0.6194 us | 35.48 |    0.50 | 10.1318 | 0.6714 |  62.27 KB |       21.42 |
+| Method       |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen0 |   Gen1 | Allocated | Alloc Ratio |
+| ------------ | -------: | -------: | -------: | ----: | ------: | -----: | -----: | --------: | ----------: |
+| DryIoc       | 1.607 us | 0.0319 us | 0.0733 us |  1.00 |    0.00 | 0.4730 | 0.0038 |   2.91 KB |        1.00 |
+| DryIoc_MsDI  | 2.450 us | 0.0483 us | 0.0931 us |  1.53 |    0.09 | 0.5074 | 0.0038 |   3.13 KB |        1.08 |
+| MsDI         | 3.821 us | 0.0744 us | 0.1180 us |  2.38 |    0.13 | 0.7858 | 0.0076 |   4.85 KB |        1.67 |
+| Grace        | 1.510 us | 0.0286 us | 0.0663 us |  0.94 |    0.06 | 0.5169 | 0.0038 |   3.17 KB |        1.09 |
+| Grace_MsDI   | 1.856 us | 0.0364 us | 0.0545 us |  1.16 |    0.06 | 0.5493 | 0.0038 |   3.37 KB |        1.16 |
+| Lamar_MsDI   | 5.681 us | 0.1097 us | 0.1078 us |  3.54 |    0.17 | 0.9384 | 0.9308 |   5.78 KB |        1.99 |
+| Autofac      | 40.734 us | 0.8131 us | 0.8700 us | 25.40 |    1.24 | 6.8970 | 0.4272 |  42.27 KB |       14.55 |
+| Autofac_MsDI | 47.894 us | 0.9532 us | 1.4841 us | 29.86 |    1.60 | 9.6436 | 0.6104 |  59.12 KB |       20.34 |
 ```
 
 <details>
