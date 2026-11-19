@@ -21,10 +21,48 @@
       <![CDATA[
 ## v6.0.0 Major feature release
 
-- 10, 11 is now supported; interim .net versions dropped; net45 -> net472; netstandard2.0 dropped-> netstandard2.1 is still supported
-- Decrease memory footprint
-- Remove Obsolete API
+### Bird view
+
+- 10, 11 is now supported, interim .net versions dropped and net45 -> net472, netstandard2.0 -> netstandard2.1
+- Decrease memory footprint without speed regression
+- Remove Obsolete API (small things in more customizable parts of Container)
 - Compile-time Dependency Injection (T4-based, AOT-friendly; see `readme.md` in the DryIoc.dll NuGet package)
+- #492 Remove obsolete WithAutoFallbackResolution
+
+### Features
+
+- #676 Add the Settings.ThrowOnRegisteringDisposableTransient on the registration level to override the global setting
+- #660 Populate on IRegistrator
+- #638 Add the global test option to run all tests with WithoutUseInterpretation option
+- #636 [question/feature request] keyed services in delegate resolution
+- #632 MS DI AddKeyed... variant registration fails
+- #618 Multiple same service key support mostly for DryIoc.MS.DI though it is already supported in DryIoc.MefAttributedModel
+- #612 For the conditional singleton or the singleton registered with AnyKey - should we create a new singleton per condition or the resolution key?
+- #512 Optimize injection of IResolverContext
+- #504 Probably add the IDictionary<TServiceKey, TService> wrapper
+- #503 [CompTimeDI] Replace partial methods with more flexible interface ICompileTimeContainer
+- #495 [CompTimeDI] Automatically generate Resolution calls for the missing registrations to avoid manual RegisterPlaceholder
+- #485 Add Rules to IResolverContext interface
+- #480 Change Request.Container property to field and change its type from IContainer to Container
+- #223 IAsyncDisposable is not being called after container.Dispose
+
+### Fixes
+
+- #708 Missed parent parameter in IContainer.With overload
+- #694 Singleton service resolved by scoped container, not root container
+- #692 Resolve failed on Android(Avalonia)
+- #690 DryIoc is not working together with Blazor InputFile component
+- #685 Creating scopes via funcs is not thread-safe and fails sporadically with NullRef exception
+- #653 KeyValuePair exposes internal DryIoc structures
+- #651 Resolving func-wrapper when having circular-dependency throws RecursiveDependencyDetected
+- #648 [BUG] Resolve<> crashes with the misleading, casting-related Exception when class is also registered using RegisterInitializer
+- #646 Resolve enforces passed arguments to be used (and fails because of it)
+- #625 FactoryType is not forwarded in the RegisterMapping<TService, TRegisteredService> method
+- #624 Consistent behavior of a faulty singleton
+- #623 Scoped service decorator
+- #610 ConstructorWithResolvableArguments conflicts with dynamic registrations
+- #580 Scope is lost in IResolver inside scope because of singleton
+- #535 Property injection is not working correctly when appending a new implementation for multiple registrations of the same interface and injecting an enumerable of the interface.
 
 ]]>
     </PackageReleaseNotes>
