@@ -35,6 +35,7 @@
 
 ### Fixes
 
+- #706 Implementation factories get the Container instead of the DryIocServiceProvider
 - #484 [MS.DI] ISupportRequiredService is expected to be implemented together with IServiceProvider and not as capability
 
 ]]>

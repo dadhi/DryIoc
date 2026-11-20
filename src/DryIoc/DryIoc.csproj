@@ -31,6 +31,8 @@
 
 ### Features
 
+- #695 Improve DryIoc.dll NuGet package CompileTime DI install/update experience
+- #679 Add DryIoc own all-encompassing RegisterAttribute
 - #676 Add the Settings.ThrowOnRegisteringDisposableTransient on the registration level to override the global setting
 - #660 Populate on IRegistrator
 - #638 Add the global test option to run all tests with WithoutUseInterpretation option
@@ -45,6 +47,7 @@
 - #485 Add Rules to IResolverContext interface
 - #480 Change Request.Container property to field and change its type from IContainer to Container
 - #223 IAsyncDisposable is not being called after container.Dispose
+- #212 Improve source package with T4 install experience
 
 ### Fixes
 
@@ -53,16 +56,22 @@
 - #692 Resolve failed on Android(Avalonia)
 - #690 DryIoc is not working together with Blazor InputFile component
 - #685 Creating scopes via funcs is not thread-safe and fails sporadically with NullRef exception
+- #672 Wrong decorator parameter with custom args
 - #653 KeyValuePair exposes internal DryIoc structures
 - #651 Resolving func-wrapper when having circular-dependency throws RecursiveDependencyDetected
 - #648 [BUG] Resolve<> crashes with the misleading, casting-related Exception when class is also registered using RegisterInitializer
 - #646 Resolve enforces passed arguments to be used (and fails because of it)
+- #643 WithConcreteTypeDynamicRegistrations results in unintended instantiation
+- #642 System.NullReferenceException: Object reference not set to an instance of an object
+- #631 Conditional registrations
 - #625 FactoryType is not forwarded in the RegisterMapping<TService, TRegisteredService> method
 - #624 Consistent behavior of a faulty singleton
 - #623 Scoped service decorator
 - #610 ConstructorWithResolvableArguments conflicts with dynamic registrations
 - #580 Scope is lost in IResolver inside scope because of singleton
 - #535 Property injection is not working correctly when appending a new implementation for multiple registrations of the same interface and injecting an enumerable of the interface.
+- #552 Compatibility with Android/iOS AOT compilation
+- #532 [Xamarin.iOS] DryIocTypeResolver.Resolve (System.Type type) SIGABRT: Operation is not supported on this platform.
 
 ]]>
     </PackageReleaseNotes>

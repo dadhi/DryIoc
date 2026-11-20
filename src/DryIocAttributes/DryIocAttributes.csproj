@@ -23,8 +23,6 @@
 - Depending on DryIoc v6 and all its goodies
 - Better performance and less memory allocations
 
-### Features
-
 ### Fixes
 
 - #663 DryIocAttributes and DryIoc.MefAttributedModel are not nullable friendly
