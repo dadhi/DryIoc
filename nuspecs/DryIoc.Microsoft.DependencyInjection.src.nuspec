@@ -13,13 +13,26 @@
     <tags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</tags>
     <releaseNotes>
 <![CDATA[
+## v8.0.0 Major feature release
 
-## v8.0.0
-
+### Bird view
+ 
+- 10, 11 is now supported, interim .net versions dropped, keep supporting net472 and netstandard2.1
 - Depending on Microsoft.Extensions.DependencyInjection.Abstractions v11
 - Depending on DryIoc v6
 - Support for the keyed services aka IKeyedServiceProvider, IServiceProviderIsKeyedService, KeyedService.AnyKey, ServiceKeyAttribute, FromKeyedServicesAttribute
 - net11: FromKeyedServicesAttribute.LookupMode (inherit the parent key, explicit null key, explicit key)
+
+### Features
+
+- #632 MS DI AddKeyed... variant registration fails
+- #618 Multiple same service key support mostly for DryIoc.MS.DI though it is already supported in DryIoc.MefAttributedModel
+- #612 For the conditional singleton or the singleton registered with AnyKey - should we create a new singleton per condition or the resolution key?
+
+### Fixes
+
+- #706 Implementation factories get the Container instead of the DryIocServiceProvider
+- #484 [MS.DI] ISupportRequiredService is expected to be implemented together with IServiceProvider and not as capability
 
 ]]>
     </releaseNotes>

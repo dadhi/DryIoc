@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata minClientVersion="3.3.0">
     <id>DryIocAttributes</id>
-    <version>7.0.0</version>
+    <version>8.0.0</version>
     <authors>Maksim Volkau</authors>
     <copyright>Copyright © 2013-2026 Maksim Volkau</copyright>
     <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -13,11 +13,17 @@
     <tags>MEF Attributes Attributed-Model Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
     <![CDATA[
-## v7.0.0 
+## v8.0.0 Major feature release
 
-Breaking:
+### Bird view
 
-- Removing old PCL and .NET 3.5, .NET 4.0, NET Standard 1.0-1.3 targets
+- 10, 11 is now supported, interim .net versions dropped, keep supporting net472 and netstandard2.1
+- Depending on DryIoc v6 and all its goodies
+- Better performance and less memory allocations
+
+### Fixes
+
+- #663 DryIocAttributes and DryIoc.MefAttributedModel are not nullable friendly
 
     ]]></releaseNotes>
     <contentFiles>

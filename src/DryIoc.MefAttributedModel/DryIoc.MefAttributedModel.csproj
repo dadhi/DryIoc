@@ -14,7 +14,7 @@
         <Description>DryIoc.MefAttributedModel is DryIoc extension to support Microsoft Managed Extensibility Framework for DryIoc container</Description>
         <PackageTags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</PackageTags>
         <PackageReleaseNotes>
-            <![CDATA[
+        <![CDATA[
 ## v8.0.0 Major feature release
 
 ### Bird view

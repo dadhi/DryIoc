@@ -16,7 +16,7 @@
         <Description>DryIoc adapter for Microsoft.Extensions.DependencyInjection</Description>
         <PackageTags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</PackageTags>
         <PackageReleaseNotes>
-            <![CDATA[
+        <![CDATA[
 ## v8.0.0 Major feature release
 
 ### Bird view
