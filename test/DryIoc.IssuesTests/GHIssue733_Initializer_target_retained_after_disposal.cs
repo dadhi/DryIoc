@@ -6,8 +6,18 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue733_Initializer_target_retained_after_disposal
+    public class GHIssue733_Initializer_target_retained_after_disposal : ITest
     {
+        public int Run()
+        {
+            Initializer_target_is_collectible_after_container_disposal();
+            Dependency_stack_does_not_reach_empty_terminal_request(false, false);
+            Dependency_stack_does_not_reach_empty_terminal_request(true, false);
+            Dependency_stack_does_not_reach_empty_terminal_request(false, true);
+            Dependency_stack_does_not_reach_empty_terminal_request(true, true);
+            return 5;
+        }
+
         [Test]
         public void Initializer_target_is_collectible_after_container_disposal()
         {

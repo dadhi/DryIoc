@@ -439,6 +439,7 @@ public class Program
             new GHIssue686_Singleton_service_resolved_by_scoped_container_not_root_container(),
             new GHIssue692_Resolve_failed_on_Android_Avalonia(),
             new GHIssue710_ConstructorWithResolvableArguments_conflicts_with_Mef(),
+            new GHIssue733_Initializer_target_retained_after_disposal(),
         };
 
         var totalPassed = 0;
