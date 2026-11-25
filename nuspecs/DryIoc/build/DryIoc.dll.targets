@@ -4,7 +4,8 @@
          - First-install-only: user-owned files (CompileTimeRegistrations.ttinclude, Container.Generated.cs,
            .config/dotnet-tools.json) are never overwritten so user customizations are preserved.
     -->
-    <Target Name="CopyCompileTimeDIToProject" BeforeTargets="Build">
+    <Target Name="CopyCompileTimeDIToProject" BeforeTargets="Build"
+            Condition="'$(EnableDryIocCompileTimeDI)' == 'true'">
         <!-- Always refresh package-owned files -->
         <Copy SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\Container.Generated.tt"
               DestinationFolder="$(ProjectDir)CompileTimeDI" SkipUnchangedFiles="true" />
@@ -29,11 +30,11 @@
 
     <!-- CompileTimeGenerate: runs dotnet-t4 to regenerate Container.Generated.cs.
          Conditions: Debug only; CompileTimeDI setup done; assembly built at least once (TargetPath exists);
-         supported TFMs only; opt-out via $(SkipCompTimeGen)=true.
+         supported TFMs only; requires $(EnableDryIocCompileTimeDI)=true; opt-out via $(SkipCompTimeGen)=true.
     -->
     <Target Name="CompileTimeGenerate"
         BeforeTargets="PrepareForBuild"
-        Condition="'$(SkipCompTimeGen)' != 'true' AND '$(Configuration)' == 'Debug'
+        Condition="'$(EnableDryIocCompileTimeDI)' == 'true' AND '$(SkipCompTimeGen)' != 'true' AND '$(Configuration)' == 'Debug'
                    AND Exists('$(ProjectDir)CompileTimeDI') AND Exists('$(TargetPath)')
                    AND ('$(TargetFramework)' == 'netstandard2.1'
                      OR '$(TargetFramework)' == 'net8.0' OR '$(TargetFramework)' == 'net10.0'
