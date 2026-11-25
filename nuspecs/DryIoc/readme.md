@@ -3,7 +3,14 @@
 ### Compile-time Dependency Injection (optional)
 
 Compile-time DI gives faster startup, smaller footprint and AOT/trimming compatibility.
-Skip this section if you only need runtime DI — everything works without it.
+Runtime DI works without any setup; no example files or tools are added by default.
+To enable compile-time DI, add the following property to your project file:
+
+```xml
+<PropertyGroup>
+  <EnableDryIocCompileTimeDI>true</EnableDryIocCompileTimeDI>
+</PropertyGroup>
+```
 
 **On first `dotnet build`** the package scaffolds your project:
 
@@ -34,7 +41,13 @@ var container = new Container(rules => rules
 
 ### Opting out
 
-Add `<SkipCompTimeGen>true</SkipCompTimeGen>` to your project file to disable T4 regeneration.
+Remove `EnableDryIocCompileTimeDI` or set it to `false` to disable copying and regeneration.
+Files previously copied into your project are not removed automatically; delete the
+`CompileTimeDI` folder and, if no longer needed, `.config/dotnet-tools.json` yourself.
+To keep scaffolding enabled but disable T4 regeneration, set `<SkipCompTimeGen>true</SkipCompTimeGen>`.
+
+Alternatively, `<PackageReference Include="DryIoc.dll" Version="..." ExcludeAssets="build" />`
+prevents NuGet from importing the package's build targets altogether, including the opt-in feature.
 
 ### T4 editing tools
 
