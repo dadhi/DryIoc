@@ -36,14 +36,18 @@ namespace DryIoc.IssuesTests
             return reference;
         }
 
-        [TestCase(false)]
-        [TestCase(true)]
-        public void Dependency_stack_does_not_reach_empty_terminal_request(bool opensResolutionScope)
+        [TestCase(false, false)]
+        [TestCase(true, false)]
+        [TestCase(false, true)]
+        [TestCase(true, true)]
+        public void Dependency_stack_does_not_reach_empty_terminal_request(bool opensResolutionScope, bool syntheticRoot)
         {
             var terminal = opensResolutionScope ? Request.EmptyOpensResolutionScope : Request.Empty;
             using (var container = new Container())
             {
-                var root = Request.Create(container, typeof(Service), preResolveParent: terminal);
+                var root = syntheticRoot
+                    ? terminal.Push(typeof(Service), 1, typeof(Service), null)
+                    : Request.Create(container, typeof(Service), preResolveParent: terminal);
                 var request = root;
                 var stackField = typeof(Request).GetField("DepRequestStack", BindingFlags.Instance | BindingFlags.NonPublic);
                 for (var i = 0; i < 8; ++i)
