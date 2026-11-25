@@ -452,6 +452,7 @@ public class Program
             new GHIssue692_Resolve_failed_on_Android_Avalonia(),
             new GHIssue710_ConstructorWithResolvableArguments_conflicts_with_Mef(),
             new GHIssue706_Implementation_factories_get_the_Container_instead_of_the_DryIocServiceProvider(),
+            new GHIssue733_Initializer_target_retained_after_disposal(),
         };
 
         var totalPassed = 0;

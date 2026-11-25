@@ -11070,7 +11070,7 @@ public sealed class Request : IEnumerable<Request>, IPrintable
                 // set the resized stack to the parents
                 for (var p = DirectParent; p != null; p = p.DirectParent)
                 {
-                    if ((p.Flags & RequestFlags.IsResolutionCall) != 0)
+                    if (p.IsEmpty || (p.Flags & RequestFlags.IsResolutionCall) != 0)
                         break;
                     p.DepRequestStack = DepRequestStack;
                 }
@@ -11084,7 +11084,7 @@ public sealed class Request : IEnumerable<Request>, IPrintable
             DepRequestStack = new Request[capacity];
             for (var p = DirectParent; p != null; p = p.DirectParent)
             {
-                if ((p.Flags & RequestFlags.IsResolutionCall) != 0)
+                if (p.IsEmpty || (p.Flags & RequestFlags.IsResolutionCall) != 0)
                     break;
                 p.DepRequestStack = DepRequestStack;
             }
