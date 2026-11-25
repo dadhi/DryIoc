@@ -7,6 +7,8 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 TEST_DIR="$(mktemp -d)"
 trap 'rm -rf "$TEST_DIR"' EXIT
 export NUGET_PACKAGES="$TEST_DIR/packages"
+export DOTNET_CLI_HOME="$TEST_DIR/dotnet-home"
+export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
 VERSION="6.0.0-e2e"
 
 echo "--- Pack DryIoc.dll ---"
@@ -34,7 +36,9 @@ dotnet run --project "$TEST_DIR/default" --no-build
 
 echo "--- ExcludeAssets=build: package targets are not imported, even with opt-in ---"
 create_consumer exclude
-sed -i 's/Version="6.0.0-e2e"/Version="6.0.0-e2e" ExcludeAssets="build"/' "$TEST_DIR/exclude/exclude.csproj"
+sed 's/Version="6.0.0-e2e"/Version="6.0.0-e2e" ExcludeAssets="build"/' \
+    "$TEST_DIR/exclude/exclude.csproj" > "$TEST_DIR/exclude.csproj"
+mv "$TEST_DIR/exclude.csproj" "$TEST_DIR/exclude/exclude.csproj"
 build_consumer exclude -p:EnableDryIocCompileTimeDI=true
 [ ! -e "$TEST_DIR/exclude/CompileTimeDI" ]
 [ ! -e "$TEST_DIR/exclude/.config/dotnet-tools.json" ]
